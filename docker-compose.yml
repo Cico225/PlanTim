@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # PHP-FPM Service
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: plantim-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - plantim-network
+    depends_on:
+      - mysql
+      - redis
+
+  # Nginx Service
+  nginx:
+    image: nginx:alpine
+    container_name: plantim-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - plantim-network
+    depends_on:
+      - app
+
+  # MySQL Service
+  mysql:
+    image: mysql:8.0
+    container_name: plantim-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-plantim}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_USER: ${DB_USERNAME:-plantim_user}
+    ports:
+      - "3306:3306"
+    volumes:
+      - plantim-mysql-data:/var/lib/mysql
+    networks:
+      - plantim-network
+
+  # Redis Service
+  redis:
+    image: redis:alpine
+    container_name: plantim-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - plantim-redis-data:/data
+    networks:
+      - plantim-network
+
+  # Node Service (for React frontend build)
+  node:
+    image: node:18-alpine
+    container_name: plantim-node
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "5173:5173"
+    networks:
+      - plantim-network
+
+volumes:
+  plantim-mysql-data:
+    driver: local
+  plantim-redis-data:
+    driver: local
+
+networks:
+  plantim-network:
+    driver: bridge
+

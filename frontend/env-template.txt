@@ -1,0 +1,38 @@
+# Kopirajte ovaj fajl u .env i popunite vrijednosti
+
+# API Configuration
+VITE_API_URL=http://localhost:8000/api
+VITE_API_TIMEOUT=30000
+
+# WebSocket Configuration
+VITE_WS_URL=ws://localhost:6001
+VITE_PUSHER_KEY=
+VITE_PUSHER_CLUSTER=mt1
+
+# App Configuration
+VITE_APP_NAME=PlanTim
+VITE_APP_URL=http://localhost:5173
+
+# Features
+VITE_ENABLE_AI=true
+VITE_ENABLE_CHAT=true
+VITE_ENABLE_OFFICE365=true
+
+# Default Settings
+VITE_DEFAULT_LANGUAGE=bs
+VITE_DEFAULT_THEME=light
+
+# File Upload
+VITE_MAX_FILE_SIZE=52428800
+VITE_ALLOWED_FILE_TYPES=.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif
+
+# AI (Gemini) — API ključ se podešava na backendu (.env GEMINI_API_KEY ili admin)
+VITE_OPENAI_API_KEY=
+
+# Office 365
+VITE_OFFICE365_CLIENT_ID=
+VITE_OFFICE365_REDIRECT_URI=http://localhost:5173/auth/office365/callback
+
+# Google reCAPTCHA
+VITE_RECAPTCHA_SITE_KEY=
+

@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-dark-800;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-dark-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-dark-500;
+}
+
+/* Theme transitions */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Dark mode styles */
+.dark {
+    color-scheme: dark;
+}
+
+/* Black mode (OLED) styles */
+.black {
+    color-scheme: dark;
+}
+
+.black body {
+    @apply bg-black text-gray-200;
+}
+
+/* Custom utilities */
+@layer utilities {
+    .text-balance {
+        text-wrap: balance;
+    }
+}
+

@@ -1,0 +1,63 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║                  🚀 PlanTim - Brzi Start                         ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+
+📌 PRVI PUT (Instalacija):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Provjerite da je MySQL pokrenut u XAMPP Control Panel-u
+2. Duplim klikom pokrenite: SETUP_AUTO.bat
+3. Sačekajte 3-5 minuta (instalacija zavisnosti)
+4. Duplim klikom pokrenite: START_ALL_AUTO.bat
+5. Otvorite browser: http://localhost:5173
+
+
+📌 SVAKI SLJEDEĆI PUT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Duplim klikom pokrenite: START_ALL_AUTO.bat
+2. Otvorite browser: http://localhost:5173
+
+
+📌 PODACI ZA PRIJAVU:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Email:    admin@plantim.com
+Password: password
+
+🔒 Pri prijavi prihvatite Uslove korištenja i Politiku privatnosti (GDPR)
+
+
+📌 VAŽNO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ NE ZATVARAJTE prozore servera dok radite sa aplikacijom
+✅ Trebaju vam 2 prozora: Backend (port 8000) i Frontend (port 5173)
+
+
+📌 PRISTUP SA MOBILNOG/DRUGOG RAČUNARA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Desni klik -> COMPLETE_NETWORK_FIX.bat -> Run as Administrator
+2. START_NETWORK.bat
+3. Sa mobilnog: http://TVOJA_IP:5173
+
+
+📌 POMOĆ:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Brzo uputstvo: POKRETANJE.md
+Detaljno uputstvo: KAKO_POKRENUTI.md
+Mrežni pristup: NETWORK_SETUP.md
+Rješavanje problema: RJESENJE_GRESKE_PRIJAVE.md
+
+
+═══════════════════════════════════════════════════════════════════
+
+             Uživajte u PlanTim aplikaciji! 🎉
+
+═══════════════════════════════════════════════════════════════════
+

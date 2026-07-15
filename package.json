@@ -1,0 +1,43 @@
+{
+    "name": "plantim",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "PlanTim - Enterprise kolaboracijski alat",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "devDependencies": {
+        "@inertiajs/vue3": "^1.0.14",
+        "@tailwindcss/forms": "^0.5.7",
+        "@vitejs/plugin-vue": "^4.5.0",
+        "autoprefixer": "^10.4.16",
+        "axios": "^1.6.2",
+        "laravel-vite-plugin": "^1.0.0",
+        "postcss": "^8.4.32",
+        "tailwindcss": "^3.3.6",
+        "vite": "^5.0.8",
+        "vue": "^3.3.11"
+    },
+    "dependencies": {
+        "@headlessui/vue": "^1.7.16",
+        "@heroicons/vue": "^2.1.1",
+        "chart.js": "^4.4.1",
+        "vue-chartjs": "^5.3.0",
+        "vue-i18n": "^9.8.0",
+        "pinia": "^2.1.7",
+        "vue-router": "^4.2.5",
+        "framer-motion": "^10.16.16",
+        "sweetalert2": "^11.10.3",
+        "vue-advanced-cropper": "^2.8.8",
+        "vue-datepicker-next": "^1.0.3",
+        "quill": "^1.3.7",
+        "fullcalendar": "^6.1.10",
+        "draggable": "^4.2.0",
+        "socket.io-client": "^4.5.4",
+        "video.js": "^8.6.1"
+    }
+}
+

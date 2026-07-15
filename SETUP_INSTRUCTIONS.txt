@@ -1,0 +1,134 @@
+========================================
+PlanTim - SETUP INSTRUKCIJE
+========================================
+
+VAŽNO: .env fajlovi moraju biti kreirani RUČNO!
+
+========================================
+KORAK 1: Kreiraj Backend .env fajl
+========================================
+
+Lokacija: C:\xampp\htdocs\PlanTim\.env
+
+Sadržaj:
+-----------------------------------------
+APP_NAME=PlanTim
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=plantim
+DB_USERNAME=root
+DB_PASSWORD=
+
+CACHE_DRIVER=file
+QUEUE_CONNECTION=sync
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+
+SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,127.0.0.1,127.0.0.1:5173
+
+FRONTEND_URL=http://localhost:5173
+-----------------------------------------
+
+========================================
+KORAK 2: Kreiraj Frontend .env fajl
+========================================
+
+Lokacija: C:\xampp\htdocs\PlanTim\frontend\.env
+
+Sadržaj:
+-----------------------------------------
+VITE_API_URL=http://localhost:8000/api
+VITE_APP_NAME=PlanTim
+VITE_APP_ENV=development
+-----------------------------------------
+
+========================================
+KORAK 3: Kreiraj Bazu Podataka
+========================================
+
+Opcija A - Kroz phpMyAdmin:
+1. Otvorite http://localhost/phpmyadmin
+2. Kliknite "New" (Nova)
+3. Database name: plantim
+4. Collation: utf8mb4_unicode_ci
+5. Kliknite "Create"
+
+Opcija B - SQL skripta:
+1. Otvorite phpMyAdmin
+2. Kliknite na "SQL" tab
+3. Kopirajte sadržaj fajla: create_database.sql
+4. Kliknite "Go"
+
+Opcija C - Command line:
+mysql -u root -p < create_database.sql
+(Pritisnite Enter kada traži password)
+
+========================================
+KORAK 4: Pokreni Setup Skriptu
+========================================
+
+Dvostruki klik na: QUICK_SETUP.bat
+
+Ova skripta će:
+- Generisati APP_KEY
+- Kreirati tabele (migracije)
+- Dodati početne podatke (seederi)
+- Optimizovati aplikaciju
+
+========================================
+KORAK 5: Pokreni Servere
+========================================
+
+Dvostruki klik na: START_SERVERS.bat
+
+Automatski će pokrenuti:
+- Backend (Laravel) na port 8000
+- Frontend (React) na port 5173
+
+========================================
+KORAK 6: Otvori Browser
+========================================
+
+URL: http://localhost:5173
+
+Login:
+Email: admin@plantim.local
+Password: password
+
+========================================
+TROUBLESHOOTING
+========================================
+
+Problem: "APP_KEY not set"
+Rješenje: Pokrenite u Command Prompt:
+  cd C:\xampp\htdocs\PlanTim
+  php artisan key:generate
+
+Problem: "Database connection refused"
+Rješenje: 
+  1. Provjerite da li MySQL radi u XAMPP-u
+  2. Provjerite .env fajl (DB_DATABASE, DB_USERNAME, DB_PASSWORD)
+
+Problem: "Table doesn't exist"
+Rješenje: Pokrenite migracije:
+  php artisan migrate
+
+Problem: "npm run dev not working"
+Rješenje: Instalirajte dependencies:
+  cd frontend
+  npm install
+  npm run dev
+
+========================================
+ZA POMOĆ
+========================================
+
+Email: support@plantim.local
+Dokumentacija: docs/QUICK_START_GUIDE.md
+

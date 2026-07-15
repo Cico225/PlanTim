@@ -1,0 +1,73 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║        ⚠️ VAŠA PHP VERZIJA (8.0.30) JE PRESTARA ⚠️               ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+
+🔴 PROBLEM:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Laravel 9 ima poznate sigurnosne ranjivosti.
+Composer blokira instalaciju zbog sigurnosnih razloga.
+
+
+✅ OPCIJA 1: Ažurirajte XAMPP (PREPORUČENO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Trajanje: 10-15 minuta
+Rezultat:  ✅ Sigurno, brzo, moderno
+
+KORACI:
+1. Backup projekta (kopija)
+2. Download XAMPP 8.2: https://www.apachefriends.org/download.html
+3. Instalirajte novi XAMPP
+4. Vratite projekat
+5. Pokrenite: SETUP_AUTO.bat
+
+📖 Detaljno uputstvo: SIGURNOSNO_UPOZORENJE.md
+
+
+⚡ OPCIJA 2: Forsirana Instalacija (SAMO ZA TEST)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Trajanje: 5 minuta
+Rezultat:  ⚠️ Radi, ali nesigurno
+
+UPOZORENJE:
+❌ SAMO za testiranje na lokalnom računaru
+❌ NIKADA za produkciju ili online pristup
+❌ Ažurirajte XAMPP što prije!
+
+KORACI:
+1. Pokrenite: SETUP_FORCE.bat
+2. Testirajte aplikaciju
+3. Planirajte ažuriranje!
+
+
+📊 POREĐENJE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                    OPCIJA 1         OPCIJA 2
+                    (XAMPP 8.2)      (Forsirana)
+                    
+Trajanje:           15 min           5 min
+Sigurnost:          ✅ Sigurno        ❌ Rizično
+Laravel:            10 (najnovija)   9 (zastarjela)
+Za Produkciju:      ✅ DA             ❌ NE
+Za Testiranje:      ✅ DA             ⚠️ OK
+
+
+🎯 MOJA PREPORUKA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ako imate 15 minuta → Ažurirajte XAMPP (isplati se!)
+Ako žurite → Koristite SETUP_FORCE.bat (ali planirajte ažuriranje!)
+
+
+═══════════════════════════════════════════════════════════════════
+
+Pogledajte: SIGURNOSNO_UPOZORENJE.md za detalje
+
+═══════════════════════════════════════════════════════════════════
+

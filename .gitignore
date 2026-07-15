@@ -1,0 +1,70 @@
+# --- Environment (nikad na GitHub) ---
+.env
+.env.backup
+.env.production
+.env.*.local
+!.env.example
+
+# --- Dependencies ---
+/vendor/
+/node_modules/
+/frontend/node_modules/
+
+# --- Laravel ---
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/storage/*.key
+/public/hot
+/public/storage
+/public/build
+/public/mix-manifest.json
+
+# --- Uploads & korisnički sadržaj (NIKAD na GitHub, NIKAD brisati na serveru) ---
+/storage/app/public/*
+!/storage/app/public/.gitkeep
+/storage/app/backups/*
+!/storage/app/backups/.gitkeep
+/storage/app/temp/*
+!/storage/app/temp/.gitkeep
+/public/uploads/
+/uploads/
+/backups/
+
+# --- Logovi i cache ---
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+*.log
+
+# --- Build artefakti ---
+/frontend/dist/
+/public/js/
+/public/css/
+
+# --- Baza: dumpovi (SQL migracije u repo su izuzetak) ---
+*.sql
+!database/migrations/sql/*.sql
+
+# --- IDE / OS ---
+/.idea/
+/.vscode/
+/.vagrant/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+.phpunit.result.cache
+docker-compose.override.yml
+
+# --- Privremeni alati (lokalni test skripti) ---
+/tools/inspect_*.php
+/tools/probe_*.php
+/tools/test_*.php
+/tools/check_*.php

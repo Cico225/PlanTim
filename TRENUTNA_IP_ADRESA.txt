@@ -1,0 +1,9 @@
+Trenutna IP adresa: 172.16.0.129
+
+Frontend: http://172.16.0.129:5173
+Backend:  http://172.16.0.129:8000
+API:      http://172.16.0.129:8000/api
+
+Lokalni pristup:
+Frontend: http://localhost:5173
+Backend:  http://localhost:8000
