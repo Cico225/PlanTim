@@ -70,6 +70,8 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [4/7] Composer (produkcija)...
+echo Napomena: ako nema novih paketa, ovo traje 30-60 sekundi.
+echo           Spor server/antivirus moze usporiti do 5 minuta - pricekajte...
 
 SET COMPOSER_CMD=
 where composer >nul 2>&1
@@ -83,70 +85,73 @@ if not defined COMPOSER_CMD (
 
 if not defined COMPOSER_CMD (
     if exist "%PROJECT_DIR%\composer.phar" (
-        "%PHP_PATH%" "%PROJECT_DIR%\composer.phar" install --no-dev --optimize-autoloader --no-interaction
+        echo Koristim: composer.phar
+        "%PHP_PATH%" "%PROJECT_DIR%\composer.phar" install --no-dev --no-interaction --no-scripts
         if errorlevel 1 (
             echo GRESKA: composer install nije uspio.
             pause
             exit /b 1
         )
-        goto :composer_done
+        goto :composer_post
     )
 )
 
 if not defined COMPOSER_CMD (
     echo GRESKA: Composer nije pronadjen.
     echo Pokreni jednom: INSTALL_COMPOSER.bat
-    echo Ili instaliraj: https://getcomposer.org/download/
     pause
     exit /b 1
 )
 
 echo Koristim: %COMPOSER_CMD%
-call %COMPOSER_CMD% install --no-dev --optimize-autoloader --no-interaction
+call %COMPOSER_CMD% install --no-dev --no-interaction --no-scripts
 if errorlevel 1 (
     echo GRESKA: composer install nije uspio.
     pause
     exit /b 1
 )
-:composer_done
+
+:composer_post
+echo Pokrecem artisan package:discover...
+"%PHP_PATH%" artisan package:discover --ansi
+if errorlevel 1 (
+    echo GRESKA: package:discover nije uspio.
+    pause
+    exit /b 1
+)
+echo Composer korak zavrsen.
 
 echo.
-echo [5/7] Frontend build...
+echo [5/7] Frontend build (vite, bez tsc)...
 cd /d "%PROJECT_DIR%\frontend"
 
 echo Zaustavljanje Node procesa (ako rade)...
 taskkill /F /IM node.exe >nul 2>&1
 
-echo Ciscenje node_modules (ako postoji problem s lockom)...
-if exist "node_modules" (
-    rmdir /s /q "node_modules" 2>nul
-    if exist "node_modules" (
-        echo UPOZORENJE: node_modules nije moguce obrisati.
-        echo Pokreni CMD kao Administrator ili zatvori programe koji koriste frontend.
-        echo Pokusavam npm ci ipak...
-    )
-)
-
-call npm ci
-if errorlevel 1 (
-    echo npm ci nije uspio. Pokusaj npm install...
-    call npm install
+if not exist "node_modules\vite" (
+    echo Instalacija npm paketa...
+    call npm ci
     if errorlevel 1 (
-        echo GRESKA: npm install nije uspio.
-        cd /d "%PROJECT_DIR%"
-        pause
-        exit /b 1
+        call npm install
+        if errorlevel 1 (
+            echo GRESKA: npm install nije uspio.
+            cd /d "%PROJECT_DIR%"
+            pause
+            exit /b 1
+        )
     )
 )
 
-call npm run build
+echo Pokretanje vite build...
+call npx vite build
 if errorlevel 1 (
-    echo GRESKA: npm run build nije uspio.
+    echo GRESKA: vite build nije uspio.
     cd /d "%PROJECT_DIR%"
     pause
     exit /b 1
 )
 cd /d "%PROJECT_DIR%"
+echo Frontend build zavrsen.
 
 echo.
 echo [6/7] Migracije baze...
