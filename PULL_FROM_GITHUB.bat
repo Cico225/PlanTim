@@ -54,18 +54,42 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [3/7] Prebacivanje na main i pull...
+
+if exist "TRENUTNA_IP_ADRESA.txt" (
+    copy /Y "TRENUTNA_IP_ADRESA.txt" "TRENUTNA_IP_ADRESA.txt.bak" >nul
+)
+
 "%GIT_PATH%" checkout main
-if %ERRORLEVEL% NEQ 0 (
+if errorlevel 1 (
     echo GRESKA: git checkout main nije uspio.
     pause
     exit /b 1
 )
 
+REM Ukloni rucno kopirane fajlove prije pull-a (dolaze iz GitHuba)
+for %%F in (
+    "CHECK_MYSQL.bat"
+    "CHECK_PHP_EXTENSIONS.bat"
+    "ENABLE_GD_EXTENSION.bat"
+    "ENABLE_PHP_EXTENSIONS.bat"
+    "INSTALL_COMPOSER.bat"
+    "PULL_FROM_GITHUB.bat"
+    "PUSH_TO_GITHUB.bat"
+    "scripts\backup-database.php"
+    "scripts\check-mysql.php"
+) do if exist %%F del /F /Q %%F 2>nul
+
+"%GIT_PATH%" reset --hard HEAD
 "%GIT_PATH%" pull origin main
-if %ERRORLEVEL% NEQ 0 (
+if errorlevel 1 (
     echo GRESKA: git pull nije uspio.
     pause
     exit /b 1
+)
+
+if exist "TRENUTNA_IP_ADRESA.txt.bak" (
+    copy /Y "TRENUTNA_IP_ADRESA.txt.bak" "TRENUTNA_IP_ADRESA.txt" >nul
+    del /F /Q "TRENUTNA_IP_ADRESA.txt.bak" 2>nul
 )
 
 echo.
