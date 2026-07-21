@@ -332,6 +332,150 @@ Sve je definisano u `.gitignore`.
 
 ---
 
+## Windows Server + XAMPP (produkcija)
+
+Isto okruženje kao na laptopu: `C:\xampp\`, projekat u `C:\xampp\htdocs\PlanTim`.
+
+### Jednokratno podešavanje servera
+
+#### 1. Instaliraj alate
+
+- **XAMPP** (Apache + MySQL + PHP 8.2+) — ista verzija kao laptop po mogućnosti
+- **Git for Windows** — [https://git-scm.com/download/win](https://git-scm.com/download/win)
+- **Composer** — [https://getcomposer.org/download/](https://getcomposer.org/download/)
+- **Node.js LTS** — za `npm run build`
+
+#### 2. Kloniraj projekat
+
+Otvori **CMD** ili **PowerShell** kao administrator:
+
+```powershell
+cd C:\xampp\htdocs
+git clone https://github.com/Cico225/PlanTim.git PlanTim
+cd PlanTim
+git checkout main
+```
+
+**Autentifikacija (HTTPS):** pri prvom push/pull GitHub traži:
+- Username: `Cico225`
+- Password: **Personal Access Token** (ne GitHub lozinka)
+
+Token: GitHub → Settings → Developer settings → Personal access tokens → **repo** scope.
+
+#### 3. `.env` na serveru (ručno, nikad s GitHuba)
+
+```powershell
+copy .env.example .env
+notepad .env
+```
+
+Produkcijske vrijednosti:
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=http://tvoj-server-adresa
+
+DB_DATABASE=plantim
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+Generiši ključ:
+
+```powershell
+C:\xampp\php\php.exe artisan key:generate
+```
+
+#### 4. Prvi setup
+
+```powershell
+cd C:\xampp\htdocs\PlanTim
+composer install --no-dev --optimize-autoloader
+cd frontend
+npm ci
+npm run build
+cd ..
+C:\xampp\php\php.exe migrate.php
+C:\xampp\php\php.exe artisan migrate --force
+C:\xampp\php\php.exe artisan storage:link
+```
+
+#### 5. Apache virtual host
+
+Document root mora biti **`C:\xampp\htdocs\PlanTim\public`** (ne root projekta).
+
+U `C:\xampp\apache\conf\extra\httpd-vhosts.conf` primjer:
+
+```apache
+<VirtualHost *:80>
+    ServerName plantim.tvoj-domen.local
+    DocumentRoot "C:/xampp/htdocs/PlanTim/public"
+    <Directory "C:/xampp/htdocs/PlanTim/public">
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
+
+Restart Apache iz XAMPP Control Panela.
+
+#### 6. Uredi `BACKUP_DATABASE.bat` na serveru
+
+Provjeri da `DB_NAME` i `DB_USER` odgovaraju produkcijskoj bazi.
+
+#### 7. Uploadi
+
+Folder `storage\app\public\` **ne briši** pri deployu — tu su korisnički fajlovi. Nije na GitHubu, ostaje samo na serveru.
+
+---
+
+### Svaki deploy (nova verzija)
+
+**Na laptopu:**
+1. Test na `develop`
+2. Merge `develop` → `main` na GitHubu
+
+**Na serveru — dupli klik ili CMD:**
+
+```bat
+C:\xampp\htdocs\PlanTim\DEPLOY.bat
+```
+
+Skripta automatski:
+1. Backup baze (`BACKUP_DATABASE.bat`)
+2. `git pull origin main`
+3. `composer install --no-dev`
+4. `npm ci` + `npm run build`
+5. `php migrate.php` + `php artisan migrate --force`
+6. Laravel cache
+
+**Ručno (korak po korak):**
+
+```powershell
+cd C:\xampp\htdocs\PlanTim
+.\BACKUP_DATABASE.bat
+git fetch origin
+git checkout main
+git pull origin main
+composer install --no-dev --optimize-autoloader
+cd frontend; npm ci; npm run build; cd ..
+C:\xampp\php\php.exe migrate.php
+C:\xampp\php\php.exe artisan migrate --force
+C:\xampp\php\php.exe artisan config:cache
+C:\xampp\php\php.exe artisan route:cache
+C:\xampp\php\php.exe artisan view:cache
+```
+
+### Zabranjeno na produkcijskom serveru
+
+- `git pull origin develop` — samo **`main`**
+- `RESTORE_DATABASE.bat` s laptop dumpom
+- `php artisan migrate:fresh`
+- Brisanje `storage\app\public\`
+
+---
+
 ## Kontakt / napomene
 
 - Za hitne rollback scenarije: restore produkcijskog backupa, zatim `git checkout` na prethodni commit na `main`.
