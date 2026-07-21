@@ -439,7 +439,19 @@ Folder `storage\app\public\` **ne briši** pri deployu — tu su korisnički faj
 **Na serveru — dupli klik ili CMD:**
 
 ```bat
+C:\xampp\htdocs\PlanTim\PULL_FROM_GITHUB.bat
+```
+
+Ili (isto radi):
+
+```bat
 C:\xampp\htdocs\PlanTim\DEPLOY.bat
+```
+
+**Na laptopu — po testiranju:**
+
+```bat
+C:\xampp\htdocs\PlanTim\PUSH_TO_GITHUB.bat
 ```
 
 Skripta automatski:

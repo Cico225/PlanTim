@@ -5,7 +5,9 @@
 .env.*.local
 !.env.example
 
-# --- Dependencies ---
+# --- Composer (lokalni phar, ne ide na GitHub) ---
+composer.phar
+composer-setup.php
 /vendor/
 /node_modules/
 /frontend/node_modules/

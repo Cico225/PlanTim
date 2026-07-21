@@ -14,21 +14,23 @@ if not exist "%PHP_PATH%" (
 )
 
 echo ========================================
-echo    PlanTim Database Backup Tool
+echo PlanTim - Provjera MySQL kredencijala
 echo ========================================
 echo.
 
-"%PHP_PATH%" scripts\backup-database.php
+"%PHP_PATH%" scripts\check-mysql.php
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo Backup nije uspio. Pokreni CHECK_MYSQL.bat za dijagnostiku.
+    echo Provjeri .env na serveru:
+    echo   DB_HOST=127.0.0.1
+    echo   DB_DATABASE=ime_baze
+    echo   DB_USERNAME=root
+    echo   DB_PASSWORD=lozinka
+    echo.
+    echo MySQL mora biti pokrenut u XAMPP Control Panelu.
     pause
     exit /b 1
 )
 
 echo.
-echo ========================================
-echo    Backup completed successfully!
-echo ========================================
-echo.
-if not "%PLANTIM_NO_PAUSE%"=="1" pause
+pause
