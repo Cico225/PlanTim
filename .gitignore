@@ -31,6 +31,7 @@ composer-setup.php
 /public/uploads/
 /uploads/
 /backups/
+TRENUTNA_IP_ADRESA.txt
 
 # --- Logovi i cache ---
 /storage/logs/*
