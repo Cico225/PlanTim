@@ -88,3 +88,10 @@ export interface KreditiBulkUnpairResult {
   unpaired_amount: number;
   currency: string;
 }
+
+export interface KreditiBulkDeleteResult {
+  message: string;
+  deleted_count: number;
+  deleted_amount: number;
+  currency: string;
+}

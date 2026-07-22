@@ -1,6 +1,7 @@
 import { apiService } from './api';
 import type {
   FinanceCredit,
+  KreditiBulkDeleteResult,
   KreditiBulkUnpairResult,
   KreditiBulkVerifyResult,
   KreditiLookupResult,
@@ -91,6 +92,14 @@ export const kreditiService = {
     paired?: '0' | '1';
   }): Promise<KreditiBulkUnpairResult> {
     return apiService.post('/planika/finance/krediti/bulk-unpair-zabrana', data);
+  },
+
+  delete(id: number): Promise<{ message: string; credit_number: string; deleted_amount: number; currency: string }> {
+    return apiService.delete(`/planika/finance/krediti/${id}`);
+  },
+
+  bulkDelete(data: { credit_ids: number[] }): Promise<KreditiBulkDeleteResult> {
+    return apiService.post('/planika/finance/krediti/bulk-delete', data);
   },
 
   report(params?: { year?: number; month?: number }): Promise<KreditiReport> {
