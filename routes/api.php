@@ -740,8 +740,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Database Backup & Restore
         Route::get('/database-backup/stats', [DatabaseBackupController::class, 'getStats']);
         Route::get('/database-backup/list', [DatabaseBackupController::class, 'listBackups']);
+        Route::get('/database-backup/settings', [DatabaseBackupController::class, 'getBackupSettings']);
+        Route::put('/database-backup/settings', [DatabaseBackupController::class, 'updateBackupSettings']);
+        Route::get('/database-backup/runs', [DatabaseBackupController::class, 'listBackupRuns']);
         Route::get('/database-backup/test', [DatabaseBackupController::class, 'testConnection']);
+        Route::post('/database-backup/test-destination', [DatabaseBackupController::class, 'testDestination']);
         Route::post('/database-backup/create', [DatabaseBackupController::class, 'createBackup']);
+        Route::post('/database-backup/run-full', [DatabaseBackupController::class, 'runFullBackup']);
         Route::get('/database-backup/download/{filename}', [DatabaseBackupController::class, 'downloadBackup']);
         Route::post('/database-backup/restore', [DatabaseBackupController::class, 'restoreBackup']);
         Route::post('/database-backup/upload-restore', [DatabaseBackupController::class, 'uploadAndRestore']);

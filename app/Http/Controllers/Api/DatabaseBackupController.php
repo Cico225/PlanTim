@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\PlanTimBackupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -73,11 +74,10 @@ class DatabaseBackupController extends Controller
             }
         });
 
-        // Set backup directory (relative to project root)
-        $this->backupDir = storage_path('app/backups');
-        
-        // Ensure backup directory exists
-        if (!File::exists($this->backupDir)) {
+        // SQL backup folder u korijenu projekta (backups/)
+        $this->backupDir = base_path('backups');
+
+        if (! File::exists($this->backupDir)) {
             File::makeDirectory($this->backupDir, 0755, true);
         }
 
@@ -782,6 +782,157 @@ class DatabaseBackupController extends Controller
         }
 
         return round($bytes, $precision) . ' ' . $units[$i];
+    }
+
+    /**
+     * Postavke automatskog punog backupa.
+     */
+    public function getBackupSettings(PlanTimBackupService $backupService)
+    {
+        try {
+            return response()->json([
+                'settings' => $backupService->getSettings(),
+                'runs_available' => $backupService->tableExists(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting backup settings: '.$e->getMessage());
+
+            return response()->json([
+                'error' => 'Greška pri učitavanju postavki backupa',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Spremi postavke automatskog backupa.
+     */
+    public function updateBackupSettings(Request $request, PlanTimBackupService $backupService)
+    {
+        try {
+            $request->validate([
+                'auto_enabled' => 'nullable|boolean',
+                'schedule_frequency' => 'nullable|in:hourly,daily,weekly',
+                'schedule_time' => 'nullable|string|max:5',
+                'schedule_day' => 'nullable|integer|min:0|max:6',
+                'destination_path' => 'nullable|string|max:500',
+                'notify_emails' => 'nullable|string|max:1000',
+                'keep_destination_count' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            $settings = $backupService->saveSettings($request->all());
+
+            try {
+                activity()
+                    ->causedBy(auth()->user())
+                    ->log('Backup settings updated');
+            } catch (\Exception $e) {
+                Log::warning('Failed to log backup settings activity: '.$e->getMessage());
+            }
+
+            return response()->json([
+                'message' => 'Postavke backupa su sačuvane',
+                'settings' => $settings,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error updating backup settings: '.$e->getMessage());
+
+            return response()->json([
+                'error' => 'Greška pri čuvanju postavki backupa',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Historija punih backupova.
+     */
+    public function listBackupRuns(PlanTimBackupService $backupService)
+    {
+        try {
+            return response()->json([
+                'runs' => $backupService->listRuns(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error listing backup runs: '.$e->getMessage());
+
+            return response()->json([
+                'error' => 'Greška pri učitavanju historije backupa',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Ručno pokretanje punog backupa (baza + ZIP + kopija).
+     */
+    public function runFullBackup(PlanTimBackupService $backupService)
+    {
+        try {
+            $result = $backupService->runFullBackup('manual', auth()->id());
+
+            try {
+                activity()
+                    ->causedBy(auth()->user())
+                    ->log('Full PlanTim backup completed: '.$result['zip_filename']);
+            } catch (\Exception $e) {
+                Log::warning('Failed to log full backup activity: '.$e->getMessage());
+            }
+
+            return response()->json([
+                'message' => 'Puni backup je uspješno završen',
+                'result' => $result,
+            ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error running full backup: '.$e->getMessage());
+
+            return response()->json([
+                'error' => 'Greška pri punom backupu',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Provjera odredišne lokacije backupa.
+     */
+    public function testDestination(Request $request, PlanTimBackupService $backupService)
+    {
+        try {
+            $request->validate([
+                'destination_path' => 'required|string|max:500',
+            ]);
+
+            $path = trim($request->input('destination_path'));
+            $backupService->assertDestinationWritable($path);
+
+            $testFile = rtrim(str_replace('/', DIRECTORY_SEPARATOR, $path), DIRECTORY_SEPARATOR)
+                .DIRECTORY_SEPARATOR.'.plantim_backup_test_'.uniqid().'.tmp';
+            File::put($testFile, 'ok');
+            File::delete($testFile);
+
+            return response()->json([
+                'message' => 'Odredišna lokacija je dostupna za pisanje',
+                'destination_path' => $path,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Odredišna lokacija nije dostupna',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
