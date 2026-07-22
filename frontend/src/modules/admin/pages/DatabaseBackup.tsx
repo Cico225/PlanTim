@@ -12,6 +12,10 @@ import {
   FiClock,
   FiHardDrive,
   FiInfo,
+  FiMail,
+  FiFolder,
+  FiPlay,
+  FiCalendar,
 } from 'react-icons/fi';
 import { format, parseISO } from 'date-fns';
 import { apiService } from '@/services/api';
@@ -35,6 +39,57 @@ interface BackupStats {
   mysqldump_path: string | null;
 }
 
+interface BackupSettings {
+  auto_enabled: boolean;
+  schedule_frequency: 'hourly' | 'daily' | 'weekly';
+  schedule_time: string;
+  schedule_day: number;
+  destination_path: string;
+  notify_emails: string;
+  keep_destination_count: number;
+  scheduler: {
+    mode: 'disabled' | 'internal' | 'windows_task';
+    message: string;
+    task_registered: boolean;
+  };
+  last_run: {
+    id: number;
+    status: string;
+    trigger_type: string;
+    started_at: string;
+    completed_at: string | null;
+    zip_filename: string | null;
+    destination_path: string | null;
+    error_message: string | null;
+  } | null;
+}
+
+interface BackupRun {
+  id: number;
+  trigger_type: string;
+  status: string;
+  db_filename: string | null;
+  zip_filename: string | null;
+  destination_path: string | null;
+  db_size_formatted: string | null;
+  zip_size_formatted: string | null;
+  error_message: string | null;
+  email_sent: boolean;
+  email_recipients: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+const WEEKDAYS = [
+  { value: 1, label: 'Ponedjeljak' },
+  { value: 2, label: 'Utorak' },
+  { value: 3, label: 'Srijeda' },
+  { value: 4, label: 'Četvrtak' },
+  { value: 5, label: 'Petak' },
+  { value: 6, label: 'Subota' },
+  { value: 0, label: 'Nedjelja' },
+];
+
 export default function DatabaseBackup() {
   const { t } = useTranslation();
   const [backups, setBackups] = useState<BackupFile[]>([]);
@@ -47,10 +102,18 @@ export default function DatabaseBackup() {
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [backupSettings, setBackupSettings] = useState<BackupSettings | null>(null);
+  const [backupRuns, setBackupRuns] = useState<BackupRun[]>([]);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [runningFullBackup, setRunningFullBackup] = useState(false);
+  const [testingDestination, setTestingDestination] = useState(false);
+  const [runsAvailable, setRunsAvailable] = useState(true);
 
   useEffect(() => {
     fetchBackups();
     fetchStats();
+    fetchBackupSettings();
+    fetchBackupRuns();
   }, []);
 
   const fetchBackups = async () => {
@@ -72,6 +135,100 @@ export default function DatabaseBackup() {
     } catch (error: any) {
       console.error('Error fetching stats:', error);
     }
+  };
+
+  const fetchBackupSettings = async () => {
+    try {
+      const data = await apiService.get<{ settings: BackupSettings; runs_available: boolean }>(
+        '/admin/database-backup/settings',
+      );
+      setBackupSettings(data.settings);
+      setRunsAvailable(data.runs_available);
+    } catch (error: any) {
+      console.error('Error fetching backup settings:', error);
+    }
+  };
+
+  const fetchBackupRuns = async () => {
+    try {
+      const data = await apiService.get<{ runs: BackupRun[] }>('/admin/database-backup/runs');
+      setBackupRuns(data.runs || []);
+    } catch (error: any) {
+      console.error('Error fetching backup runs:', error);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    if (!backupSettings) return;
+
+    if (backupSettings.auto_enabled && !backupSettings.destination_path.trim()) {
+      toast.error('Odredišna lokacija je obavezna za automatski backup');
+      return;
+    }
+
+    setSavingSettings(true);
+    try {
+      const response = await apiService.put<{ message: string; settings: BackupSettings }>(
+        '/admin/database-backup/settings',
+        backupSettings,
+      );
+      setBackupSettings(response.settings);
+      toast.success(response.message || 'Postavke su sačuvane');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Greška pri čuvanju postavki');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleTestDestination = async () => {
+    if (!backupSettings?.destination_path.trim()) {
+      toast.error('Unesite odredišnu lokaciju');
+      return;
+    }
+
+    setTestingDestination(true);
+    try {
+      const response = await apiService.post<{ message: string }>(
+        '/admin/database-backup/test-destination',
+        { destination_path: backupSettings.destination_path.trim() },
+      );
+      toast.success(response.message || 'Lokacija je dostupna');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Lokacija nije dostupna');
+    } finally {
+      setTestingDestination(false);
+    }
+  };
+
+  const handleRunFullBackup = async () => {
+    if (!backupSettings?.destination_path.trim()) {
+      toast.error('Postavite odredišnu lokaciju prije punog backupa');
+      return;
+    }
+
+    if (!window.confirm(
+      'Pokrenuti puni backup?\n\n1. Backup baze u folder backups/\n2. ZIP cijelog projekta\n3. Kopija ZIP-a na odredišnu lokaciju\n\nOperacija može potrajati nekoliko minuta.',
+    )) {
+      return;
+    }
+
+    setRunningFullBackup(true);
+    try {
+      const response = await apiService.post<{ message: string }>('/admin/database-backup/run-full');
+      toast.success(response.message || 'Puni backup je završen');
+      await Promise.all([fetchBackups(), fetchStats(), fetchBackupSettings(), fetchBackupRuns()]);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Greška pri punom backupu');
+      await fetchBackupRuns();
+      await fetchBackupSettings();
+    } finally {
+      setRunningFullBackup(false);
+    }
+  };
+
+  const updateSetting = <K extends keyof BackupSettings>(key: K, value: BackupSettings[K]) => {
+    setBackupSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   const handleCreateBackup = async () => {
@@ -194,9 +351,258 @@ export default function DatabaseBackup() {
           Backup i Restore Baze Podataka
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Upravljajte backup fajlovima i restaurirajte bazu podataka
+          Upravljajte backup fajlovima, automatskim punim backupom i restauracijom baze podataka
         </p>
       </div>
+
+      {!runsAvailable && (
+        <div className="card p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            Pokrenite SQL migracije (<code className="font-mono">php migrate.php</code>) da biste omogućili historiju punih backupova.
+          </p>
+        </div>
+      )}
+
+      {/* Automatski / puni backup */}
+      {backupSettings && (
+        <div className="card p-6 space-y-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <FiCalendar />
+                Automatski puni backup
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Prvo SQL u <code className="font-mono text-xs">backups/</code>, zatim ZIP projekta na odabranu lokaciju
+              </p>
+            </div>
+            <button
+              onClick={handleRunFullBackup}
+              disabled={runningFullBackup || !backupSettings.destination_path.trim()}
+              className="btn-primary flex items-center gap-2"
+            >
+              {runningFullBackup ? (
+                <>
+                  <FiRefreshCw className="animate-spin" />
+                  Backup u toku…
+                </>
+              ) : (
+                <>
+                  <FiPlay />
+                  Pokreni puni backup sada
+                </>
+              )}
+            </button>
+          </div>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300"
+              checked={backupSettings.auto_enabled}
+              onChange={(e) => updateSetting('auto_enabled', e.target.checked)}
+            />
+            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              Uključi automatski backup
+            </span>
+          </label>
+
+          {backupSettings.auto_enabled && backupSettings.scheduler && (
+            <div className={`rounded-lg border p-3 text-sm ${
+              backupSettings.scheduler.mode === 'windows_task'
+                ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200'
+                : 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200'
+            }`}>
+              <p className="font-medium flex items-center gap-2">
+                <FiCheckCircle size={16} />
+                {backupSettings.scheduler.mode === 'windows_task'
+                  ? 'Scheduler: automatski (24/7)'
+                  : 'Scheduler: PlanTim interni'}
+              </p>
+              <p className="mt-1 opacity-90">{backupSettings.scheduler.message}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Učestalost</label>
+              <select
+                className="input"
+                value={backupSettings.schedule_frequency}
+                onChange={(e) => updateSetting('schedule_frequency', e.target.value as BackupSettings['schedule_frequency'])}
+              >
+                <option value="hourly">Svaki sat</option>
+                <option value="daily">Dnevno</option>
+                <option value="weekly">Sedmično</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Vrijeme (HH:MM)</label>
+              <input
+                type="time"
+                className="input"
+                value={backupSettings.schedule_time}
+                onChange={(e) => updateSetting('schedule_time', e.target.value)}
+              />
+            </div>
+            {backupSettings.schedule_frequency === 'weekly' && (
+              <div>
+                <label className="label">Dan u sedmici</label>
+                <select
+                  className="input"
+                  value={backupSettings.schedule_day}
+                  onChange={(e) => updateSetting('schedule_day', Number(e.target.value))}
+                >
+                  {WEEKDAYS.map((d) => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="label">Zadrži zadnjih N ZIP arhiva na odredištu</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                className="input"
+                value={backupSettings.keep_destination_count}
+                onChange={(e) => updateSetting('keep_destination_count', Number(e.target.value) || 10)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="label flex items-center gap-2">
+              <FiFolder size={14} />
+              Odredišna lokacija na serveru
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                className="input flex-1 font-mono text-sm"
+                placeholder="npr. D:\Backups\PlanTim ili \\server\share\PlanTim"
+                value={backupSettings.destination_path}
+                onChange={(e) => updateSetting('destination_path', e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={handleTestDestination}
+                disabled={testingDestination || !backupSettings.destination_path.trim()}
+                className="btn-secondary shrink-0"
+              >
+                {testingDestination ? 'Provjera…' : 'Testiraj lokaciju'}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="label flex items-center gap-2">
+              <FiMail size={14} />
+              Email obavijesti (odvojite zarezom)
+            </label>
+            <input
+              type="text"
+              className="input"
+              placeholder="admin@firma.ba, it@firma.ba"
+              value={backupSettings.notify_emails}
+              onChange={(e) => updateSetting('notify_emails', e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleSaveSettings}
+              disabled={savingSettings}
+              className="btn-primary flex items-center gap-2"
+            >
+              {savingSettings ? <FiRefreshCw className="animate-spin" /> : <FiSave />}
+              Sačuvaj postavke
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4 text-sm text-gray-600 dark:text-gray-400">
+            <p className="font-medium text-gray-800 dark:text-gray-200 mb-1">Kako radi automatski backup</p>
+            <p>
+              Postavite vrijeme i sačuvajte — PlanTim sam provjerava raspored pri korištenju aplikacije.
+              Ručni Windows Task Scheduler <strong>nije potreban</strong>.
+              Ako server ima dovoljno prava, PlanTim pokušava registrirati Windows zadatak automatski (24/7).
+            </p>
+          </div>
+
+          {backupSettings.last_run && (
+            <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/50 dark:bg-primary-900/10 p-4">
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Zadnji puni backup</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Status:{' '}
+                <span className={backupSettings.last_run.status === 'success' ? 'text-green-600' : 'text-red-600'}>
+                  {backupSettings.last_run.status === 'success' ? 'Uspješan' : 'Neuspješan'}
+                </span>
+                {' · '}
+                {backupSettings.last_run.trigger_type === 'scheduled' ? 'Automatski' : 'Ručni'}
+                {' · '}
+                {formatDate(backupSettings.last_run.started_at)}
+              </p>
+              {backupSettings.last_run.zip_filename && (
+                <p className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-1">
+                  {backupSettings.last_run.zip_filename}
+                  {backupSettings.last_run.destination_path && ` → ${backupSettings.last_run.destination_path}`}
+                </p>
+              )}
+              {backupSettings.last_run.error_message && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{backupSettings.last_run.error_message}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Historija punih backupova */}
+      {backupRuns.length > 0 && (
+        <div className="card p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <FiHardDrive />
+            Historija punih backupova
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <th className="text-left py-3 px-4 text-sm font-semibold">Datum</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold">Tip</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold">Status</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold">ZIP</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold">Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {backupRuns.map((run) => (
+                  <tr key={run.id} className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="py-3 px-4 text-sm">{formatDate(run.started_at)}</td>
+                    <td className="py-3 px-4 text-sm">{run.trigger_type === 'scheduled' ? 'Automatski' : 'Ručni'}</td>
+                    <td className="py-3 px-4 text-sm">
+                      <span className={run.status === 'success' ? 'text-green-600' : run.status === 'failed' ? 'text-red-600' : 'text-amber-600'}>
+                        {run.status === 'success' ? 'Uspješan' : run.status === 'failed' ? 'Neuspješan' : 'U toku'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-sm font-mono text-xs">
+                      {run.zip_filename || '—'}
+                      {run.zip_size_formatted && ` (${run.zip_size_formatted})`}
+                    </td>
+                    <td className="py-3 px-4 text-sm">
+                      {run.email_sent ? (
+                        <span className="text-green-600 flex items-center gap-1"><FiCheckCircle size={14} /> Poslano</span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Statistics Cards */}
       {stats && (
