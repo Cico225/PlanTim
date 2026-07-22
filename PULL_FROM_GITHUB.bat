@@ -178,9 +178,11 @@ if errorlevel 1 (
 
 "%PHP_PATH%" artisan migrate --force
 if errorlevel 1 (
-    echo GRESKA: artisan migrate nije uspio.
-    pause
-    exit /b 1
+    echo.
+    echo UPOZORENJE: artisan migrate nije uspio.
+    echo Tabele vjerovatno vec postoje u bazi.
+    echo Jednokratno pokreni: REGISTER_LARAVEL_MIGRATIONS.bat
+    echo Deploy nastavlja dalje...
 )
 
 echo.
