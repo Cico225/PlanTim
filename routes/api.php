@@ -676,8 +676,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/krediti/upload', [PlanikaFinanceController::class, 'uploadKrediti']);
         Route::post('/krediti/bulk-verify-zabrana', [PlanikaFinanceController::class, 'bulkVerifyZabrana']);
         Route::post('/krediti/bulk-unpair-zabrana', [PlanikaFinanceController::class, 'bulkUnpairZabrana']);
+        Route::post('/krediti/bulk-delete', [PlanikaFinanceController::class, 'bulkDeleteKrediti']);
         Route::post('/krediti/{id}/verify-zabrana', [PlanikaFinanceController::class, 'verifyZabrana']);
         Route::post('/krediti/{id}/unpair-zabrana', [PlanikaFinanceController::class, 'unpairZabrana']);
+        Route::delete('/krediti/{id}', [PlanikaFinanceController::class, 'deleteKredit']);
     });
 
     // Meeting Rooms (Kalendar zauzetosti sala za sastanke)

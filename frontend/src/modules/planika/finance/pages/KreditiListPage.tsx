@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiSearch, FiDownload, FiRotateCcw, FiCheck } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch, FiDownload, FiRotateCcw, FiCheck, FiTrash2 } from 'react-icons/fi';
 import { kreditiService } from '@/services/kreditiService';
 import type { FinanceCredit } from '@/types/planika-finance';
 
@@ -71,6 +71,7 @@ export default function KreditiListPage() {
   const [bulkNotes, setBulkNotes] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkUnpairing, setBulkUnpairing] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const filterParams = useMemo<FilterParams>(() => ({
     search: search || undefined,
@@ -209,6 +210,31 @@ export default function KreditiListPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectionStats.count === 0) return;
+    if (!window.confirm(
+      `Trajno obrisati ${selectionStats.count} odabranih kredita?\nUkupan iznos: ${selectionStats.amount.toLocaleString('bs-BA')} ${selectionStats.currency}\n\nOva radnja se ne može poništiti.`,
+    )) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    try {
+      const res = await kreditiService.bulkDelete({
+        credit_ids: [...selectedMeta.keys()],
+      });
+      toast.success(
+        `Obrisano ${res.deleted_count} kredita — ukupno ${res.deleted_amount.toLocaleString('bs-BA')} ${res.currency}`,
+      );
+      clearSelection();
+      await load();
+    } catch {
+      toast.error('Greška pri brisanju kredita');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -240,7 +266,7 @@ export default function KreditiListPage() {
   const formatMoney = (amount: number, currency: string) =>
     `${amount.toLocaleString('bs-BA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 
-  const busy = bulkSaving || bulkUnpairing;
+  const busy = bulkSaving || bulkUnpairing || bulkDeleting;
 
   return (
     <div className="space-y-4">
@@ -379,9 +405,20 @@ export default function KreditiListPage() {
               </div>
             )}
 
-            <button type="button" className="btn-secondary w-fit px-3 text-sm" onClick={clearSelection} disabled={busy}>
-              Poništi selekciju
-            </button>
+            <div className="flex flex-wrap items-center gap-2 border-t border-primary-200/80 pt-3 dark:border-primary-800">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-40 dark:border-red-900/50 dark:bg-dark-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                disabled={busy}
+                onClick={handleBulkDelete}
+              >
+                <FiTrash2 size={16} />
+                {bulkDeleting ? 'Brisanje…' : `Obriši (${selectionStats.count})`}
+              </button>
+              <button type="button" className="btn-secondary px-3 text-sm" onClick={clearSelection} disabled={busy}>
+                Poništi selekciju
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -311,6 +311,77 @@ class PlanikaFinanceController extends Controller
     }
 
     /**
+     * Brisanje pojedinačnog kredita.
+     */
+    public function deleteKredit(int $id)
+    {
+        if (! $this->kreditiTableExists()) {
+            return response()->json(['message' => 'Modul kredita nije inicijalizovan.'], 503);
+        }
+
+        $credit = FinanceCredit::query()->findOrFail($id);
+        $amount = round((float) ($credit->amount ?? 0), 2);
+        $currency = $credit->currency ?? 'BAM';
+        $creditNumber = $credit->credit_number;
+
+        $credit->delete();
+
+        return response()->json([
+            'message' => 'Kredit je uspješno obrisan.',
+            'credit_number' => $creditNumber,
+            'deleted_amount' => $amount,
+            'currency' => $currency,
+        ]);
+    }
+
+    /**
+     * Grupno brisanje odabranih kredita.
+     */
+    public function bulkDeleteKrediti(Request $request)
+    {
+        if (! $this->kreditiTableExists()) {
+            return response()->json(['message' => 'Modul kredita nije inicijalizovan.'], 503);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'credit_ids' => 'required|array|min:1',
+            'credit_ids.*' => 'integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $ids = collect($request->input('credit_ids', []))->map(fn ($id) => (int) $id)->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return response()->json(['message' => 'Nema kredita za brisanje.'], 422);
+        }
+
+        $credits = FinanceCredit::query()->whereIn('id', $ids)->get();
+
+        if ($credits->isEmpty()) {
+            return response()->json(['message' => 'Odabrani krediti nisu pronađeni.'], 404);
+        }
+
+        $deletedAmount = round($credits->sum(fn (FinanceCredit $c) => (float) ($c->amount ?? 0)), 2);
+        $currency = $credits->first()->currency ?? 'BAM';
+
+        DB::transaction(function () use ($credits) {
+            foreach ($credits as $credit) {
+                $credit->delete();
+            }
+        });
+
+        return response()->json([
+            'message' => 'Odabrani krediti su uspješno obrisani.',
+            'deleted_count' => $credits->count(),
+            'deleted_amount' => $deletedAmount,
+            'currency' => $currency,
+        ]);
+    }
+
+    /**
      * Evidentiranje ovjerene zabrane — broj registratora je obavezan.
      */
     public function verifyZabrana(Request $request, int $id)
