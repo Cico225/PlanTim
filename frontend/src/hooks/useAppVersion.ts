@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '@/services/api';
 
-interface AppVersion {
+export interface AppVersion {
   version: string;
   version_name?: string;
   released_at?: string;
