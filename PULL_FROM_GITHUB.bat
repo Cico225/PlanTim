@@ -168,7 +168,7 @@ if errorlevel 1 (
 cd /d "%PROJECT_DIR%"
 
 echo.
-echo [5/7] Migracije baze...
+echo [5/7] Migracije baze i verzija...
 "%PHP_PATH%" migrate.php
 if errorlevel 1 (
     echo GRESKA: migrate.php nije uspio.
@@ -183,6 +183,15 @@ if errorlevel 1 (
     echo Tabele vjerovatno vec postoje u bazi.
     echo Jednokratno pokreni: REGISTER_LARAVEL_MIGRATIONS.bat
     echo Deploy nastavlja dalje...
+)
+
+echo.
+echo Sinkronizacija verzije iz app\release.json...
+"%PHP_PATH%" artisan app:version-sync
+if errorlevel 1 (
+    echo UPOZORENJE: app:version-sync nije uspio.
+    echo Aplikacija i dalje koristi verziju iz app\release.json u API-ju.
+    echo Jednokratno pokreni: SYNC_APP_VERSION.bat
 )
 
 echo.

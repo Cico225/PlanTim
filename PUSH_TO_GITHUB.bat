@@ -5,6 +5,7 @@ REM ============================================================
 REM PlanTim - LAPTOP: posalji nove verzije na GitHub (develop)
 REM ============================================================
 
+SET PHP_PATH=C:\xampp\php\php.exe
 SET GIT_PATH=C:\Program Files\Git\bin\git.exe
 SET PROJECT_DIR=C:\xampp\htdocs\PlanTim
 
@@ -22,12 +23,18 @@ if not exist "%GIT_PATH%" (
     exit /b 1
 )
 
+if not exist "%PHP_PATH%" (
+    echo GRESKA: PHP nije pronadjen: %PHP_PATH%
+    pause
+    exit /b 1
+)
+
 echo ========================================
 echo PlanTim - PUSH na GitHub (develop)
 echo ========================================
 echo.
 
-echo [1/5] Prebacivanje na develop...
+echo [1/6] Prebacivanje na develop...
 "%GIT_PATH%" checkout develop
 if %ERRORLEVEL% NEQ 0 (
     echo GRESKA: checkout develop nije uspio.
@@ -36,7 +43,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [2/5] Povlacenje najnovijeg s GitHuba...
+echo [2/6] Povlacenje najnovijeg s GitHuba...
 "%GIT_PATH%" pull origin develop
 if %ERRORLEVEL% NEQ 0 (
     echo GRESKA: git pull nije uspio. Rijesi konflikte pa pokusaj ponovo.
@@ -45,7 +52,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [3/5] Pregled promjena...
+echo [3/6] Pregled promjena...
 "%GIT_PATH%" status --short
 echo.
 
@@ -73,9 +80,18 @@ if "%COMMIT_MSG%"=="" (
 )
 
 echo.
-echo [4/5] Commit...
+echo [4/6] Automatsko povecanje verzije...
+"%PHP_PATH%" artisan app:version-bump --message="%COMMIT_MSG%" --sync
+if %ERRORLEVEL% NEQ 0 (
+    echo GRESKA: app:version-bump nije uspio.
+    pause
+    exit /b 1
+)
+
+echo.
+echo [5/6] Commit...
 "%GIT_PATH%" add .
-"%GIT_PATH%" commit -m "%COMMIT_MSG%"
+"%GIT_PATH%" commit -m "v: %COMMIT_MSG%"
 if %ERRORLEVEL% NEQ 0 (
     echo GRESKA: commit nije uspio.
     pause
@@ -83,7 +99,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [5/5] Push na GitHub...
+echo [6/6] Push na GitHub...
 "%GIT_PATH%" push origin develop
 if %ERRORLEVEL% NEQ 0 (
     echo GRESKA: push nije uspio.
@@ -97,6 +113,7 @@ echo ========================================
 echo Uspjesno poslano na GitHub (develop)!
 echo ========================================
 echo.
+echo Verzija je automatski povecana i sinkronizovana na laptopu.
 echo Sljedeci koraci:
 echo   1. Testiraj aplikaciju na laptopu
 echo   2. Na GitHubu: Pull Request develop -^> main (merge)
