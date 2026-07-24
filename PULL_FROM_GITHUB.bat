@@ -171,9 +171,15 @@ echo.
 echo [5/7] Migracije baze i verzija...
 "%PHP_PATH%" migrate.php
 if errorlevel 1 (
-    echo GRESKA: migrate.php nije uspio.
-    pause
-    exit /b 1
+    echo.
+    echo UPOZORENJE: migrate.php nije uspio — pokusavam sync verzije iz release.json...
+    "%PHP_PATH%" artisan app:version-sync
+    if errorlevel 1 (
+        echo GRESKA: ni migrate.php ni app:version-sync nisu uspjeli.
+        pause
+        exit /b 1
+    )
+    goto :after_migrations
 )
 
 "%PHP_PATH%" artisan migrate --force
@@ -194,6 +200,7 @@ if errorlevel 1 (
     echo Jednokratno pokreni: SYNC_APP_VERSION.bat
 )
 
+:after_migrations
 echo.
 echo [6/7] Laravel cache...
 "%PHP_PATH%" artisan config:cache

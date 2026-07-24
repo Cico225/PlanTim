@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AppVersion;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 
@@ -188,9 +189,7 @@ class AppReleaseService
             throw new \RuntimeException('Release file not found or invalid.');
         }
 
-        if (! Schema::hasTable('app_versions')) {
-            throw new \RuntimeException('Table app_versions does not exist.');
-        }
+        $this->ensureTableExists();
 
         $versionNumber = $release['version'];
         $versionName = $release['version_name'] ?? null;
@@ -313,5 +312,28 @@ class AppReleaseService
             'released_at' => $entry->released_at?->toIso8601String(),
             'source' => 'database',
         ];
+    }
+
+    private function ensureTableExists(): void
+    {
+        if (Schema::hasTable('app_versions')) {
+            return;
+        }
+
+        Schema::create('app_versions', function (Blueprint $table) {
+            $table->id();
+            $table->string('version', 20)->unique();
+            $table->string('version_name')->nullable();
+            $table->json('changelog')->nullable();
+            $table->text('release_notes')->nullable();
+            $table->boolean('is_active')->default(false);
+            $table->boolean('is_latest')->default(false);
+            $table->timestamp('released_at')->nullable();
+            $table->timestamps();
+
+            $table->index('version');
+            $table->index('is_active');
+            $table->index('is_latest');
+        });
     }
 }
