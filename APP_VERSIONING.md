@@ -36,7 +36,52 @@ php artisan app:version 1.0.0 --name="Initial Release" --active --latest
 
 ## 📝 Ažuriranje Verzije
 
-### Korišćenje Artisan komande
+### Automatski bump pri push-u (preporučeno)
+
+Verzija se **automatski povećava** kada pokrenete `PUSH_TO_GITHUB.bat`:
+
+1. Unesete opis promjene (commit poruku)
+2. Skripta pokreće `php artisan app:version-bump` — poveća patch verziju (npr. 1.2.0 → 1.2.1)
+3. Ažurira `app/release.json` i `frontend/package.json`
+4. Commit poruka ide u changelog
+5. Sinkronizuje verziju u lokalnu bazu (`--sync`)
+6. Na serveru `PULL_FROM_GITHUB.bat` automatski pokreće `app:version-sync`
+
+Ručni bump (opciono):
+
+```bash
+php artisan app:version-bump --message="Opis promjene" --sync
+php artisan app:version-bump --message="Vece promjene" --type=minor --sync
+```
+
+### Ručni način: `app/release.json`
+
+```json
+{
+  "version": "1.2.0",
+  "version_name": "Dashboard i UI",
+  "release_notes": "Kratak opis verzije...",
+  "changelog": [
+    "Prva promjena",
+    "Druga promjena"
+  ]
+}
+```
+
+**Workflow:**
+
+1. Na laptopu: uredite `app/release.json` (povećajte verziju i changelog)
+2. `PUSH_TO_GITHUB.bat` → merge `develop` → `main` na GitHubu
+3. Na serveru: `PULL_FROM_GITHUB.bat` — automatski pokreće `php artisan app:version-sync`
+
+Ručna sinkronizacija (lokalno ili na serveru):
+
+```bash
+php artisan app:version-sync
+php artisan app:version-sync --dry-run
+```
+
+### Korišćenje Artisan komande (ručno)
 
 Osnovna sintaksa:
 

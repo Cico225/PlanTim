@@ -1,0 +1,17 @@
+{
+    "version": "1.2.1",
+    "version_name": "Release 2026-07-24",
+    "release_notes": "Poboljšanje dizajna Pregleda aktivnosti i dodano verzioniranje aplikacije sa opisom promjena.",
+    "changelog": [
+        "Poboljšanje dizajna Pregleda aktivnosti i dodano verzioniranje aplikacije sa opisom promjena.",
+        "Modernizovan dashboard s animiranim karticama u Planika stilu",
+        "Nedavne aktivnosti s ikonama po tipu akcije",
+        "Animirani pregled aktivnosti i kompaktni kalendar sala",
+        "Hijerarhijski prikaz dozvola modula i podmodula u administraciji",
+        "Animirane kartice Planika podmodula umjesto statičnih brojeva",
+        "Brisanje kredita u Planika Finansije modulu",
+        "Automatski backup baze i projekta s internim schedulerom",
+        "Podmoduli u meniju (Planika → Finansije → Krediti)",
+        "Informativni prozor verzije s animiranim changelogom"
+    ]
+}
