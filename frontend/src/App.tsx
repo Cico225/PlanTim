@@ -52,7 +52,7 @@ import Office365Overview from './modules/office365/pages/Office365Overview';
 // Planika
 import PlanikaOverview from './modules/planika/pages/PlanikaOverview';
 import PlanikaSubmodule from './modules/planika/pages/PlanikaSubmodule';
-import FinanceOverview from './modules/planika/finance/FinanceOverview';
+import FinanceModuleEntry from './modules/planika/finance/FinanceModuleEntry';
 
 // AI
 import AIOverview from './modules/ai/pages/AIOverview';
@@ -131,7 +131,7 @@ function App() {
             <Route path="/gdpr/*" element={<GDPROverview />} />
             <Route path="/office365/*" element={<Office365Overview />} />
             <Route path="/planika" element={<PlanikaOverview />} />
-            <Route path="/planika/finance/krediti/*" element={<FinanceOverview />} />
+            <Route path="/planika/finance/krediti/*" element={<FinanceModuleEntry />} />
             <Route path="/planika/:submoduleId" element={<PlanikaSubmodule />} />
             <Route path="/ai/*" element={<AIOverview />} />
             <Route path="/meeting-rooms/*" element={<MeetingRoomsOverview />} />

@@ -18,7 +18,6 @@ export interface PlanikaSubmoduleDefinition {
   route: string;
   icon: IconType;
   color: string;
-  highlights: Array<{ label: string; value: string; trend?: string }>;
   actions: string[];
 }
 
@@ -30,23 +29,15 @@ export const PLANIKA_SUBMODULES: PlanikaSubmoduleDefinition[] = [
     route: '/planika/sales',
     icon: FiTrendingUp,
     color: 'orange',
-    highlights: [
-      { label: 'KPI', value: '+18%', trend: 'growth' },
-      { label: 'Aktivni ugovori', value: '126' },
-    ],
     actions: ['leadManagement', 'productSync', 'pricingRules'],
   },
   {
     id: 'finance',
     nameKey: 'planika.finance',
     descriptionKey: 'planikaDescriptions.finance',
-    route: '/planika/finance/krediti',
+    route: '/planika/finance',
     icon: FiDollarSign,
     color: 'teal',
-    highlights: [
-      { label: 'Budžet', value: '3.2M €' },
-      { label: 'Računi', value: '54' },
-    ],
     actions: ['krediti', 'reporting', 'expenseControl'],
   },
   {
@@ -56,10 +47,6 @@ export const PLANIKA_SUBMODULES: PlanikaSubmoduleDefinition[] = [
     route: '/planika/retail',
     icon: FiShoppingBag,
     color: 'pink',
-    highlights: [
-      { label: 'Prodavnice', value: '42' },
-      { label: 'POS uređaji', value: '128' },
-    ],
     actions: ['inventory', 'pricing', 'posMonitoring'],
   },
   {
@@ -69,10 +56,6 @@ export const PLANIKA_SUBMODULES: PlanikaSubmoduleDefinition[] = [
     route: '/planika/marketing',
     icon: FiVolume2,
     color: 'purple',
-    highlights: [
-      { label: 'Kampanje', value: '12 aktivnih' },
-      { label: 'ROI', value: '142%' },
-    ],
     actions: ['campaignBuilder', 'audienceSegmentation', 'contentHub'],
   },
   {
@@ -82,10 +65,6 @@ export const PLANIKA_SUBMODULES: PlanikaSubmoduleDefinition[] = [
     route: '/planika/hr',
     icon: FiUsers,
     color: 'green',
-    highlights: [
-      { label: 'Zaposleni', value: '640' },
-      { label: 'Otvorene pozicije', value: '18' },
-    ],
     actions: ['talentPool', 'shiftPlanning', 'performanceReviews'],
   },
   {
@@ -95,10 +74,6 @@ export const PLANIKA_SUBMODULES: PlanikaSubmoduleDefinition[] = [
     route: '/planika/club',
     icon: FiStar,
     color: 'yellow',
-    highlights: [
-      { label: 'Članova', value: '52k' },
-      { label: 'Aktivne kartice', value: '91%' },
-    ],
     actions: ['loyaltyCampaigns', 'rewards', 'clubAnalytics'],
   },
 ];

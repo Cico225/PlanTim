@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 interface UserModule {
   id: number;
   name: string;
+  parent_name?: string | null;
   display_name: string;
   description: string;
   icon: string;

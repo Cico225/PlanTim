@@ -130,6 +130,7 @@ class SystemModulesSeeder extends Seeder
             ],
             [
                 'name' => 'planika',
+                'parent_name' => null,
                 'display_name' => 'Planika',
                 'description' => 'Planika Integration Module',
                 'icon' => 'FiPackage',
@@ -138,6 +139,30 @@ class SystemModulesSeeder extends Seeder
                 'is_active' => true,
                 'is_plugin' => true,
                 'sort_order' => 11,
+            ],
+            [
+                'name' => 'planika.finance',
+                'parent_name' => 'planika',
+                'display_name' => 'Finansije i računovodstvo',
+                'description' => 'Finansijski podmodul Planika',
+                'icon' => 'FiDollarSign',
+                'route' => '/planika/finance',
+                'available_permissions' => json_encode(['view_reports', 'manage_budgets']),
+                'is_active' => true,
+                'is_plugin' => true,
+                'sort_order' => 111,
+            ],
+            [
+                'name' => 'planika.finance.krediti',
+                'parent_name' => 'planika.finance',
+                'display_name' => 'Krediti — uvoz, uparivanje zabrana i izvještaji',
+                'description' => 'Upravljanje kreditima i zabrana',
+                'icon' => 'FiCreditCard',
+                'route' => '/planika/finance/krediti',
+                'available_permissions' => json_encode(['import', 'pair', 'export', 'report']),
+                'is_active' => true,
+                'is_plugin' => true,
+                'sort_order' => 112,
             ],
             [
                 'name' => 'ai',
@@ -175,6 +200,10 @@ class SystemModulesSeeder extends Seeder
         ];
 
         foreach ($modules as $module) {
+            if (!array_key_exists('parent_name', $module)) {
+                $module['parent_name'] = null;
+            }
+
             DB::table('system_modules')->updateOrInsert(
                 ['name' => $module['name']],
                 array_merge($module, [
