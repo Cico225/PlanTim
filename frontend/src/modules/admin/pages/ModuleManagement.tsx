@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
@@ -7,20 +7,17 @@ import {
   FiUsers,
   FiToggleLeft,
   FiToggleRight,
-  FiEdit2,
-  FiTrash2,
-  FiPlus,
-  FiCopy,
   FiShield,
-  FiEye,
   FiEyeOff,
   FiSearch,
 } from 'react-icons/fi';
 import { apiService } from '@/services/api';
+import ModulePermissionsTree, { type ModulePermission } from '../components/ModulePermissionsTree';
 
 interface SystemModule {
   id: number;
   name: string;
+  parent_name?: string | null;
   display_name: string;
   description: string;
   icon: string;
@@ -61,22 +58,6 @@ interface PaginatedResponse<T> {
   prev_page_url: string | null;
   to: number;
   total: number;
-}
-
-interface ModulePermission {
-  module_name: string;
-  display_name: string;
-  icon: string;
-  is_plugin: boolean;
-  available_permissions: string[];
-  can_view: boolean;
-  can_read: boolean;
-  can_create: boolean;
-  can_update: boolean;
-  can_delete: boolean;
-  can_export: boolean;
-  can_import: boolean;
-  custom_permissions: Record<string, boolean> | null;
 }
 
 export default function ModuleManagement() {
@@ -282,83 +263,6 @@ export default function ModuleManagement() {
     }
   };
 
-  const updatePermission = (moduleIndex: number, permission: string, value: boolean) => {
-    setUserPermissions(prev => prev.map((perm, index) => 
-      index === moduleIndex 
-        ? { ...perm, [permission]: value }
-        : perm
-    ));
-  };
-
-  const updateCustomPermission = (moduleIndex: number, customPerm: string, value: boolean) => {
-    setUserPermissions(prev => prev.map((perm, index) => 
-      index === moduleIndex 
-        ? { 
-            ...perm, 
-            custom_permissions: {
-              ...perm.custom_permissions,
-              [customPerm]: value
-            }
-          }
-        : perm
-    ));
-  };
-
-  // Toggle all permissions for a single module
-  const toggleAllModulePermissions = (moduleIndex: number, enable: boolean) => {
-    setUserPermissions(prev => prev.map((perm, index) => {
-      if (index !== moduleIndex) return perm;
-      
-      // Build custom permissions object with all permissions enabled/disabled
-      const customPerms: Record<string, boolean> = {};
-      if (perm.available_permissions) {
-        perm.available_permissions.forEach(cp => {
-          customPerms[cp] = enable;
-        });
-      }
-      
-      return {
-        ...perm,
-        can_view: enable,
-        can_read: enable,
-        can_create: enable,
-        can_update: enable,
-        can_delete: enable,
-        can_export: enable,
-        can_import: enable,
-        custom_permissions: customPerms
-      };
-    }));
-  };
-
-  // Check if all permissions are enabled for a module
-  const areAllPermissionsEnabled = (permission: ModulePermission): boolean => {
-    const basicPermissions = 
-      Boolean(permission.can_view) && 
-      Boolean(permission.can_read) && 
-      Boolean(permission.can_create) && 
-      Boolean(permission.can_update) && 
-      Boolean(permission.can_delete) && 
-      Boolean(permission.can_export) && 
-      Boolean(permission.can_import);
-    
-    if (!basicPermissions) return false;
-    
-    // Check custom permissions if they exist
-    if (permission.available_permissions && permission.available_permissions.length > 0) {
-      return permission.available_permissions.every(cp => 
-        permission.custom_permissions?.[cp] === true
-      );
-    }
-    
-    return true;
-  };
-
-  // Check if any permission is enabled (for showing module in menu)
-  const hasAnyPermission = (permission: ModulePermission): boolean => {
-    return Boolean(permission.can_view);
-  };
-
   const saveUserPermissions = async () => {
     if (!selectedUser) return;
 
@@ -377,53 +281,6 @@ export default function ModuleManagement() {
     }
   };
 
-  const updateRoleModulePermission = (moduleIndex: number, permission: string, value: boolean) => {
-    setRoleModulePermissions(prev => prev.map((perm, index) => 
-      index === moduleIndex 
-        ? { ...perm, [permission]: value }
-        : perm
-    ));
-  };
-
-  const updateRoleModuleCustomPermission = (moduleIndex: number, customPerm: string, value: boolean) => {
-    setRoleModulePermissions(prev => prev.map((perm, index) => 
-      index === moduleIndex 
-        ? { 
-            ...perm, 
-            custom_permissions: {
-              ...perm.custom_permissions,
-              [customPerm]: value
-            }
-          }
-        : perm
-    ));
-  };
-
-  const toggleAllRoleModulePermissions = (moduleIndex: number, enable: boolean) => {
-    setRoleModulePermissions(prev => prev.map((perm, index) => {
-      if (index !== moduleIndex) return perm;
-      
-      const customPerms: Record<string, boolean> = {};
-      if (perm.available_permissions) {
-        perm.available_permissions.forEach(cp => {
-          customPerms[cp] = enable;
-        });
-      }
-      
-      return {
-        ...perm,
-        can_view: enable,
-        can_read: enable,
-        can_create: enable,
-        can_update: enable,
-        can_delete: enable,
-        can_export: enable,
-        can_import: enable,
-        custom_permissions: customPerms
-      };
-    }));
-  };
-
   const saveRoleModulePermissions = async () => {
     if (!selectedRole) return;
 
@@ -440,35 +297,6 @@ export default function ModuleManagement() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const copyPermissions = async (sourceUserId: number, targetUserIds: number[]) => {
-    try {
-      await apiService.post('/admin/copy-permissions', {
-        source_user_id: sourceUserId,
-        target_user_ids: targetUserIds
-      });
-      toast.success('Permissions copied successfully');
-      if (selectedUser && targetUserIds.includes(selectedUser.id)) {
-        loadUserPermissions(selectedUser.id);
-      }
-    } catch (error) {
-      console.error('Error copying permissions:', error);
-      toast.error('Failed to copy permissions');
-    }
-  };
-
-  const getPermissionIcon = (permission: string) => {
-    const icons: Record<string, React.ComponentType> = {
-      can_view: FiEye,
-      can_read: FiEye,
-      can_create: FiPlus,
-      can_update: FiEdit2,
-      can_delete: FiTrash2,
-      can_export: FiPackage,
-      can_import: FiPackage,
-    };
-    return icons[permission] || FiShield;
   };
 
   if (loading) {
@@ -721,116 +549,11 @@ export default function ModuleManagement() {
                   </div>
                 </div>
 
-                <div className="p-4 space-y-6">
-                  {userPermissions.map((permission, index) => {
-                    const allEnabled = areAllPermissionsEnabled(permission);
-                    const hasPermission = hasAnyPermission(permission);
-                    
-                    return (
-                    <div
-                      key={permission.module_name}
-                      className={`border rounded-lg p-4 transition-colors ${
-                        hasPermission 
-                          ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/10' 
-                          : 'border-gray-200 dark:border-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-lg ${
-                            permission.is_plugin
-                              ? 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400'
-                              : 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
-                          }`}>
-                            <FiPackage className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900 dark:text-white">
-                              {permission.display_name}
-                            </h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {permission.is_plugin ? t('admin.plugin') : t('admin.coreModule')}
-                              {!hasPermission && (
-                                <span className="ml-2 text-red-500">
-                                  • {t('admin.notVisibleInMenu') || 'Nije vidljivo u meniju'}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Allow All Toggle */}
-                        <button
-                          onClick={() => toggleAllModulePermissions(index, !allEnabled)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${
-                            allEnabled
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {allEnabled ? (
-                            <>
-                              <FiToggleRight className="w-4 h-4" />
-                              <span>{t('admin.allEnabled') || 'Sve dozvoljeno'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <FiToggleLeft className="w-4 h-4" />
-                              <span>{t('admin.allowAll') || 'Dozvoli sve'}</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Basic Permissions */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        {['can_view', 'can_read', 'can_create', 'can_update', 'can_delete', 'can_export', 'can_import'].map((perm) => {
-                          const IconComponent = getPermissionIcon(perm);
-                          const isViewPermission = perm === 'can_view';
-                          return (
-                            <label key={perm} className={`flex items-center space-x-2 cursor-pointer ${isViewPermission ? 'font-medium' : ''}`}>
-                              <input
-                                type="checkbox"
-                                checked={Boolean(permission[perm as keyof ModulePermission])}
-                                onChange={(e) => updatePermission(index, perm, e.target.checked)}
-                                className={`rounded border-gray-300 focus:ring-blue-500 ${
-                                  isViewPermission ? 'text-green-600' : 'text-blue-600'
-                                }`}
-                              />
-                              <IconComponent className={`w-4 h-4 ${isViewPermission ? 'text-green-500' : 'text-gray-500'}`} />
-                              <span className={`text-sm ${isViewPermission ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                {perm === 'can_view' ? (t('admin.canView') || 'vidljivo') : perm.replace('can_', '').replace('_', ' ')}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      {/* Custom Permissions */}
-                      {permission.available_permissions && permission.available_permissions.length > 0 && (
-                        <div>
-                          <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            {t('admin.moduleSpecificPermissions')}:
-                          </h5>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {permission.available_permissions.map((customPerm) => (
-                              <label key={customPerm} className="flex items-center space-x-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={permission.custom_permissions?.[customPerm] || false}
-                                  onChange={(e) => updateCustomPermission(index, customPerm, e.target.checked)}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                  {customPerm.replace(/_/g, ' ')}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )})}
+                <div className="p-4">
+                  <ModulePermissionsTree
+                    permissions={userPermissions}
+                    onChange={setUserPermissions}
+                  />
                 </div>
               </div>
             ) : (
@@ -931,116 +654,11 @@ export default function ModuleManagement() {
                   </div>
                 </div>
 
-                <div className="p-4 space-y-6">
-                  {roleModulePermissions.map((permission, index) => {
-                    const allEnabled = areAllPermissionsEnabled(permission);
-                    const hasPermission = hasAnyPermission(permission);
-                    
-                    return (
-                    <div
-                      key={permission.module_name}
-                      className={`border rounded-lg p-4 transition-colors ${
-                        hasPermission 
-                          ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/10' 
-                          : 'border-gray-200 dark:border-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-lg ${
-                            permission.is_plugin
-                              ? 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400'
-                              : 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
-                          }`}>
-                            <FiPackage className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900 dark:text-white">
-                              {permission.display_name}
-                            </h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {permission.is_plugin ? t('admin.plugin') : t('admin.coreModule')}
-                              {!hasPermission && (
-                                <span className="ml-2 text-red-500">
-                                  • {t('admin.notVisibleInMenu')}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Allow All Toggle */}
-                        <button
-                          onClick={() => toggleAllRoleModulePermissions(index, !allEnabled)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${
-                            allEnabled
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {allEnabled ? (
-                            <>
-                              <FiToggleRight className="w-4 h-4" />
-                              <span>{t('admin.allEnabled')}</span>
-                            </>
-                          ) : (
-                            <>
-                              <FiToggleLeft className="w-4 h-4" />
-                              <span>{t('admin.allowAll')}</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Basic Permissions */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        {['can_view', 'can_read', 'can_create', 'can_update', 'can_delete', 'can_export', 'can_import'].map((perm) => {
-                          const IconComponent = getPermissionIcon(perm);
-                          const isViewPermission = perm === 'can_view';
-                          return (
-                            <label key={perm} className={`flex items-center space-x-2 cursor-pointer ${isViewPermission ? 'font-medium' : ''}`}>
-                              <input
-                                type="checkbox"
-                                checked={Boolean(permission[perm as keyof ModulePermission])}
-                                onChange={(e) => updateRoleModulePermission(index, perm, e.target.checked)}
-                                className={`rounded border-gray-300 focus:ring-blue-500 ${
-                                  isViewPermission ? 'text-green-600' : 'text-blue-600'
-                                }`}
-                              />
-                              <IconComponent className={`w-4 h-4 ${isViewPermission ? 'text-green-500' : 'text-gray-500'}`} />
-                              <span className={`text-sm ${isViewPermission ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                {perm === 'can_view' ? t('admin.canView') : perm.replace('can_', '').replace('_', ' ')}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      {/* Custom Permissions */}
-                      {permission.available_permissions && permission.available_permissions.length > 0 && (
-                        <div>
-                          <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            {t('admin.moduleSpecificPermissions')}:
-                          </h5>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {permission.available_permissions.map((customPerm) => (
-                              <label key={customPerm} className="flex items-center space-x-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={permission.custom_permissions?.[customPerm] || false}
-                                  onChange={(e) => updateRoleModuleCustomPermission(index, customPerm, e.target.checked)}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                  {customPerm.replace(/_/g, ' ')}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )})}
+                <div className="p-4">
+                  <ModulePermissionsTree
+                    permissions={roleModulePermissions}
+                    onChange={setRoleModulePermissions}
+                  />
                 </div>
               </div>
             ) : (

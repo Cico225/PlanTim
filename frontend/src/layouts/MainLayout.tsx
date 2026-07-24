@@ -38,7 +38,21 @@ import {
   FiChevronUp,
   FiPackage,
   FiSearch,
+  FiDollarSign,
+  FiCreditCard,
 } from 'react-icons/fi';
+
+type PlanikaNavItem = {
+  name: string;
+  href: string;
+  icon: typeof FiHome;
+  color: string;
+  badge?: string;
+  isPlanikaRoot?: boolean;
+  isFinanceChild?: boolean;
+  hasFinanceChildren?: boolean;
+  children?: PlanikaNavItem[];
+};
 
 export default function MainLayout() {
   const { isAuthenticated, user, logout } = useAuthStore();
@@ -49,6 +63,7 @@ export default function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [planikaExpanded, setPlanikaExpanded] = useState(false);
+  const [financeExpanded, setFinanceExpanded] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [edelOpen, setEdelOpen] = useState(false);
   
@@ -90,6 +105,9 @@ export default function MainLayout() {
     if (location.pathname.startsWith('/planika')) {
       setPlanikaExpanded(true);
     }
+    if (location.pathname.startsWith('/planika/finance')) {
+      setFinanceExpanded(true);
+    }
   }, [location.pathname]);
 
   if (!isAuthenticated) {
@@ -113,6 +131,8 @@ export default function MainLayout() {
       FiCpu,
       FiSettings,
       FiPackage,
+      FiDollarSign,
+      FiCreditCard,
     };
     return iconMap[iconName] || FiGrid;
   };
@@ -161,20 +181,80 @@ export default function MainLayout() {
 
   // Create navigation groups from user modules
   const createNavigationGroups = () => {
-    const buildPlanikaItems = () => [
-      {
-        name: t('planika.title'),
-        href: PLANIKA_OVERVIEW_CARD.route,
-        icon: PLANIKA_OVERVIEW_CARD.icon,
-        color: PLANIKA_OVERVIEW_CARD.color,
-      },
-      ...PLANIKA_SUBMODULES.map(submodule => ({
-        name: t(submodule.nameKey),
-        href: submodule.route,
-        icon: submodule.icon,
-        color: submodule.color,
-      })),
-    ];
+    const buildPlanikaItems = (): PlanikaNavItem[] => {
+      const accessibleByName = new Map(userModules.map((m) => [m.name, m]));
+      const hasPlanikaRoot = accessibleByName.has('planika');
+      const items: PlanikaNavItem[] = [];
+
+      if (hasPlanikaRoot || userModules.some((m) => m.name.startsWith('planika.'))) {
+        items.push({
+          name: t('planika.title'),
+          href: PLANIKA_OVERVIEW_CARD.route,
+          icon: PLANIKA_OVERVIEW_CARD.icon,
+          color: PLANIKA_OVERVIEW_CARD.color,
+          isPlanikaRoot: true,
+        });
+      }
+
+      if (hasPlanikaRoot) {
+        PLANIKA_SUBMODULES.filter((sub) => sub.id !== 'finance').forEach((submodule) => {
+          items.push({
+            name: t(submodule.nameKey),
+            href: submodule.route,
+            icon: submodule.icon,
+            color: submodule.color,
+          });
+        });
+      }
+
+      const financeModule = accessibleByName.get('planika.finance');
+      const financeChildren = userModules.filter((m) => m.parent_name === 'planika.finance');
+
+      if (financeModule) {
+        const children: PlanikaNavItem[] = financeChildren.map((module) => ({
+          name: module.display_name,
+          href: module.route || '/planika/finance/krediti',
+          icon: getModuleIcon(module.icon || 'FiCreditCard'),
+          color: 'teal',
+          isFinanceChild: true,
+        }));
+
+        items.push({
+          name: financeModule.display_name,
+          href: children[0]?.href || financeModule.route || '/planika/finance',
+          icon: getModuleIcon(financeModule.icon || 'FiDollarSign'),
+          color: 'teal',
+          hasFinanceChildren: children.length > 0,
+          children,
+        });
+      } else {
+        financeChildren.forEach((module) => {
+          items.push({
+            name: module.display_name,
+            href: module.route || '/planika/finance/krediti',
+            icon: getModuleIcon(module.icon || 'FiCreditCard'),
+            color: 'teal',
+          });
+        });
+      }
+
+      return items;
+    };
+
+    const flattenPlanikaItems = (items: PlanikaNavItem[]): PlanikaNavItem[] => {
+      if (!planikaExpanded) {
+        return items.filter((item) => item.isPlanikaRoot);
+      }
+
+      const flattened: PlanikaNavItem[] = [];
+      items.forEach((item) => {
+        flattened.push(item);
+        if (item.children?.length && financeExpanded) {
+          flattened.push(...item.children);
+        }
+      });
+      return flattened;
+    };
 
     if (modulesLoading) {
       // Show minimal navigation while loading - only dashboard
@@ -206,6 +286,7 @@ export default function MainLayout() {
     const dashboardModule = userModules.find(m => m.name === 'dashboard');
     const adminModule = userModules.find(m => m.name === 'admin');
     const planikaModule = plugins.find(m => m.name === 'planika');
+    const planikaChildModules = userModules.filter(m => m.name.startsWith('planika.'));
     const otherPlugins = plugins.filter(m => m.name !== 'planika' && m.name !== 'admin');
 
     const groups = [];
@@ -304,11 +385,13 @@ export default function MainLayout() {
     });
 
     // Plugins - Planika modul se prikazuje samo ako korisnik ima dozvolu
-    if (planikaModule) {
-    groups.push({
-      title: t('planika.title'),
-      items: buildPlanikaItems(),
-    });
+    if (planikaModule || planikaChildModules.length > 0) {
+      const planikaItems = buildPlanikaItems();
+      groups.push({
+        title: t('planika.title'),
+        items: flattenPlanikaItems(planikaItems) as any,
+        isPlanikaGroup: true,
+      });
     }
 
     // Admin module
@@ -333,8 +416,10 @@ export default function MainLayout() {
     userModules, 
     inboxCount, 
     notificationCount, 
-    i18n.language, // Re-create when language changes
-    t // Re-create when translation function changes
+    i18n.language,
+    planikaExpanded,
+    financeExpanded,
+    t
   ]);
 
 
@@ -428,10 +513,8 @@ export default function MainLayout() {
           {/* Navigation Groups */}
           <nav className="flex-1 overflow-y-auto sidebar-nav px-3 py-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
             {navigationGroups.map((group, groupIndex) => {
-              const isPlanikaGroup = group.title === t('planika.title');
-              const mainItem = isPlanikaGroup ? group.items[0] : null;
-              const subItems = isPlanikaGroup ? group.items.slice(1) : group.items;
-              const itemsToShow = isPlanikaGroup && !planikaExpanded ? [mainItem].filter(Boolean) : group.items;
+              const isPlanikaGroup = Boolean((group as { isPlanikaGroup?: boolean }).isPlanikaGroup);
+              const itemsToShow = group.items;
 
               return (
                 <div key={groupIndex}>
@@ -443,31 +526,34 @@ export default function MainLayout() {
                   <div className="space-y-1">
                     {itemsToShow.map((item, itemIndex) => {
                       if (!item) return null;
-                      
-                      const isMainPlanikaItem = isPlanikaGroup && itemIndex === 0;
-                      const isActive = location.pathname.startsWith(item.href);
-                      const Icon = item.icon;
-                      const colorClasses = getColorClasses(item.color, isActive);
-                      const isSubItem = isPlanikaGroup && itemIndex > 0;
+
+                      const planikaItem = item as PlanikaNavItem;
+                      const isMainPlanikaItem = isPlanikaGroup && planikaItem.isPlanikaRoot;
+                      const isFinanceParent = isPlanikaGroup && planikaItem.hasFinanceChildren;
+                      const isFinanceChild = isPlanikaGroup && planikaItem.isFinanceChild;
+                      const isActive = isFinanceParent
+                        ? location.pathname.startsWith('/planika/finance')
+                        : location.pathname.startsWith(planikaItem.href);
+                      const Icon = planikaItem.icon;
+                      const colorClasses = getColorClasses(planikaItem.color, isActive);
+                      const indentClass = isFinanceChild ? 'ml-12' : (isPlanikaGroup && !isMainPlanikaItem ? 'ml-6' : '');
 
                       if (isMainPlanikaItem) {
-                        // Main Planika item with expand/collapse
                         return (
-                          <div key={item.name}>
+                          <div key={`${planikaItem.name}-${itemIndex}`}>
                             <Link
-                              to={item.href}
+                              to={planikaItem.href}
                               className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                                 isActive
                                   ? 'bg-gradient-to-r from-primary-50 to-primary-100/50 dark:from-primary-900/30 dark:to-primary-800/20 shadow-sm'
                                   : 'hover:bg-gray-100 dark:hover:bg-dark-700/50'
                               }`}
-                              title={sidebarCollapsed ? item.name : undefined}
+                              title={sidebarCollapsed ? planikaItem.name : undefined}
                             >
-                              {/* Icon with colored background */}
                               <div
                                 className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 ${
                                   isActive
-                                    ? `${colorClasses.activeBg} shadow-lg shadow-${item.color}-500/20`
+                                    ? `${colorClasses.activeBg} shadow-lg shadow-${planikaItem.color}-500/20`
                                     : `${colorClasses.bg} group-hover:scale-110`
                                 }`}
                               >
@@ -477,7 +563,6 @@ export default function MainLayout() {
                                 />
                               </div>
 
-                              {/* Text */}
                               {!sidebarCollapsed && (
                                 <>
                                   <span
@@ -487,11 +572,11 @@ export default function MainLayout() {
                                         : 'text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'
                                     }`}
                                   >
-                                    {item.name}
+                                    {planikaItem.name}
                                   </span>
-                                  
-                                  {/* Chevron icon for expand/collapse */}
+
                                   <button
+                                    type="button"
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -499,16 +584,11 @@ export default function MainLayout() {
                                     }}
                                     className="flex items-center justify-center w-5 h-5 rounded transition-colors hover:bg-gray-200 dark:hover:bg-dark-600 text-gray-500 dark:text-gray-400"
                                   >
-                                    {planikaExpanded ? (
-                                      <FiChevronUp size={16} />
-                                    ) : (
-                                      <FiChevronDown size={16} />
-                                    )}
+                                    {planikaExpanded ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
                                   </button>
                                 </>
                               )}
 
-                              {/* Active indicator */}
                               {isActive && (
                                 <div className="absolute left-0 w-1 h-8 bg-gradient-to-b from-primary-500 to-primary-600 rounded-r-full" />
                               )}
@@ -517,25 +597,77 @@ export default function MainLayout() {
                         );
                       }
 
-                      // Regular items or sub-items
+                      if (isFinanceParent) {
+                        return (
+                          <div key={`${planikaItem.name}-${itemIndex}`}>
+                            <div
+                              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ml-6 ${
+                                isActive
+                                  ? 'bg-gradient-to-r from-primary-50 to-primary-100/50 dark:from-primary-900/30 dark:to-primary-800/20 shadow-sm'
+                                  : 'hover:bg-gray-100 dark:hover:bg-dark-700/50'
+                              }`}
+                            >
+                              <Link
+                                to={planikaItem.href}
+                                className="flex flex-1 items-center gap-3 min-w-0"
+                                title={sidebarCollapsed ? planikaItem.name : undefined}
+                              >
+                                <div
+                                  className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 ${
+                                    isActive
+                                      ? `${colorClasses.activeBg} shadow-lg shadow-${planikaItem.color}-500/20`
+                                      : `${colorClasses.bg} group-hover:scale-110`
+                                  }`}
+                                >
+                                  <Icon
+                                    size={18}
+                                    className={isActive ? colorClasses.activeText : colorClasses.text}
+                                  />
+                                </div>
+
+                                {!sidebarCollapsed && (
+                                  <span
+                                    className={`flex-1 font-medium text-sm transition-colors ${
+                                      isActive
+                                        ? 'text-gray-900 dark:text-white'
+                                        : 'text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'
+                                    }`}
+                                  >
+                                    {planikaItem.name}
+                                  </span>
+                                )}
+                              </Link>
+
+                              {!sidebarCollapsed && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFinanceExpanded(!financeExpanded)}
+                                  className="flex items-center justify-center w-5 h-5 rounded transition-colors hover:bg-gray-200 dark:hover:bg-dark-600 text-gray-500 dark:text-gray-400"
+                                >
+                                  {financeExpanded ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
                         <Link
-                          key={item.name}
-                          to={item.href}
-                          className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-                            isSubItem ? 'ml-6' : ''
-                          } ${
+                          key={`${planikaItem.name}-${itemIndex}`}
+                          to={planikaItem.href}
+                          className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${indentClass} ${
                             isActive
                               ? 'bg-gradient-to-r from-primary-50 to-primary-100/50 dark:from-primary-900/30 dark:to-primary-800/20 shadow-sm'
                               : 'hover:bg-gray-100 dark:hover:bg-dark-700/50'
                           }`}
-                          title={sidebarCollapsed ? item.name : undefined}
+                          title={sidebarCollapsed ? planikaItem.name : undefined}
                         >
                           {/* Icon with colored background */}
                           <div
                             className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 ${
                               isActive
-                                ? `${colorClasses.activeBg} shadow-lg shadow-${item.color}-500/20`
+                                ? `${colorClasses.activeBg} shadow-lg shadow-${planikaItem.color}-500/20`
                                 : `${colorClasses.bg} group-hover:scale-110`
                             }`}
                           >
@@ -555,11 +687,11 @@ export default function MainLayout() {
                                     : 'text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'
                                 }`}
                               >
-                                {item.name}
+                                {planikaItem.name}
                               </span>
                               
                               {/* Badge */}
-                              {item.badge && (
+                              {planikaItem.badge && (
                                 <span
                                   className={`flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-semibold ${
                                     isActive
@@ -567,7 +699,7 @@ export default function MainLayout() {
                                       : 'bg-red-500 text-white'
                                   }`}
                                 >
-                                  {item.badge}
+                                  {planikaItem.badge}
                                 </span>
                               )}
                             </>

@@ -52,6 +52,7 @@ class AdminModuleController extends Controller
             
             $modulePermissions[] = [
                 'module_name' => $module->name,
+                'parent_name' => $module->parent_name ?? null,
                 'display_name' => $module->display_name,
                 'icon' => $module->icon,
                 'is_plugin' => $module->is_plugin,
@@ -571,6 +572,7 @@ class AdminModuleController extends Controller
             
             $modulePermissions[] = [
                 'module_name' => $module->name,
+                'parent_name' => $module->parent_name ?? null,
                 'display_name' => $module->display_name,
                 'icon' => $module->icon,
                 'is_plugin' => $module->is_plugin,

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PLANIKA_SUBMODULES } from '../constants';
+import PlanikaSubmoduleAnimation from '../components/PlanikaSubmoduleAnimation';
 import MaloprodajaOverview from '../../maloprodaja/pages/MaloprodajaOverview';
 import HRMOverview from '../../hrm/pages/HRMOverview';
 
@@ -55,25 +56,13 @@ export default function PlanikaSubmodule() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {submodule.highlights.map((highlight) => (
-          <div key={highlight.label} className="card p-5">
-            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {highlight.label}
-            </p>
-            <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
-              {highlight.value}
-            </p>
-            {highlight.trend && (
-              <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
-                {highlight.trend}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
+      <PlanikaSubmoduleAnimation
+        submoduleId={submodule.id}
+        color={submodule.color}
+        className="max-w-xl"
+      />
 
-      <div className="card p-6 space-y-4">
+      <div className="card space-y-4 p-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           Operativne funkcije
         </h2>
