@@ -133,6 +133,72 @@ class AppVersionController extends Controller
     }
 
     /**
+     * Get version history for changelog modal
+     */
+    public function getHistory(Request $request)
+    {
+        try {
+            if (!Schema::hasTable('app_versions')) {
+                $version = $this->getVersionFromPackage();
+                return response()->json([
+                    [
+                        'version' => $version,
+                        'version_name' => null,
+                        'released_at' => null,
+                        'changelog' => null,
+                        'release_notes' => null,
+                    ],
+                ]);
+            }
+
+            $versions = AppVersion::query()
+                ->orderByDesc('released_at')
+                ->orderByDesc('id')
+                ->limit(12)
+                ->get();
+
+            if ($versions->isEmpty()) {
+                $version = $this->getVersionFromPackage();
+                return response()->json([
+                    [
+                        'version' => $version,
+                        'version_name' => null,
+                        'released_at' => null,
+                        'changelog' => null,
+                        'release_notes' => null,
+                    ],
+                ]);
+            }
+
+            return response()->json($versions->map(function (AppVersion $entry) {
+                return [
+                    'id' => $entry->id,
+                    'version' => $entry->version,
+                    'version_name' => $entry->version_name,
+                    'released_at' => $entry->released_at ? $entry->released_at->toIso8601String() : null,
+                    'changelog' => $entry->changelog,
+                    'release_notes' => $entry->release_notes,
+                    'is_active' => $entry->is_active,
+                    'is_latest' => $entry->is_latest,
+                ];
+            })->values());
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('AppVersion getHistory error: ' . $e->getMessage());
+
+            $version = $this->getVersionFromPackage();
+            return response()->json([
+                [
+                    'version' => $version,
+                    'version_name' => null,
+                    'released_at' => null,
+                    'changelog' => null,
+                    'release_notes' => null,
+                ],
+            ]);
+        }
+    }
+
+    /**
      * Get version from package.json
      */
     private function getVersionFromPackage(): string

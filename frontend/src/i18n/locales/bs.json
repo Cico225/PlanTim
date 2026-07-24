@@ -481,6 +481,13 @@
     "search": "Pretraži...",
     "theme": "Tema",
     "logout": "Izlaz"
+  },
+  "version": {
+    "whatsNew": "Šta je novo",
+    "changes": "Promjene u ovoj verziji",
+    "previousVersions": "Prethodne verzije",
+    "noChanges": "Nema zabilježenih promjena za ovu verziju.",
+    "gotIt": "Razumijem"
   }
 }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiCalendar,
   FiPlus,
@@ -185,41 +186,58 @@ export default function MeetingRoomCalendarCompact() {
 
   return (
     <>
-      <div className="card p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <FiCalendar className="text-gray-600 dark:text-gray-400" size={20} />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Kalendar Zauzetosti Sala
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <select
-              value={selectedRoomId || ''}
-              onChange={(e) => setSelectedRoomId(parseInt(e.target.value))}
-              className="input text-sm"
-            >
-              {rooms.map(room => (
-                <option key={room.id} value={room.id}>
-                  {room.name} {room.location ? `(${room.location})` : ''}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleCreateReservation}
-              className="btn-primary flex items-center gap-2 text-sm"
-            >
-              <FiPlus size={16} />
-              Rezerviši
-            </button>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="card overflow-hidden border border-transparent p-0 transition-shadow hover:shadow-lg"
+      >
+        <div className="border-b border-gray-100 bg-gradient-to-r from-indigo-50/80 to-primary-50/50 px-5 py-4 dark:border-dark-700 dark:from-indigo-900/15 dark:to-primary-900/10">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <motion.div
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/30"
+                animate={{ rotate: [0, 3, -3, 0] }}
+                transition={{ duration: 4, repeat: Infinity }}
+              >
+                <FiCalendar className="text-primary-600 dark:text-primary-400" size={20} />
+              </motion.div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Kalendar zauzetosti sala
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Sedmični pregled rezervacija</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={selectedRoomId || ''}
+                onChange={(e) => setSelectedRoomId(parseInt(e.target.value))}
+                className="input text-sm"
+              >
+                {rooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.name} {room.location ? `(${room.location})` : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleCreateReservation}
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                <FiPlus size={16} />
+                Rezerviši
+              </button>
+            </div>
           </div>
         </div>
 
+        <div className="p-5">
         {/* Week Navigation */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 px-2 py-1 dark:bg-dark-900/40">
           <button
             onClick={() => navigateWeek('prev')}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="rounded-lg p-2 transition hover:bg-white dark:hover:bg-dark-700"
           >
             <FiChevronLeft size={20} />
           </button>
@@ -230,7 +248,7 @@ export default function MeetingRoomCalendarCompact() {
           </div>
           <button
             onClick={() => navigateWeek('next')}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="rounded-lg p-2 transition hover:bg-white dark:hover:bg-dark-700"
           >
             <FiChevronRight size={20} />
           </button>
@@ -238,20 +256,23 @@ export default function MeetingRoomCalendarCompact() {
 
         {/* Week Calendar */}
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <div className="flex h-32 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-7 sm:gap-2">
-            {weekDays.map(day => {
+            {weekDays.map((day, index) => {
               const dayReservations = getReservationsForDay(day);
               return (
-                <div
+                <motion.div
                   key={day.toISOString()}
-                  className={`rounded-lg border p-3 sm:min-h-[120px] sm:p-2 ${
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.04 }}
+                  className={`rounded-xl border p-3 transition-all sm:min-h-[120px] sm:p-2 ${
                     isToday(day)
-                      ? 'border-primary-300 bg-primary-50 dark:border-primary-700 dark:bg-primary-900/20'
-                      : 'border-gray-200 dark:border-gray-700'
+                      ? 'border-primary-300 bg-primary-50 shadow-sm ring-2 ring-primary-200/60 dark:border-primary-700 dark:bg-primary-900/20 dark:ring-primary-800/40'
+                      : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                   }`}
                 >
                   <div className="mb-2 flex items-center justify-between gap-2 sm:block">
@@ -265,10 +286,13 @@ export default function MeetingRoomCalendarCompact() {
                     </div>
                   </div>
                   <div className="space-y-2 sm:space-y-1">
-                    {dayReservations.slice(0, 2).map(reservation => (
-                      <div
+                    {dayReservations.slice(0, 2).map((reservation) => (
+                      <motion.div
                         key={reservation.id}
-                        className={`rounded border p-2 text-sm sm:truncate sm:p-1 sm:text-xs ${getReservationColor(reservation)}`}
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={`rounded-lg border p-2 text-sm sm:truncate sm:p-1 sm:text-xs ${getReservationColor(reservation)}`}
                         title={reservation.title}
                       >
                         <div className="flex items-center gap-1">
@@ -285,7 +309,7 @@ export default function MeetingRoomCalendarCompact() {
                             })()}
                           </div>
                         )}
-                      </div>
+                      </motion.div>
                     ))}
                     {dayReservations.length > 2 && (
                       <div className="text-sm text-gray-500 dark:text-gray-400 sm:text-xs">
@@ -293,14 +317,14 @@ export default function MeetingRoomCalendarCompact() {
                       </div>
                     )}
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
         )}
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-4 text-xs mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-4 flex flex-wrap gap-4 border-t border-gray-200 pt-4 text-xs dark:border-gray-700">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded bg-red-100 border border-red-300"></div>
             <span>Zauzeto</span>
@@ -310,12 +334,25 @@ export default function MeetingRoomCalendarCompact() {
             <span>Moj sastanak</span>
           </div>
         </div>
-      </div>
+        </div>
+      </motion.div>
 
       {/* Reservation Modal */}
+      <AnimatePresence>
       {showReservationModal && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/50 sm:items-center sm:justify-center sm:p-4">
-          <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-gray-800 sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-lg">
+        <motion.div
+          className="fixed inset-0 z-50 flex flex-col bg-black/50 sm:items-center sm:justify-center sm:p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-gray-800 sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl"
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+          >
             <div className="shrink-0 border-b border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white sm:text-xl">
@@ -457,16 +494,10 @@ export default function MeetingRoomCalendarCompact() {
                 </div>
               </div>
             </form>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </>
   );
 }
-
-
-
-
-
-
-

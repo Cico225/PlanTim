@@ -480,6 +480,13 @@
     "search": "Search...",
     "theme": "Theme",
     "logout": "Logout"
+  },
+  "version": {
+    "whatsNew": "What's new",
+    "changes": "Changes in this version",
+    "previousVersions": "Previous versions",
+    "noChanges": "No recorded changes for this version.",
+    "gotIt": "Got it"
   }
 }
 

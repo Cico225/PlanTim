@@ -42,6 +42,7 @@ Route::get('/health', function () {
 Route::prefix('app-version')->group(function () {
     Route::get('/current', [AppVersionController::class, 'getCurrent']);
     Route::get('/latest', [AppVersionController::class, 'getLatest']);
+    Route::get('/history', [AppVersionController::class, 'getHistory']);
 });
 
 // Public API routes
