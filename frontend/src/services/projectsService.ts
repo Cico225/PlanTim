@@ -26,9 +26,7 @@ export interface Task {
   due_date?: string;
   estimated_hours?: number;
   actual_hours?: number;
-  kanban_column_id?: number;
   position?: number;
-  swimlane?: string;
   story_points?: number;
   created_by?: number;
   created_by_name?: string;
@@ -42,27 +40,6 @@ export interface Task {
   }>;
   comments_count?: number;
   project_name?: string; // For "all projects" view
-}
-
-export interface KanbanColumn {
-  id: number;
-  project_id: number;
-  name: string;
-  status: string;
-  order: number;
-  wip_limit?: number;
-  color?: string;
-  is_default: boolean;
-  tasks_count?: number;
-  wip_exceeded?: boolean;
-  tasks?: Task[];
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface KanbanBoard {
-  columns: KanbanColumn[];
-  swimlane?: string;
 }
 
 class ProjectsService {
@@ -171,41 +148,6 @@ class ProjectsService {
 
   async deleteTask(projectId: number, taskId: number) {
     return apiService.delete<{ message: string }>(`/projects/${projectId}/tasks/${taskId}`);
-  }
-
-  // ==================== KANBAN ====================
-  
-  async getKanbanBoard(projectId: number | string, params?: { swimlane?: string }) {
-    return apiService.get<KanbanBoard>(`/projects/${projectId}/kanban`, params);
-  }
-
-  async getKanbanColumns(projectId: number) {
-    return apiService.get<KanbanColumn[]>(`/projects/${projectId}/kanban/columns`);
-  }
-
-  async createKanbanColumn(projectId: number, data: Partial<KanbanColumn>) {
-    return apiService.post<KanbanColumn>(`/projects/${projectId}/kanban/columns`, data);
-  }
-
-  async updateKanbanColumn(projectId: number, columnId: number, data: Partial<KanbanColumn>) {
-    return apiService.put<KanbanColumn>(`/projects/${projectId}/kanban/columns/${columnId}`, data);
-  }
-
-  async deleteKanbanColumn(projectId: number, columnId: number) {
-    return apiService.delete<{ message: string }>(`/projects/${projectId}/kanban/columns/${columnId}`);
-  }
-
-  async moveTask(
-    projectId: number,
-    taskId: number,
-    data: {
-      kanban_column_id: number;
-      position?: number;
-      previous_column_id?: number;
-      previous_position?: number;
-    }
-  ) {
-    return apiService.post<{ task: Task; message: string }>(`/projects/${projectId}/tasks/${taskId}/move`, data);
   }
 
   // ==================== TASK ASSIGNEES ====================

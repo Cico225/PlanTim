@@ -8,7 +8,6 @@ interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId?: number; // Optional - if not provided, it's a personal task
-  defaultColumnId?: number;
   onTaskCreated: () => void;
 }
 
@@ -16,7 +15,6 @@ export default function CreateTaskModal({
   isOpen,
   onClose,
   projectId,
-  defaultColumnId,
   onTaskCreated,
 }: CreateTaskModalProps) {
   const isPersonalTask = projectId === undefined;
@@ -32,17 +30,12 @@ export default function CreateTaskModal({
     due_date: '',
     start_date: '',
     estimated_hours: '',
-    kanban_column_id: defaultColumnId,
   });
   const [users, setUsers] = useState<Array<{ id: number; name: string; email: string }>>([]);
-  const [kanbanColumns, setKanbanColumns] = useState<Array<{ id: number; name: string; status: string }>>([]);
 
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
-      if (projectId) {
-        fetchKanbanColumns();
-      }
       // Reset form
       setFormData({
         title: '',
@@ -54,11 +47,10 @@ export default function CreateTaskModal({
         due_date: '',
         start_date: '',
         estimated_hours: '',
-        kanban_column_id: defaultColumnId,
       });
       setTaskType(isPersonalTask ? 'personal' : 'assigned');
     }
-  }, [isOpen, defaultColumnId, projectId, isPersonalTask]);
+  }, [isOpen, projectId, isPersonalTask]);
 
   const fetchUsers = async () => {
     try {
@@ -67,28 +59,6 @@ export default function CreateTaskModal({
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Greška pri učitavanju korisnika');
-    }
-  };
-
-  const fetchKanbanColumns = async () => {
-    if (!projectId) return;
-    try {
-      const columns = await projectsService.getKanbanColumns(projectId);
-      setKanbanColumns(columns);
-      
-      // Set default column if provided
-      if (defaultColumnId && columns.find((c) => c.id === defaultColumnId)) {
-        const column = columns.find((c) => c.id === defaultColumnId);
-        if (column) {
-          setFormData((prev) => ({
-            ...prev,
-            status: column.status,
-            kanban_column_id: defaultColumnId,
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching kanban columns:', error);
     }
   };
 
@@ -138,9 +108,6 @@ export default function CreateTaskModal({
           taskData.assignee_ids = formData.assignee_ids;
         } else if (formData.assigned_to) {
           taskData.assigned_to = formData.assigned_to;
-        }
-        if (formData.kanban_column_id) {
-          taskData.kanban_column_id = formData.kanban_column_id;
         }
         await projectsService.createTask(projectId!, taskData);
       }
@@ -244,32 +211,6 @@ export default function CreateTaskModal({
               </select>
             </div>
           </div>
-
-          {/* Kanban Column */}
-          {kanbanColumns.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Kanban kolona
-              </label>
-              <select
-                value={formData.kanban_column_id || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    kanban_column_id: e.target.value ? parseInt(e.target.value) : undefined,
-                  })
-                }
-                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="">Izaberi kolonu...</option>
-                {kanbanColumns.map((column) => (
-                  <option key={column.id} value={column.id}>
-                    {column.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {/* Task Type (for personal tasks) */}
           {isPersonalTask && (
