@@ -172,7 +172,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/{projectId}/tasks', [ProjectController::class, 'storeTask']);
         Route::put('/{projectId}/tasks/{taskId}', [ProjectController::class, 'updateTask']);
         Route::delete('/{projectId}/tasks/{taskId}', [ProjectController::class, 'deleteTask']);
-        Route::post('/{projectId}/tasks/{taskId}/move', [ProjectController::class, 'moveTaskInKanban']);
         
         // Task Comments
         Route::get('/{projectId}/tasks/{taskId}/comments', [ProjectController::class, 'getTaskComments']);
@@ -202,14 +201,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/{projectId}/tasks/{taskId}/time-tracking/stop', [ProjectController::class, 'stopTimeTracking']);
         Route::post('/{projectId}/tasks/{taskId}/time-tracking/manual', [ProjectController::class, 'addManualTimeEntry']);
         Route::delete('/{projectId}/tasks/{taskId}/time-tracking/{timeEntryId}', [ProjectController::class, 'deleteTimeEntry']);
-        
-        // Kanban Board
-        Route::get('/{projectId}/kanban', [ProjectController::class, 'getKanbanBoard']);
-        Route::get('/{projectId}/kanban/columns', [ProjectController::class, 'getKanbanColumns']);
-        Route::post('/{projectId}/kanban/columns', [ProjectController::class, 'createKanbanColumn']);
-        Route::put('/{projectId}/kanban/columns/{columnId}', [ProjectController::class, 'updateKanbanColumn']);
-        Route::delete('/{projectId}/kanban/columns/{columnId}', [ProjectController::class, 'deleteKanbanColumn']);
-        Route::put('/{projectId}/kanban/tasks/{taskId}/move', [ProjectController::class, 'moveTaskInKanban']);
         
         // Project CRUD (must be last to avoid conflicts)
         Route::get('/{id}', [ProjectController::class, 'show']);

@@ -278,40 +278,53 @@ export default function ProjectsCalendar() {
   }
 
   const weekDayShort = ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned'];
+  const hasActiveFilters = Boolean(filters.project_id || filters.user_id || filters.task_id);
 
   return (
     <div className="min-w-0 space-y-4 sm:space-y-6">
       {/* Calendar Controls */}
-      <div className="card p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+      <div className="card overflow-hidden p-3 sm:p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={() => navigateDate('prev')}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="rounded-lg border border-gray-200 p-2 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
             >
               <FiChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={goToToday}
-              className="px-4 py-2 btn-secondary text-sm"
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700"
             >
               Danas
             </button>
             <button
               onClick={() => navigateDate('next')}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="rounded-lg border border-gray-200 p-2 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
             >
               <FiChevronRight className="w-5 h-5" />
             </button>
-            <h2 className="ml-1 text-base font-semibold text-gray-900 dark:text-white sm:ml-4 sm:text-xl">
-              {formatDateHeader()}
-            </h2>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-1 flex-col gap-2 xl:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-900 dark:bg-dark-700 dark:text-white">
+                {formatDateHeader()}
+              </div>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  <FiX className="h-3.5 w-3.5" />
+                  Očisti
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                showFilters || Object.keys(filters).some(k => filters[k as keyof typeof filters])
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2 ${
+                showFilters || hasActiveFilters
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
@@ -339,15 +352,16 @@ export default function ProjectsCalendar() {
             >
               Mjesec
             </button>
+            </div>
           </div>
         </div>
 
         {/* Filters */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-dark-900/20">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   <FiFolder className="inline mr-1" size={14} />
                   Projekt
                 </label>
@@ -366,7 +380,7 @@ export default function ProjectsCalendar() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   <FiUser className="inline mr-1" size={14} />
                   Korisnik
                 </label>
@@ -385,10 +399,10 @@ export default function ProjectsCalendar() {
               </div>
 
               <div className="flex items-end">
-                {(filters.project_id || filters.user_id || filters.task_id) && (
+                {hasActiveFilters && (
                   <button
                     onClick={clearFilters}
-                    className="px-4 py-2 text-sm btn-secondary flex items-center gap-2"
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600"
                   >
                     <FiX className="w-4 h-4" />
                     Obriši filtere
@@ -400,22 +414,25 @@ export default function ProjectsCalendar() {
         )}
       </div>
 
-      {/* Legenda – boje usklađene s prikazom u kalendaru, simetrično poredane */}
-      <div className="card p-4">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Legenda</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+      {/* Legenda – kompaktnija da ostane više prostora za kalendar */}
+      <div className="card p-3 sm:p-4">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Legenda</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Boje projekta i zadataka</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
           {Object.entries(PROJECT_COLORS).map(([status, color]) => (
-            <div key={`proj-${status}`} className="flex items-center gap-2 min-w-0">
-              <div className="w-4 h-4 rounded shrink-0 flex-shrink-0" style={{ backgroundColor: color }} />
-              <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
+            <div key={`proj-${status}`} className="flex items-center gap-2 rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-dark-900/20">
+              <div className="h-3 w-3 rounded shrink-0 flex-shrink-0" style={{ backgroundColor: color }} />
+              <span className="truncate text-xs text-gray-600 dark:text-gray-400">
                 Projekt ({STATUS_LABELS[status] ?? status})
               </span>
             </div>
           ))}
           {(['urgent', 'high', 'medium', 'low', 'done'] as const).map((key) => (
-            <div key={`task-${key}`} className="flex items-center gap-2 min-w-0">
-              <div className="w-4 h-4 rounded shrink-0 flex-shrink-0" style={{ backgroundColor: TASK_COLORS[key] ?? '#3b82f6' }} />
-              <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
+            <div key={`task-${key}`} className="flex items-center gap-2 rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-dark-900/20">
+              <div className="h-3 w-3 rounded shrink-0 flex-shrink-0" style={{ backgroundColor: TASK_COLORS[key] ?? '#3b82f6' }} />
+              <span className="truncate text-xs text-gray-600 dark:text-gray-400">
                 Zadatak ({key === 'done' ? 'završeno' : PRIORITY_LABELS[key] ?? key})
               </span>
             </div>

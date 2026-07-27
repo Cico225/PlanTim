@@ -27,6 +27,7 @@ interface TimelineItem {
   color?: string;
   project_name?: string;
   project_id?: number;
+  task_id?: number;
   entity_type?: string;
   entity_id?: number;
   action?: string;
@@ -100,6 +101,9 @@ export default function ProjectsTimeline() {
       }
       if (filters.task_status) {
         params.task_status = filters.task_status;
+      }
+      if (filters.priority) {
+        params.priority = filters.priority;
       }
       if (filters.date_from) {
         params.date_from = filters.date_from;
@@ -181,6 +185,10 @@ export default function ProjectsTimeline() {
     setFilters({});
   };
 
+  const hasActiveFilters = Boolean(
+    filters.project_id || filters.user_id || filters.status || filters.task_status || filters.priority || filters.date_from || filters.date_to
+  );
+
   if (loading && timeline.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -192,26 +200,42 @@ export default function ProjectsTimeline() {
   return (
     <div className="min-w-0 space-y-4 sm:space-y-6">
       {/* Filters */}
-      <div className="card p-3 sm:p-4">
-        <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">Timeline Zadataka</h2>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-              showFilters || Object.keys(filters).some(k => filters[k as keyof typeof filters])
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            <FiFilter className="w-4 h-4" />
-            Filteri
-          </button>
+      <div className="card overflow-hidden p-3 sm:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">Timeline Zadataka</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Kompaktniji pregled aktivnosti kako bi lista ostala pregledna i fokusirana na zadatke.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                <FiX className="w-3.5 h-3.5" />
+                Očisti
+              </button>
+            )}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                showFilters || hasActiveFilters
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              <FiFilter className="w-4 h-4" />
+              Filteri
+            </button>
+          </div>
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-dark-900/20 md:grid-cols-2 lg:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <FiFolder className="inline mr-1" size={14} />
                 Projekt
               </label>
@@ -230,7 +254,7 @@ export default function ProjectsTimeline() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <FiUser className="inline mr-1" size={14} />
                 Osoba
               </label>
@@ -249,7 +273,7 @@ export default function ProjectsTimeline() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <FiTag className="inline mr-1" size={14} />
                 Status Zadatka
               </label>
@@ -268,7 +292,7 @@ export default function ProjectsTimeline() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <FiTag className="inline mr-1" size={14} />
                 Prioritet
               </label>
@@ -286,7 +310,7 @@ export default function ProjectsTimeline() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <FiCalendar className="inline mr-1" size={14} />
                 Od datuma
               </label>
@@ -299,7 +323,7 @@ export default function ProjectsTimeline() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <FiCalendar className="inline mr-1" size={14} />
                 Do datuma
               </label>
@@ -311,11 +335,11 @@ export default function ProjectsTimeline() {
               />
             </div>
 
-            {(filters.project_id || filters.user_id || filters.status || filters.task_status || filters.priority || filters.date_from || filters.date_to) && (
+            {hasActiveFilters && (
               <div className="flex items-end">
                 <button
                   onClick={clearFilters}
-                  className="px-4 py-2 text-sm btn-secondary flex items-center gap-2"
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600"
                 >
                   <FiX className="w-4 h-4" />
                   Obriši filtere
@@ -329,9 +353,12 @@ export default function ProjectsTimeline() {
       {/* Timeline */}
       <div className="card p-3 sm:p-6">
         {/* Legend */}
-        <div className="mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Legenda boja (prioritet):</h3>
-          <div className="flex flex-wrap gap-4 text-xs">
+        <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50/70 p-3 dark:border-gray-700 dark:bg-dark-900/20">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Legenda boja</h3>
+            <span className="text-xs text-gray-500 dark:text-gray-400">Prioritet zadataka</span>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded border-2" style={{ borderColor: '#ef4444', backgroundColor: '#ef444420' }}></div>
               <span className="text-gray-600 dark:text-gray-400">Urgentno</span>
@@ -360,7 +387,7 @@ export default function ProjectsTimeline() {
         ) : (
           <div className="relative">
             {/* Timeline Line */}
-            <div className="absolute left-[104px] top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+            <div className="absolute bottom-0 left-[84px] top-0 w-0.5 bg-gray-200 dark:bg-gray-700 sm:left-[104px]"></div>
             
             <div className="space-y-6">
               {timeline.map((item, index) => {
@@ -368,9 +395,9 @@ export default function ProjectsTimeline() {
                 const colorStyle = getColorStyle(item.color);
                 
                 return (
-                  <div key={`${item.type}-${item.id}-${index}`} className="relative flex items-start gap-4">
+                  <div key={`${item.type}-${item.id}-${index}`} className="relative flex items-start gap-3 sm:gap-4">
                     {/* Date - Left side above icon */}
-                    <div className="relative z-10 w-24 flex-shrink-0 pt-1">
+                    <div className="relative z-10 w-20 flex-shrink-0 pt-1 sm:w-24">
                       <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
                         <div className="whitespace-nowrap">{dateInfo.date}</div>
                         <div className="whitespace-nowrap mt-0.5">{dateInfo.time}</div>
@@ -379,7 +406,7 @@ export default function ProjectsTimeline() {
                     
                     {/* Icon */}
                     <div 
-                      className="relative z-10 flex items-center justify-center w-16 h-16 rounded-full border-2 bg-white dark:bg-gray-800 flex-shrink-0"
+                      className="relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border-2 bg-white dark:bg-gray-800 sm:h-16 sm:w-16"
                       style={{
                         borderColor: item.color || '#6366f1',
                         color: item.color || '#6366f1',
@@ -395,7 +422,7 @@ export default function ProjectsTimeline() {
                         if (item.type === 'project' && item.project_id) {
                           navigate(`/projects/${item.project_id}`);
                         } else if (item.type === 'task' && item.project_id) {
-                          navigate(`/projects/${item.project_id}?task=${item.id}`);
+                          navigate(`/projects/${item.project_id}?task=${item.task_id || item.id}`);
                         }
                       }}
                     >
@@ -405,10 +432,10 @@ export default function ProjectsTimeline() {
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="mb-1 flex flex-wrap items-center gap-2">
                               <h3 className="font-medium text-gray-900 dark:text-white">{item.title}</h3>
                               {item.type === 'task' && item.project_name && (
-                                <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                                <span className="rounded-full bg-gray-100 px-2 py-1 text-xs dark:bg-gray-700">
                                   {item.project_name}
                                 </span>
                               )}
