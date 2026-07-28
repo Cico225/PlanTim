@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FiArrowLeft, FiCheckCircle, FiMessageSquare, FiXCircle } from 'react-icons/fi';
 import AuthenticatedImage from '../components/AuthenticatedImage';
@@ -15,6 +15,7 @@ import {
 
 export default function ComplaintDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [complaint, setComplaint] = useState<RetailComplaint | null>(null);
   const [capabilities, setCapabilities] = useState<ComplaintCapabilities | null>(null);
@@ -89,6 +90,7 @@ export default function ComplaintDetailPage() {
     PAYMENT_METHODS.find((item) => item.value === complaint?.payment_method)?.label ||
     complaint?.payment_method ||
     '—';
+  const activeTab = searchParams.get('tab') === 'obrada' ? 'obrada' : 'unos';
 
   if (loading) {
     return (
@@ -109,11 +111,11 @@ export default function ComplaintDetailPage() {
   return (
     <div className="space-y-6">
       <Link
-        to="/planika/retail/reklamacije"
+        to={`/planika/retail/reklamacije?tab=${activeTab}`}
         className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400"
       >
         <FiArrowLeft size={16} />
-        Nazad na listu
+        Nazad na {activeTab === 'obrada' ? 'obradu reklamacija' : 'unos reklamacija'}
       </Link>
 
       <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800 sm:p-8">
