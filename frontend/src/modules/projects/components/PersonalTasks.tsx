@@ -156,7 +156,7 @@ export default function PersonalTasks() {
 
   const weekDays = ['Ponedeljak', 'Utorak', 'Srijeda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja'];
 
-  if (loading) {
+  if (loading && tasks.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -173,9 +173,9 @@ export default function PersonalTasks() {
         {/* Header */}
         <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="shrink-0">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white sm:text-2xl">Lični zadaci</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white sm:text-2xl">Upravljanje zadacima</h2>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-              {tasks.length} {tasks.length === 1 ? 'zadatak' : 'zadataka'}
+              Lični i dodijeljeni zadaci na jednom mjestu, ukupno {tasks.length} {tasks.length === 1 ? 'zadatak' : 'zadataka'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -240,6 +240,7 @@ export default function PersonalTasks() {
         <div className="mb-3 border-b border-gray-200 dark:border-dark-600 sm:mb-4">
           <nav className="-mb-px grid grid-cols-3 gap-1 sm:flex sm:gap-0 sm:space-x-8">
             <button
+              type="button"
               onClick={() => setActiveTab('all')}
               className={`border-b-2 px-1 pb-2 text-center text-xs font-medium transition-colors sm:pb-3 sm:text-left sm:text-base ${
                 activeTab === 'all'
@@ -250,6 +251,7 @@ export default function PersonalTasks() {
               Svi zadaci
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('created-for-others')}
               className={`border-b-2 px-1 pb-2 text-center text-xs font-medium transition-colors sm:pb-3 sm:text-left sm:text-base ${
                 activeTab === 'created-for-others'
@@ -260,6 +262,7 @@ export default function PersonalTasks() {
               Kreirani za druge
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('assigned-to-me')}
               className={`border-b-2 px-1 pb-2 text-center text-xs font-medium transition-colors sm:pb-3 sm:text-left sm:text-base ${
                 activeTab === 'assigned-to-me'
@@ -281,6 +284,12 @@ export default function PersonalTasks() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
+          {loading && (
+            <div className="inline-flex items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 text-xs font-medium text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600 dark:border-primary-700 dark:border-t-primary-300" />
+              Učitavanje...
+            </div>
+          )}
         </div>
       </div>
 

@@ -22,9 +22,11 @@ use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\PushNotificationController;
 use App\Http\Controllers\Api\PlanikaMaloprodajaController;
 use App\Http\Controllers\Api\PlanikaFinanceController;
+use App\Http\Controllers\Api\FinanceContractCompaniesController;
 use App\Http\Controllers\Api\RetailControlPlansController;
 use App\Http\Controllers\Api\RetailEducationPlansController;
 use App\Http\Controllers\Api\RetailControlRecordsController;
+use App\Http\Controllers\Api\RetailComplaintsController;
 use App\Http\Controllers\Api\MeetingRoomController;
 
 /*
@@ -655,6 +657,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // Automated Scenarios
         Route::get('/automated-scenarios', [PlanikaMaloprodajaController::class, 'checkAutomatedScenarios']);
+
+        // Reklamacije
+        Route::get('/complaints/capabilities', [RetailComplaintsController::class, 'capabilities']);
+        Route::get('/complaints', [RetailComplaintsController::class, 'index']);
+        Route::post('/complaints', [RetailComplaintsController::class, 'store']);
+        Route::put('/complaints/{id}', [RetailComplaintsController::class, 'update']);
+        Route::get('/complaints/{id}', [RetailComplaintsController::class, 'show']);
+        Route::post('/complaints/{id}/review', [RetailComplaintsController::class, 'review']);
+        Route::post('/complaints/{id}/photos/{slot}', [RetailComplaintsController::class, 'uploadPhoto']);
+        Route::get('/complaints/{id}/photos/{slot}', [RetailComplaintsController::class, 'getPhoto']);
     });
 
     // Planika Finansije (Krediti)
@@ -672,6 +684,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/krediti/{id}/verify-zabrana', [PlanikaFinanceController::class, 'verifyZabrana']);
         Route::post('/krediti/{id}/unpair-zabrana', [PlanikaFinanceController::class, 'unpairZabrana']);
         Route::delete('/krediti/{id}', [PlanikaFinanceController::class, 'deleteKredit']);
+
+        // Spiskovi aktivnih ugovora — firme
+        Route::get('/contract-companies', [FinanceContractCompaniesController::class, 'index']);
+        Route::post('/contract-companies', [FinanceContractCompaniesController::class, 'store']);
+        Route::post('/contract-companies/upload', [FinanceContractCompaniesController::class, 'uploadExcel']);
+        Route::get('/contract-companies/{id}', [FinanceContractCompaniesController::class, 'show']);
+        Route::put('/contract-companies/{id}', [FinanceContractCompaniesController::class, 'update']);
+        Route::delete('/contract-companies/{id}', [FinanceContractCompaniesController::class, 'destroy']);
+        Route::post('/contract-companies/{id}/employee-lists', [FinanceContractCompaniesController::class, 'uploadEmployeeList']);
+        Route::get('/contract-companies/{companyId}/employee-lists/{listId}', [FinanceContractCompaniesController::class, 'getEmployeeList']);
+        Route::delete('/contract-companies/{companyId}/employee-lists/{listId}', [FinanceContractCompaniesController::class, 'deleteEmployeeList']);
     });
 
     // Meeting Rooms (Kalendar zauzetosti sala za sastanke)

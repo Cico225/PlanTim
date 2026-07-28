@@ -35,18 +35,22 @@ export default function FinanceOverview() {
     <div className="flex h-full min-h-0 w-full max-w-full min-w-0 flex-col overflow-x-hidden">
       <div className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${isScanTab ? 'mb-2 sm:mb-4' : 'mb-4'}`}>
         <div>
-          <p className={`uppercase tracking-wide text-gray-500 dark:text-gray-400 ${isScanTab ? 'hidden text-sm sm:block' : 'text-sm'}`}>{t('planika.title')}</p>
+          <p className={`uppercase tracking-wide text-gray-500 dark:text-gray-400 ${isScanTab ? 'hidden text-sm sm:block' : 'text-sm'}`}>
+            {t('planika.title')}
+          </p>
           <h1 className={`font-bold text-gray-900 dark:text-white ${isScanTab ? 'text-lg sm:text-3xl' : 'text-2xl sm:text-3xl'}`}>
-            {t('planika.finance')}
+            Krediti — Upravljanje administrativnim zabranama
           </h1>
-          <p className={`text-gray-600 dark:text-gray-400 ${isScanTab ? 'hidden text-sm sm:mt-1 sm:block' : 'mt-1 text-sm'}`}>Krediti — uvoz, uparivanje zabrana i izvještaji</p>
+          <p className={`text-gray-600 dark:text-gray-400 ${isScanTab ? 'hidden text-sm sm:mt-1 sm:block' : 'mt-1 text-sm'}`}>
+            Pregled, uvoz, uparivanje zabrana i izvještaji
+          </p>
         </div>
         <Link
-          to="/planika"
+          to="/planika/finance"
           className={`inline-flex items-center gap-1 font-medium text-primary-600 hover:underline dark:text-primary-400 ${isScanTab ? 'text-xs sm:text-sm' : 'text-sm'}`}
         >
           <FiArrowLeft size={16} />
-          {t('planika.title')}
+          Finansije
         </Link>
       </div>
 

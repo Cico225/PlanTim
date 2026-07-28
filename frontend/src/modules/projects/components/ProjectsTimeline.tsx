@@ -175,9 +175,9 @@ export default function ProjectsTimeline() {
 
   const handleItemClick = (item: TimelineItem) => {
     if (item.type === 'project' && item.project_id) {
-      navigate(`/projects/${item.project_id}`);
+      navigate(`/projects/project-management/${item.project_id}`);
     } else if (item.type === 'task' && item.task_id && item.project_id) {
-      navigate(`/projects/${item.project_id}?task=${item.task_id}`);
+      navigate(`/projects/project-management/${item.project_id}?task=${item.task_id}`);
     }
   };
 
@@ -418,13 +418,7 @@ export default function ProjectsTimeline() {
                     {/* Content */}
                     <div 
                       className={`flex-1 pb-6 cursor-pointer hover:opacity-80 transition-opacity ${item.type === 'project' || item.type === 'task' ? 'cursor-pointer' : ''}`}
-                      onClick={() => {
-                        if (item.type === 'project' && item.project_id) {
-                          navigate(`/projects/${item.project_id}`);
-                        } else if (item.type === 'task' && item.project_id) {
-                          navigate(`/projects/${item.project_id}?task=${item.task_id || item.id}`);
-                        }
-                      }}
+                      onClick={() => handleItemClick({ ...item, task_id: item.task_id || item.id })}
                     >
                       <div 
                         className="rounded-lg p-4 border-l-4 bg-white dark:bg-gray-800"

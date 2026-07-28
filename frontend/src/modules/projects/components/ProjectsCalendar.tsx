@@ -256,9 +256,9 @@ export default function ProjectsCalendar() {
 
   const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'project' && event.project_id) {
-      navigate(`/projects/${event.project_id}`);
+      navigate(`/projects/project-management/${event.project_id}`);
     } else if (event.type === 'task' && event.task_id && event.project_id) {
-      navigate(`/projects/${event.project_id}?task=${event.task_id}`);
+      navigate(`/projects/project-management/${event.project_id}?task=${event.task_id}`);
     }
   };
 
