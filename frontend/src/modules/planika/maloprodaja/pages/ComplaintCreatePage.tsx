@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FiArrowLeft, FiSave } from 'react-icons/fi';
 import ComplaintPhotoSlot from '../components/ComplaintPhotoSlot';
@@ -62,6 +62,7 @@ function toPayload(form: typeof emptyForm, selectedStoreId: string): CreateCompl
 
 export default function ComplaintCreatePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState(emptyForm);
   const [capabilities, setCapabilities] = useState<ComplaintCapabilities | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState('');
@@ -84,12 +85,13 @@ export default function ComplaintCreatePage() {
     () => new Date().toLocaleDateString('bs-BA', { day: '2-digit', month: '2-digit', year: 'numeric' }),
     []
   );
+  const activeTab = searchParams.get('tab') === 'obrada' ? 'obrada' : 'unos';
 
   useEffect(() => {
     retailComplaintsService.getCapabilities().then((caps) => {
       if (!caps.can_create) {
         toast.error('Nemate dozvolu za unos reklamacija');
-        navigate('/planika/retail/reklamacije');
+        navigate('/planika/retail/reklamacije?tab=obrada');
         return;
       }
       setCapabilities(caps);
@@ -191,7 +193,7 @@ export default function ComplaintCreatePage() {
       const result = await retailComplaintsService.update(complaintId, payload);
 
       toast.success('Zahtjev za reklamacijom je zaprimljen');
-      navigate(`/planika/retail/reklamacije/${result.id}`);
+      navigate(`/planika/retail/reklamacije/${result.id}?tab=${activeTab}`);
     } catch {
       toast.error('Greška pri spremanju reklamacije');
     } finally {
@@ -203,7 +205,7 @@ export default function ComplaintCreatePage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link
-          to="/planika/retail/reklamacije"
+          to={`/planika/retail/reklamacije?tab=${activeTab}`}
           className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400"
         >
           <FiArrowLeft size={16} />

@@ -1,8 +1,9 @@
 {
-    "version": "1.2.4",
+    "version": "1.2.5",
     "version_name": "Release 2026-07-28",
-    "release_notes": "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije.",
+    "release_notes": "Dorada funkcionalnosti Reklamacije.",
     "changelog": [
+        "Dorada funkcionalnosti Reklamacije.",
         "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije.",
         "Dorada modula Upravljanje projektima!",
         "Promjena nova verzija.",

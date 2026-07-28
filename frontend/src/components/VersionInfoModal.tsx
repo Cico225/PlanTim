@@ -250,13 +250,13 @@ export default function VersionInfoModal({
                       >
                         <details className="group rounded-xl border border-gray-100 bg-white dark:border-dark-600 dark:bg-dark-900/20">
                           <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium text-gray-800 dark:text-gray-100">
-                            <span className="inline-flex items-center gap-2">
+                            <span className="flex min-w-0 flex-wrap items-center gap-2">
                               <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-[11px] dark:bg-dark-700">
                               v{entry.version}
                               </span>
-                              <span className="truncate">{entry.version_name || 'Verzija'}</span>
+                              <span className="min-w-0 break-words">{entry.version_name || 'Verzija'}</span>
                               {entry.released_at && (
-                                <span className="text-[11px] font-normal text-gray-500 dark:text-gray-400">
+                                <span className="break-words text-[11px] font-normal text-gray-500 dark:text-gray-400">
                                   · {formatDate(entry.released_at)}
                                 </span>
                               )}
