@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ModulePermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -15,35 +16,49 @@ class RetailComplaintsController extends Controller
 {
     private const STORAGE_FOLDER = 'planika_maloprodaja_complaints';
 
+    private const MODULE_NAME = 'planika.maloprodaja.reklamacije';
+
     private function isAdmin($user): bool
     {
-        if (method_exists($user, 'hasAnyRole')) {
-            try {
-                return $user->hasAnyRole(['admin', 'super-admin']);
-            } catch (\Exception $e) {
-                Log::warning('Failed to check user roles', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return isset($user->role) && in_array(strtolower($user->role), ['admin', 'super-admin']);
+        return ModulePermissionHelper::isAdmin($user);
     }
 
     private function canReview($user): bool
     {
-        return $this->isAdmin($user)
-            || (method_exists($user, 'can') && $user->can('planika.maloprodaja.complaints.review'));
+        return ModulePermissionHelper::allows(
+            $user,
+            self::MODULE_NAME,
+            'review',
+            'planika.maloprodaja.complaints.review'
+        );
     }
 
     private function canViewAll($user): bool
     {
-        return $this->canReview($user)
-            || (method_exists($user, 'can') && $user->can('planika.maloprodaja.complaints.view_all'));
+        return ModulePermissionHelper::allows(
+            $user,
+            self::MODULE_NAME,
+            'view_all',
+            'planika.maloprodaja.complaints.view_all'
+        );
     }
 
     private function canCreate($user): bool
     {
-        return $this->isAdmin($user)
-            || (method_exists($user, 'can') && $user->can('planika.maloprodaja.complaints.create'));
+        return ModulePermissionHelper::allows(
+            $user,
+            self::MODULE_NAME,
+            'create',
+            'planika.maloprodaja.complaints.create'
+        );
+    }
+
+    private function canAccessModule($user): bool
+    {
+        return ModulePermissionHelper::hasModuleAccess($user, self::MODULE_NAME)
+            || $this->canCreate($user)
+            || $this->canReview($user)
+            || $this->canViewAll($user);
     }
 
     private function getEmployeeStoreId($user): ?int
@@ -191,6 +206,10 @@ class RetailComplaintsController extends Controller
     {
         $user = $request->user();
 
+        if (!$this->canAccessModule($user)) {
+            return response()->json(['error' => 'Nemate dozvolu za modul reklamacija'], 403);
+        }
+
         $storeId = $this->getEmployeeStoreId($user);
         $requiresStoreSelection = $this->canViewAll($user) && !$storeId;
         $stores = [];
@@ -219,6 +238,10 @@ class RetailComplaintsController extends Controller
         }
 
         $user = $request->user();
+        if (!$this->canAccessModule($user)) {
+            return response()->json(['error' => 'Nemate dozvolu za pregled reklamacija'], 403);
+        }
+
         $query = DB::table('planika_maloprodaja_complaints as c')
             ->leftJoin('hrm_stores as s', 's.id', '=', 'c.store_id')
             ->leftJoin('users as u', 'u.id', '=', 'c.created_by')

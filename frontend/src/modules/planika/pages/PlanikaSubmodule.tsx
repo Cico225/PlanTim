@@ -5,7 +5,7 @@ import { PLANIKA_SUBMODULES } from '../constants';
 import PlanikaSubmoduleAnimation from '../components/PlanikaSubmoduleAnimation';
 import MaloprodajaOverview from '../maloprodaja/pages/MaloprodajaOverview';
 import FinanceLandingPage from '../finance/FinanceLandingPage';
-import HRMOverview from '../../hrm/pages/HRMOverview';
+import HRLandingPage from '../hr/HRLandingPage';
 
 export default function PlanikaSubmodule() {
   const { submoduleId } = useParams<{ submoduleId: string }>();
@@ -25,9 +25,9 @@ export default function PlanikaSubmodule() {
     return <MaloprodajaOverview />;
   }
 
-  // Route to HRM module for hr submodule
+  // Ljudski resursi — hub sa panelima
   if (submoduleId === 'hr') {
-    return <HRMOverview />;
+    return <HRLandingPage />;
   }
 
   // Finansije — hub sa panelima

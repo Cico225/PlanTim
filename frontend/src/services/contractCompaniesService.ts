@@ -6,9 +6,19 @@ import type {
   ContractCompanyFormData,
 } from '@/types/contract-companies';
 
+export interface ContractCompaniesCapabilities {
+  can_view: boolean;
+  can_manage: boolean;
+  can_import: boolean;
+}
+
 const BASE = '/planika/finance/contract-companies';
 
 export const contractCompaniesService = {
+  getCapabilities(): Promise<ContractCompaniesCapabilities> {
+    return apiService.get(`${BASE}/capabilities`);
+  },
+
   list(params?: { search?: string; city?: string }): Promise<ContractCompaniesResponse> {
     return apiService.get(BASE, params);
   },

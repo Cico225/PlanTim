@@ -87,6 +87,19 @@ class RolePermissionSeeder extends Seeder
             );
         }
 
+        // Planika Finansije — ugovori
+        $financePermissions = [
+            'planika.finance.ugovori.view' => 'View contract companies',
+            'planika.finance.ugovori.manage' => 'Manage contract companies',
+            'planika.finance.ugovori.import' => 'Import contract companies',
+        ];
+
+        foreach ($financePermissions as $name => $displayName) {
+            Permission::updateOrCreate(
+                ['name' => $name, 'guard_name' => 'web']
+            );
+        }
+
         // Create Roles
         $superAdmin = Role::firstOrCreate(
             ['name' => 'super-admin', 'guard_name' => 'web']

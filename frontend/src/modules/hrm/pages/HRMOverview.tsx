@@ -2075,9 +2075,21 @@ function HRReports() {
 }
 
 // Main Component
-export default function HRMOverview() {
+interface HRMOverviewProps {
+  initialTab?: TabKey;
+  hideNavigation?: boolean;
+}
+
+export default function HRMOverview({
+  initialTab = 'dashboard',
+  hideNavigation = false,
+}: HRMOverviewProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -2101,49 +2113,56 @@ export default function HRMOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          {t('hrm.title')}
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Upravljanje ljudskim resursima i životnim ciklusom zaposlenika
-          </p>
-        </div>
-      </div>
+      {!hideNavigation && (
+        <>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {t('hrm.title')}
+              </h1>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">
+                Upravljanje ljudskim resursima i životnim ciklusom zaposlenika
+              </p>
+            </div>
+          </div>
 
-      {/* Navigation Cards - Always visible - 13 tabs in 2 rows: 7 in first row, 6 in second row */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-7 gap-1.5 sm:gap-2">
-        {navItems.map((item) => {
-          const isActive = activeTab === item.key;
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              onClick={() => setActiveTab(item.key)}
-              className={`
-                flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-lg transition-all min-h-[55px] sm:min-h-[58px] w-full
-                ${isActive
-                  ? 'bg-blue-600 text-white shadow-md scale-[1.01]'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
-                }
-              `}
-              title={item.description}
-            >
-              <Icon className={`w-[18px] h-[18px] sm:w-5 sm:h-5 mb-1 flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
-              <span className="text-[10px] sm:text-xs font-medium text-center leading-tight px-0.5 line-clamp-2 break-words">{item.label}</span>
-            </button>
-          );
-        })}
-        </div>
-      </div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50 sm:p-4">
+            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 sm:gap-2 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-7">
+              {navItems.map((item) => {
+                const isActive = activeTab === item.key;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setActiveTab(item.key)}
+                    className={`
+                      flex min-h-[55px] w-full flex-col items-center justify-center rounded-lg p-1 transition-all sm:min-h-[58px] sm:p-1.5
+                      ${
+                        isActive
+                          ? 'scale-[1.01] bg-blue-600 text-white shadow-md'
+                          : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                      }
+                    `}
+                    title={item.description}
+                  >
+                    <Icon
+                      className={`mb-1 h-[18px] w-[18px] flex-shrink-0 sm:h-5 sm:w-5 ${
+                        isActive ? 'text-white' : 'text-gray-600 dark:text-gray-400'
+                      }`}
+                    />
+                    <span className="line-clamp-2 break-words px-0.5 text-center text-[10px] font-medium leading-tight sm:text-xs">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
 
-      {/* Content */}
-      <div className="min-h-[400px]">
-        {renderContent()}
-      </div>
+      <div className="min-h-[400px]">{renderContent()}</div>
     </div>
   );
 }

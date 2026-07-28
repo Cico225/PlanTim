@@ -12,23 +12,9 @@ import {
 import toast from 'react-hot-toast';
 import AuthenticatedImage from '@/modules/planika/maloprodaja/components/AuthenticatedImage';
 import { contractCompaniesService } from '@/services/contractCompaniesService';
-import { useAuthStore } from '@/store/authStore';
-import type { ContractCompany, ContractCompanyFormData } from '@/types/contract-companies';
+import type { ContractCompany, ContractCompanyFormData, ContractCompaniesCapabilities } from '@/types/contract-companies';
 
 const emptyForm: ContractCompanyFormData = { name: '', code: '', city: '', notes: '' };
-
-function isAdminUser(user: ReturnType<typeof useAuthStore.getState>['user']): boolean {
-  if (!user) return false;
-  const role = user.role?.toLowerCase();
-  if (role === 'admin' || role === 'super-admin') return true;
-  const roles = (user as { roles?: string[] }).roles;
-  return (
-    roles?.some((r) => {
-      const lower = r?.toLowerCase();
-      return lower === 'admin' || lower === 'super-admin' || lower === 'super admin';
-    }) ?? false
-  );
-}
 
 function formatBytes(bytes?: number | null): string {
   if (!bytes) return '—';
@@ -38,8 +24,10 @@ function formatBytes(bytes?: number | null): string {
 }
 
 export default function ContractCompaniesPage() {
-  const { user } = useAuthStore();
-  const canManage = isAdminUser(user);
+  const [capabilities, setCapabilities] = useState<ContractCompaniesCapabilities | null>(null);
+  const canManage = capabilities?.can_manage ?? false;
+  const canImport = capabilities?.can_import ?? false;
+  const canAdminister = canManage || canImport;
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<ContractCompany[]>([]);
   const [cities, setCities] = useState<string[]>([]);
@@ -66,10 +54,14 @@ export default function ContractCompaniesPage() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await contractCompaniesService.list({
-        search: search.trim() || undefined,
-        city: cityFilter || undefined,
-      });
+      const [caps, res] = await Promise.all([
+        contractCompaniesService.getCapabilities(),
+        contractCompaniesService.list({
+          search: search.trim() || undefined,
+          city: cityFilter || undefined,
+        }),
+      ]);
+      setCapabilities(caps);
       setCompanies(res.data);
       setCities(res.cities ?? []);
     } catch {
@@ -286,7 +278,7 @@ export default function ContractCompaniesPage() {
         >
           Pregled firmi i spiskova
         </button>
-        {canManage && (
+        {canAdminister && (
           <button
             type="button"
             onClick={() => setActiveTab('administracija')}
@@ -338,16 +330,18 @@ export default function ContractCompaniesPage() {
           </button>
         </form>
 
-        {canManage && activeTab === 'administracija' && (
+        {canAdminister && activeTab === 'administracija' && (
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setShowExcel((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium dark:border-dark-600 dark:bg-dark-800"
-            >
-              <FiUpload size={16} />
-              Uvoz Excel
-            </button>
+            {canImport && (
+              <button
+                type="button"
+                onClick={() => setShowExcel((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium dark:border-dark-600 dark:bg-dark-800"
+              >
+                <FiUpload size={16} />
+                Uvoz Excel
+              </button>
+            )}
             <button
               type="button"
               onClick={openCreate}
@@ -360,13 +354,13 @@ export default function ContractCompaniesPage() {
         )}
       </div>
 
-      {!canManage && (
+      {!canAdminister && (
         <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm text-sky-800 dark:border-sky-900/40 dark:bg-sky-900/10 dark:text-sky-200">
-          Dostupan vam je pregled firmi i spiskova. Unos i izmjene su dostupni samo u administratorskom tabu.
+          Dostupan vam je pregled firmi i spiskova. Unos i izmjene su dostupni samo korisnicima sa administrativnom dozvolom.
         </div>
       )}
 
-      {canManage && activeTab === 'administracija' && showExcel && (
+      {canImport && activeTab === 'administracija' && showExcel && (
         <div className="card space-y-4 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -412,7 +406,7 @@ export default function ContractCompaniesPage() {
           </div>
         ) : companies.length === 0 ? (
           <div className="py-16 text-center text-sm text-gray-500 dark:text-gray-400">
-            {canManage && activeTab === 'administracija'
+            {canAdminister && activeTab === 'administracija'
               ? 'Nema firmi za prikaz. Dodajte ručno ili uvezite iz Excel-a.'
               : 'Nema firmi za prikaz.'}
           </div>
@@ -454,7 +448,7 @@ export default function ContractCompaniesPage() {
                         >
                           <FiFile size={16} />
                         </button>
-                        {canManage && activeTab === 'administracija' && (
+                        {canAdminister && activeTab === 'administracija' && (
                           <>
                             <button
                               type="button"
@@ -608,7 +602,7 @@ export default function ContractCompaniesPage() {
                   )}
                 </div>
 
-                {canManage && activeTab === 'administracija' && (
+                {canAdminister && activeTab === 'administracija' && (
                   <div className="rounded-xl border border-dashed border-gray-300 p-4 dark:border-dark-600">
                     <h4 className="mb-3 text-sm font-medium text-gray-900 dark:text-white">
                       Učitaj novi spisak (slika ili PDF)
@@ -679,7 +673,7 @@ export default function ContractCompaniesPage() {
                             >
                               Zoom +
                             </button>
-                            {canManage && activeTab === 'administracija' && (
+                            {canAdminister && activeTab === 'administracija' && (
                               <button
                                 type="button"
                                 onClick={() => handleListDelete(activeList.id)}
@@ -732,7 +726,7 @@ export default function ContractCompaniesPage() {
                           >
                             Zoom +
                           </button>
-                          {canManage && activeTab === 'administracija' && (
+                          {canAdminister && activeTab === 'administracija' && (
                             <button
                               type="button"
                               onClick={() => handleListDelete(activeList.id)}
