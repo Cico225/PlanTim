@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\PlanikaModuleRegistry;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -141,42 +142,6 @@ class SystemModulesSeeder extends Seeder
                 'sort_order' => 11,
             ],
             [
-                'name' => 'planika.finance',
-                'parent_name' => 'planika',
-                'display_name' => 'Finansije i računovodstvo',
-                'description' => 'Finansijski podmodul Planika',
-                'icon' => 'FiDollarSign',
-                'route' => '/planika/finance',
-                'available_permissions' => json_encode(['view_reports', 'manage_budgets']),
-                'is_active' => true,
-                'is_plugin' => true,
-                'sort_order' => 111,
-            ],
-            [
-                'name' => 'planika.finance.krediti',
-                'parent_name' => 'planika.finance',
-                'display_name' => 'Krediti — Upravljanje administrativnim zabranama',
-                'description' => 'Uvoz, uparivanje administrativnih zabrana i izvještaji',
-                'icon' => 'FiCreditCard',
-                'route' => '/planika/finance/krediti',
-                'available_permissions' => json_encode(['import', 'pair', 'export', 'report']),
-                'is_active' => true,
-                'is_plugin' => true,
-                'sort_order' => 112,
-            ],
-            [
-                'name' => 'planika.finance.ugovori',
-                'parent_name' => 'planika.finance',
-                'display_name' => 'Krediti — Spiskovi aktivnih ugovora',
-                'description' => 'Pregled spiskova aktivnih kreditnih ugovora',
-                'icon' => 'FiFileText',
-                'route' => '/planika/finance/ugovori',
-                'available_permissions' => json_encode(['view', 'export']),
-                'is_active' => true,
-                'is_plugin' => true,
-                'sort_order' => 113,
-            ],
-            [
                 'name' => 'ai',
                 'display_name' => 'AI Assistant',
                 'description' => 'AI-powered features and automation',
@@ -224,5 +189,7 @@ class SystemModulesSeeder extends Seeder
                 ])
             );
         }
+
+        PlanikaModuleRegistry::sync();
     }
 }

@@ -44,6 +44,40 @@ const BASIC_PERMS = [
   'can_import',
 ] as const;
 
+const PERMISSION_LABELS: Record<string, string> = {
+  can_view: 'Pregled modula',
+  can_read: 'Čitanje',
+  can_create: 'Kreiranje',
+  can_update: 'Izmjena',
+  can_delete: 'Brisanje',
+  can_export: 'Izvoz',
+  can_import: 'Uvoz',
+  create: 'Unos reklamacija',
+  view_own: 'Pregled svoje prodavnice',
+  review: 'Obrada reklamacija',
+  view_all: 'Pregled svih prodavnica',
+  manage: 'Administracija',
+  import: 'Uvoz Excel',
+  view: 'Pregled',
+  pair: 'Uparivanje zabrana',
+  report: 'Izvještaji',
+  controls_create: 'Unos kontrola',
+  controls_review: 'Pregled kontrola',
+  evaluations_create: 'Unos evaluacija',
+  plans_manage: 'Upravljanje planovima',
+  stores_manage: 'Upravljanje prodavnicama',
+  reports_view: 'Pregled izvještaja',
+  reports_view_all: 'Pregled svih izvještaja',
+  view_reports: 'Finansijski izvještaji',
+  manage_budgets: 'Upravljanje budžetom',
+  export: 'Izvoz podataka',
+};
+
+function labelForPermission(key: string): string {
+  if (PERMISSION_LABELS[key]) return PERMISSION_LABELS[key];
+  return key.replace(/_/g, ' ');
+}
+
 function buildPermissionTree(permissions: ModulePermission[]): PermissionNode[] {
   const nodes = new Map<string, PermissionNode>();
 
@@ -215,7 +249,7 @@ export default function ModulePermissionsTree({ permissions, onChange }: ModuleP
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
               }`}
             >
-              {perm === 'can_view' ? t('admin.canView') || 'Pregled' : perm.replace('can_', '').replace('_', ' ')}
+              {perm === 'can_view' ? t('admin.canView') || 'Pregled' : labelForPermission(perm)}
             </button>
           );
         })}
@@ -248,7 +282,7 @@ export default function ModulePermissionsTree({ permissions, onChange }: ModuleP
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300'
                   }`}
                 >
-                  {customPerm.replace(/_/g, ' ')}
+                  {labelForPermission(customPerm)}
                 </button>
               );
             })}

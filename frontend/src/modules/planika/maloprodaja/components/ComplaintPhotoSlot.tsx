@@ -1,6 +1,64 @@
 import { useRef, useState } from 'react';
 import { FiCamera, FiCheck, FiImage } from 'react-icons/fi';
 
+const MAX_IMAGE_DIMENSION = 1600;
+const JPEG_QUALITY = 0.78;
+
+function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Neuspješno učitavanje slike'));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function optimizeImageFile(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) {
+    return file;
+  }
+
+  const image = await loadImageFromFile(file);
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.width, image.height));
+  const targetWidth = Math.max(1, Math.round(image.width * scale));
+  const targetHeight = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return file;
+  }
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
+  });
+
+  if (!blob) {
+    return file;
+  }
+
+  const optimizedName = file.name.replace(/\.[^.]+$/, '') || `complaint-${Date.now()}`;
+  return new File([blob], `${optimizedName}.jpg`, {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  });
+}
+
 interface ComplaintPhotoSlotProps {
   label: string;
   slot: number;
@@ -31,9 +89,10 @@ export default function ComplaintPhotoSlot({
 
     try {
       setUploading(true);
-      objectUrl = URL.createObjectURL(file);
+      const optimizedFile = await optimizeImageFile(file);
+      objectUrl = URL.createObjectURL(optimizedFile);
       setLocalPreview(objectUrl);
-      await onSelect(slot, file);
+      await onSelect(slot, optimizedFile);
     } catch {
       setLocalPreview(null);
       if (objectUrl) {
@@ -115,7 +174,9 @@ export default function ComplaintPhotoSlot({
       )}
 
       {uploading && (
-        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Optimizacija i upload...</p>
+        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+          Automatska optimizacija i upload...
+        </p>
       )}
     </div>
   );

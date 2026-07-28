@@ -686,6 +686,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/krediti/{id}', [PlanikaFinanceController::class, 'deleteKredit']);
 
         // Spiskovi aktivnih ugovora — firme
+        Route::get('/contract-companies/capabilities', [FinanceContractCompaniesController::class, 'capabilities']);
         Route::get('/contract-companies', [FinanceContractCompaniesController::class, 'index']);
         Route::post('/contract-companies', [FinanceContractCompaniesController::class, 'store']);
         Route::post('/contract-companies/upload', [FinanceContractCompaniesController::class, 'uploadExcel']);

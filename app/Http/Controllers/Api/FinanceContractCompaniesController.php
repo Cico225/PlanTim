@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Imports\ContractCompaniesImport;
+use App\Support\ModulePermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -15,28 +16,47 @@ use Maatwebsite\Excel\Facades\Excel;
 class FinanceContractCompaniesController extends Controller
 {
     private const STORAGE_FOLDER = 'planika_finance_contract_employee_lists';
+    private const MODULE_NAME = 'planika.finance.ugovori';
 
     private function isAdmin($user): bool
     {
-        if (!$user) {
-            return false;
-        }
-
-        if (method_exists($user, 'hasAnyRole')) {
-            try {
-                return $user->hasAnyRole(['admin', 'super-admin']);
-            } catch (\Throwable $e) {
-                Log::warning('Failed to check finance contract company roles', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return isset($user->role) && in_array(strtolower((string) $user->role), ['admin', 'super-admin'], true);
+        return ModulePermissionHelper::isAdmin($user);
     }
 
-    private function ensureAdmin(Request $request)
+    private function canView($user): bool
     {
-        if (!$this->isAdmin($request->user())) {
-            return response()->json(['message' => 'Nemate dozvolu za ovu akciju.'], 403);
+        return ModulePermissionHelper::hasModuleAccess($user, self::MODULE_NAME)
+            || ModulePermissionHelper::allows($user, self::MODULE_NAME, 'view');
+    }
+
+    private function canManage($user): bool
+    {
+        return ModulePermissionHelper::allows($user, self::MODULE_NAME, 'manage');
+    }
+
+    private function ensureView(Request $request)
+    {
+        if (!$this->canView($request->user())) {
+            return response()->json(['message' => 'Nemate dozvolu za pregled modula.'], 403);
+        }
+
+        return null;
+    }
+
+    private function ensureManage(Request $request)
+    {
+        if (!$this->canManage($request->user())) {
+            return response()->json(['message' => 'Nemate dozvolu za administraciju modula.'], 403);
+        }
+
+        return null;
+    }
+
+    private function ensureImport(Request $request)
+    {
+        $user = $request->user();
+        if (!$this->canManage($user) && !ModulePermissionHelper::allows($user, self::MODULE_NAME, 'import')) {
+            return response()->json(['message' => 'Nemate dozvolu za uvoz podataka.'], 403);
         }
 
         return null;
@@ -67,8 +87,23 @@ class FinanceContractCompaniesController extends Controller
         return $data;
     }
 
+    public function capabilities(Request $request)
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'can_view' => $this->canView($user),
+            'can_manage' => $this->canManage($user),
+            'can_import' => $this->canManage($user) || ModulePermissionHelper::allows($user, self::MODULE_NAME, 'import'),
+        ]);
+    }
+
     public function index(Request $request)
     {
+        if ($response = $this->ensureView($request)) {
+            return $response;
+        }
+
         if (!$this->tablesExist()) {
             return response()->json(['data' => [], 'total' => 0]);
         }
@@ -109,6 +144,10 @@ class FinanceContractCompaniesController extends Controller
 
     public function show(Request $request, $id)
     {
+        if ($response = $this->ensureView($request)) {
+            return $response;
+        }
+
         if (!$this->tablesExist()) {
             return response()->json(['error' => 'Modul nije dostupan'], 503);
         }
@@ -132,7 +171,7 @@ class FinanceContractCompaniesController extends Controller
             return response()->json(['error' => 'Modul nije dostupan'], 503);
         }
 
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureManage($request)) {
             return $response;
         }
 
@@ -169,7 +208,7 @@ class FinanceContractCompaniesController extends Controller
             return response()->json(['error' => 'Modul nije dostupan'], 503);
         }
 
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureManage($request)) {
             return $response;
         }
 
@@ -210,7 +249,7 @@ class FinanceContractCompaniesController extends Controller
             return response()->json(['error' => 'Modul nije dostupan'], 503);
         }
 
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureManage($request)) {
             return $response;
         }
 
@@ -237,7 +276,7 @@ class FinanceContractCompaniesController extends Controller
             return response()->json(['error' => 'Modul nije dostupan'], 503);
         }
 
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureImport($request)) {
             return $response;
         }
 
@@ -276,7 +315,7 @@ class FinanceContractCompaniesController extends Controller
             return response()->json(['error' => 'Modul nije dostupan'], 503);
         }
 
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureManage($request)) {
             return $response;
         }
 
@@ -325,8 +364,12 @@ class FinanceContractCompaniesController extends Controller
         ], 201);
     }
 
-    public function getEmployeeList($companyId, $listId)
+    public function getEmployeeList(Request $request, $companyId, $listId)
     {
+        if ($response = $this->ensureView($request)) {
+            return $response;
+        }
+
         $list = DB::table('planika_finance_contract_employee_lists')
             ->where('id', $listId)
             ->where('company_id', $companyId)
@@ -344,7 +387,7 @@ class FinanceContractCompaniesController extends Controller
 
     public function deleteEmployeeList(Request $request, $companyId, $listId)
     {
-        if ($response = $this->ensureAdmin($request)) {
+        if ($response = $this->ensureManage($request)) {
             return $response;
         }
 

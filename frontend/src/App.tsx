@@ -54,7 +54,8 @@ import PlanikaOverview from './modules/planika/pages/PlanikaOverview';
 import PlanikaSubmodule from './modules/planika/pages/PlanikaSubmodule';
 import FinanceModuleEntry from './modules/planika/finance/FinanceModuleEntry';
 import ActiveContractsPage from './modules/planika/finance/ActiveContractsPage';
-import RetailComplaintsPage from './modules/planika/maloprodaja/pages/RetailComplaintsPage';
+import RetailComplaintsModuleEntry from './modules/planika/maloprodaja/RetailComplaintsModuleEntry';
+import HRModuleEntry from './modules/planika/hr/HRModuleEntry';
 
 // AI
 import AIOverview from './modules/ai/pages/AIOverview';
@@ -135,7 +136,8 @@ function App() {
             <Route path="/planika" element={<PlanikaOverview />} />
             <Route path="/planika/finance/krediti/*" element={<FinanceModuleEntry />} />
             <Route path="/planika/finance/ugovori" element={<ActiveContractsPage />} />
-            <Route path="/planika/retail/reklamacije/*" element={<RetailComplaintsPage />} />
+            <Route path="/planika/retail/reklamacije/*" element={<RetailComplaintsModuleEntry />} />
+            <Route path="/planika/hr/:section" element={<HRModuleEntry />} />
             <Route path="/planika/:submoduleId" element={<PlanikaSubmodule />} />
             <Route path="/ai/*" element={<AIOverview />} />
             <Route path="/meeting-rooms/*" element={<MeetingRoomsOverview />} />
