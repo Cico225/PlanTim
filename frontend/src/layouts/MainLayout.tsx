@@ -208,33 +208,16 @@ export default function MainLayout() {
       }
 
       const financeModule = accessibleByName.get('planika.finance');
-      const financeChildren = userModules.filter((m) => m.parent_name === 'planika.finance');
+      const hasFinanceAccess =
+        !!financeModule || userModules.some((m) => m.name.startsWith('planika.finance'));
 
-      if (financeModule) {
-        const children: PlanikaNavItem[] = financeChildren.map((module) => ({
-          name: module.display_name,
-          href: module.route || '/planika/finance/krediti',
-          icon: getModuleIcon(module.icon || 'FiCreditCard'),
-          color: 'teal',
-          isFinanceChild: true,
-        }));
-
+      // Finansije se prikazuje kao jedan meni bez podmenija — hub sa panelima
+      if (hasFinanceAccess) {
         items.push({
-          name: financeModule.display_name,
-          href: children[0]?.href || financeModule.route || '/planika/finance',
-          icon: getModuleIcon(financeModule.icon || 'FiDollarSign'),
+          name: financeModule?.display_name || t('planika.finance'),
+          href: financeModule?.route || '/planika/finance',
+          icon: getModuleIcon(financeModule?.icon || 'FiDollarSign'),
           color: 'teal',
-          hasFinanceChildren: children.length > 0,
-          children,
-        });
-      } else {
-        financeChildren.forEach((module) => {
-          items.push({
-            name: module.display_name,
-            href: module.route || '/planika/finance/krediti',
-            icon: getModuleIcon(module.icon || 'FiCreditCard'),
-            color: 'teal',
-          });
         });
       }
 

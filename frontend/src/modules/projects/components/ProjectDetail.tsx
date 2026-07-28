@@ -41,7 +41,7 @@ export default function ProjectDetail() {
     // Check if projectId is a valid number (not "new" or other string)
     const projectIdNum = Number(projectId);
     if (isNaN(projectIdNum) || projectIdNum <= 0) {
-      navigate('/projects');
+      navigate('/projects/project-management');
       return;
     }
 
@@ -52,7 +52,7 @@ export default function ProjectDetail() {
     } catch (error) {
       console.error('Error fetching project:', error);
       toast.error('Greška pri učitavanju projekta');
-      navigate('/projects');
+      navigate('/projects/project-management');
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export default function ProjectDetail() {
     try {
       await projectsService.deleteProject(Number(projectId));
       toast.success('Projekt uspješno obrisan');
-      navigate('/projects');
+      navigate('/projects/project-management');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Greška pri brisanju projekta');
     }
@@ -165,7 +165,7 @@ export default function ProjectDetail() {
       <div className="text-center py-12">
         <p className="text-gray-500 dark:text-gray-400 mb-4">Projekt nije pronađen</p>
         <Link
-          to="/projects"
+          to="/projects/project-management"
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
         >
           <FiArrowLeft size={18} />
@@ -181,7 +181,7 @@ export default function ProjectDetail() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3 sm:gap-4">
           <Link
-            to="/projects"
+            to="/projects/project-management"
             className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex-shrink-0"
           >
             <FiArrowLeft size={20} />

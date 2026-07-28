@@ -88,7 +88,7 @@ export default function CreateProjectModal({
         onProjectCreated(project);
       } else {
         // Navigate to the new project
-        navigate(`/projects/${project.id}`);
+        navigate(`/projects/project-management/${project.id}`);
       }
     } catch (error: any) {
       console.error('Error creating project:', error);

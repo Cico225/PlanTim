@@ -72,6 +72,10 @@ class RolePermissionSeeder extends Seeder
             'planika.maloprodaja.criteria.manage' => 'Manage Evaluation Criteria',
             'planika.maloprodaja.reports.view' => 'View Reports',
             'planika.maloprodaja.reports.view_all' => 'View All Reports',
+            'planika.maloprodaja.complaints.create' => 'Create Retail Complaints',
+            'planika.maloprodaja.complaints.view_own' => 'View Own Store Complaints',
+            'planika.maloprodaja.complaints.review' => 'Review Retail Complaints',
+            'planika.maloprodaja.complaints.view_all' => 'View All Retail Complaints',
         ];
 
         foreach ($maloprodajaPermissions as $name => $displayName) {
@@ -177,6 +181,10 @@ class RolePermissionSeeder extends Seeder
             'planika.maloprodaja.criteria.manage',
             'planika.maloprodaja.reports.view',
             'planika.maloprodaja.reports.view_all',
+            'planika.maloprodaja.complaints.create',
+            'planika.maloprodaja.complaints.view_own',
+            'planika.maloprodaja.complaints.review',
+            'planika.maloprodaja.complaints.view_all',
         ]);
 
         // Regionalni Menadžer permissions
@@ -187,6 +195,8 @@ class RolePermissionSeeder extends Seeder
             'planika.maloprodaja.evaluations.create',
             'planika.maloprodaja.evaluations.view',
             'planika.maloprodaja.reports.view',
+            'planika.maloprodaja.complaints.view_all',
+            'planika.maloprodaja.complaints.review',
         ]);
 
         // Šef Prodavnice permissions
@@ -194,12 +204,16 @@ class RolePermissionSeeder extends Seeder
             'planika.maloprodaja.view',
             'planika.maloprodaja.controls.view',
             'planika.maloprodaja.evaluations.view',
+            'planika.maloprodaja.complaints.create',
+            'planika.maloprodaja.complaints.view_own',
         ]);
 
         // Prodavač permissions
         $prodavac->givePermissionTo([
             'planika.maloprodaja.view',
             'planika.maloprodaja.evaluations.view_own',
+            'planika.maloprodaja.complaints.create',
+            'planika.maloprodaja.complaints.view_own',
         ]);
 
         $this->command->info('Roles and Permissions seeded successfully!');

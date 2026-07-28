@@ -1,8 +1,9 @@
 {
-    "version": "1.2.3",
-    "version_name": "Release 2026-07-27",
-    "release_notes": "Dorada modula Upravljanje projektima!",
+    "version": "1.2.4",
+    "version_name": "Release 2026-07-28",
+    "release_notes": "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije.",
     "changelog": [
+        "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije.",
         "Dorada modula Upravljanje projektima!",
         "Promjena nova verzija.",
         "Poboljšanje dizajna Pregleda aktivnosti i dodano verzioniranje aplikacije sa opisom promjena.",

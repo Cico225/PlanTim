@@ -3,7 +3,8 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PLANIKA_SUBMODULES } from '../constants';
 import PlanikaSubmoduleAnimation from '../components/PlanikaSubmoduleAnimation';
-import MaloprodajaOverview from '../../maloprodaja/pages/MaloprodajaOverview';
+import MaloprodajaOverview from '../maloprodaja/pages/MaloprodajaOverview';
+import FinanceLandingPage from '../finance/FinanceLandingPage';
 import HRMOverview from '../../hrm/pages/HRMOverview';
 
 export default function PlanikaSubmodule() {
@@ -29,9 +30,9 @@ export default function PlanikaSubmodule() {
     return <HRMOverview />;
   }
 
-  // Finansije — modul Krediti
+  // Finansije — hub sa panelima
   if (submoduleId === 'finance') {
-    return <Navigate to="/planika/finance/krediti" replace />;
+    return <FinanceLandingPage />;
   }
 
   return (

@@ -145,7 +145,7 @@ export default function ProjectsList() {
             <span className="sm:hidden">Zadatak</span>
           </button>
           <Link
-            to="/projects/new"
+            to="/projects/project-management/new"
             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base"
           >
             <FiPlus size={18} />
@@ -204,7 +204,7 @@ export default function ProjectsList() {
           </p>
           {!searchTerm && (
             <Link
-              to="/projects/new"
+              to="/projects/project-management/new"
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
               <FiPlus size={18} />
@@ -217,7 +217,7 @@ export default function ProjectsList() {
           {projects.map((project) => (
             <Link
               key={project.id}
-              to={`/projects/${project.id}`}
+              to={`/projects/project-management/${project.id}`}
               className="bg-white dark:bg-dark-800 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-dark-700"
             >
               <div className="flex items-start justify-between mb-4">
@@ -269,7 +269,7 @@ export default function ProjectsList() {
           {projects.map((project) => (
             <Link
               key={project.id}
-              to={`/projects/${project.id}`}
+              to={`/projects/project-management/${project.id}`}
               className="bg-white dark:bg-dark-800 rounded-lg p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-dark-700 block"
             >
               <div className="flex flex-col sm:flex-row sm:items-start gap-4">
