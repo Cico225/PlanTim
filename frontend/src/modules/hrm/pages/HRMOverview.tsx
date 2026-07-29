@@ -42,6 +42,7 @@ import ATSInterviews from '../components/ATSInterviews';
 import ATSOffers from '../components/ATSOffers';
 import OrganizationalStructure from '../components/OrganizationalStructure';
 import Onboarding from '../components/Onboarding';
+import EmploymentContracts from '../components/EmploymentContracts';
 
 // Tab components - inline implementations
 type TabKey = 'dashboard' | 'employees' | 'onboarding' | 'contracts' | 'decisions' | 
@@ -137,9 +138,23 @@ function HRDashboard() {
     offboarding_in_progress: 0,
     new_hires_this_month: 0,
     terminations_this_month: 0,
+    upcoming_birthdays: 0,
+    upcoming_anniversaries: 0,
   };
 
-  const alerts = alertsData || [];
+  const alerts = alertsData || dashboardData?.alerts || [];
+  const recentActivities = dashboardData?.recent_activities || [];
+
+  const formatShortDate = (value?: string) => {
+    if (!value) return 'Bez datuma';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString('bs-BA', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
 
   const statCards = [
     { label: 'Ukupno zaposlenika', value: stats.total_employees, icon: Users, color: 'bg-blue-500' },
@@ -150,6 +165,13 @@ function HRDashboard() {
     { label: 'Offboarding', value: stats.offboarding_in_progress, icon: UserMinus, color: 'bg-red-500' },
     { label: 'Novi ovaj mjesec', value: stats.new_hires_this_month, icon: TrendingUp, color: 'bg-teal-500' },
     { label: 'Ugovori ističu', value: stats.expiring_contracts, icon: AlertTriangle, color: 'bg-amber-500' },
+  ];
+
+  const secondaryCards = [
+    { label: 'Evaluacije u toku', value: stats.pending_evaluations, icon: Award, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-900/20 dark:text-violet-300' },
+    { label: 'Prekidi ovog mjeseca', value: stats.terminations_this_month, icon: TrendingDown, tone: 'text-rose-600 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-300' },
+    { label: 'Rođendani uskoro', value: stats.upcoming_birthdays, icon: Bell, tone: 'text-fuchsia-600 bg-fuchsia-50 dark:bg-fuchsia-900/20 dark:text-fuchsia-300' },
+    { label: 'Godišnjice uskoro', value: stats.upcoming_anniversaries, icon: Building2, tone: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 dark:text-cyan-300' },
   ];
 
   return (
@@ -169,6 +191,83 @@ function HRDashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {secondaryCards.map((stat, idx) => (
+          <div key={idx} className="rounded-xl border border-gray-200 bg-white/80 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/80">
+            <div className="flex items-center gap-3">
+              <div className={`rounded-lg p-2 ${stat.tone}`}>
+                <stat.icon className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{stat.value}</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">{stat.label}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-4 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-emerald-500" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nedavne HR aktivnosti</h3>
+          </div>
+
+          {recentActivities.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 p-6 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+              Trenutno nema evidentiranih HR aktivnosti za prikaz.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentActivities.map((activity: any) => (
+                <div
+                  key={activity.id}
+                  className="flex items-start justify-between gap-4 rounded-lg border border-gray-100 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-700/30"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{activity.title}</p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{activity.description}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                    {formatShortDate(activity.date || activity.created_at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-4 flex items-center gap-2">
+            <BriefcaseIcon className="h-5 w-5 text-sky-500" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sažetak procesa</h3>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { label: 'Aktivni onboarding', value: stats.onboarding_in_progress, color: 'bg-purple-500' },
+              { label: 'Aktivni offboarding', value: stats.offboarding_in_progress, color: 'bg-rose-500' },
+              { label: 'Odobrenja odsustva na čekanju', value: stats.pending_leaves, color: 'bg-amber-500' },
+              { label: 'Evaluacije za obradu', value: stats.pending_evaluations, color: 'bg-indigo-500' },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{item.label}</span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">{item.value}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                  <div
+                    className={`h-full rounded-full ${item.color}`}
+                    style={{ width: `${Math.min(item.value * 12, 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Alerts Section */}
@@ -195,36 +294,13 @@ function HRDashboard() {
                   </div>
                 </div>
                 {alert.due_date && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{alert.due_date}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{formatShortDate(alert.due_date)}</span>
                 )}
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {/* Quick Actions */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Brze akcije</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-            <UserPlus className="w-4 h-4" />
-            <span className="text-sm font-medium">Novi zaposlenik</span>
-          </button>
-          <button className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-            <Calendar className="w-4 h-4" />
-            <span className="text-sm font-medium">Zatraži odsustvo</span>
-          </button>
-          <button className="flex items-center gap-2 p-3 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
-            <FileText className="w-4 h-4" />
-            <span className="text-sm font-medium">Novi ugovor</span>
-          </button>
-          <button className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
-            <Award className="w-4 h-4" />
-            <span className="text-sm font-medium">Nova evaluacija</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1624,33 +1700,6 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
   );
 }
 
-// Placeholder components for other tabs
-function ContractsList() {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <FileText className="w-6 h-6 text-blue-500" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Ugovori o radu</h3>
-      </div>
-      <p className="text-gray-500 dark:text-gray-400 mb-4">Upravljanje ugovorima zaposlenika</p>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
-          <p className="text-2xl font-bold text-green-700 dark:text-green-400">0</p>
-          <p className="text-sm text-green-600 dark:text-green-500">Na neodređeno</p>
-        </div>
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
-          <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">0</p>
-          <p className="text-sm text-blue-600 dark:text-blue-500">Na određeno</p>
-        </div>
-        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-center">
-          <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">0</p>
-          <p className="text-sm text-amber-600 dark:text-amber-500">Ističu uskoro</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DecisionsList() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -2098,7 +2147,7 @@ export default function HRMOverview({
       case 'departments': return <OrganizationalStructure />;
       case 'ats': return <ATSList />;
       case 'onboarding': return <Onboarding />;
-      case 'contracts': return <ContractsList />;
+      case 'contracts': return <EmploymentContracts />;
       case 'decisions': return <DecisionsList />;
       case 'attendance': return <AttendanceList />;
       case 'leaves': return <LeavesList />;

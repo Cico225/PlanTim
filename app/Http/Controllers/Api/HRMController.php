@@ -14,6 +14,279 @@ use App\Imports\EmployeesImport;
 
 class HRMController extends Controller
 {
+    public function getDashboard(Request $request)
+    {
+        $today = now()->toDateString();
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+
+        $stats = [
+            'total_employees' => 0,
+            'active_employees' => 0,
+            'on_leave_today' => 0,
+            'pending_leaves' => 0,
+            'pending_evaluations' => 0,
+            'expiring_contracts' => 0,
+            'onboarding_in_progress' => 0,
+            'offboarding_in_progress' => 0,
+            'new_hires_this_month' => 0,
+            'terminations_this_month' => 0,
+            'upcoming_birthdays' => 0,
+            'upcoming_anniversaries' => 0,
+        ];
+
+        $recentActivities = collect();
+        $alerts = collect();
+
+        if (Schema::hasTable('hrm_employees')) {
+            $employeeBase = DB::table('hrm_employees');
+
+            if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
+                $employeeBase->whereNull('deleted_at');
+            }
+
+            $stats['total_employees'] = (clone $employeeBase)->count();
+            $stats['active_employees'] = (clone $employeeBase)->where('status', 'active')->count();
+            $stats['offboarding_in_progress'] = (clone $employeeBase)->where('status', 'offboarding')->count();
+
+            if (Schema::hasColumn('hrm_employees', 'hire_date')) {
+                $stats['new_hires_this_month'] = (clone $employeeBase)
+                    ->whereBetween('hire_date', [$monthStart, $monthEnd])
+                    ->count();
+
+                $stats['upcoming_anniversaries'] = (clone $employeeBase)
+                    ->whereNotNull('hire_date')
+                    ->whereRaw("DATE_FORMAT(hire_date, '%m-%d') between ? and ?", [
+                        now()->format('m-d'),
+                        now()->copy()->addDays(30)->format('m-d'),
+                    ])
+                    ->count();
+
+                $newHires = DB::table('hrm_employees')
+                    ->select('hrm_employees.id', 'users.name', 'hrm_employees.hire_date')
+                    ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
+                    ->whereBetween('hrm_employees.hire_date', [$monthStart, $monthEnd])
+                    ->orderByDesc('hrm_employees.hire_date')
+                    ->limit(4)
+                    ->get()
+                    ->map(function ($row) {
+                        return [
+                            'id' => 'hire-' . $row->id,
+                            'type' => 'employee_hired',
+                            'title' => 'Novi zaposlenik',
+                            'description' => trim(($row->name ?? 'Nepoznat zaposlenik') . ' je evidentiran kao novi zaposlenik.'),
+                            'date' => $row->hire_date,
+                            'created_at' => $row->hire_date,
+                        ];
+                    });
+
+                $recentActivities = $recentActivities->concat($newHires);
+            }
+
+            if (Schema::hasColumn('hrm_employees', 'termination_date')) {
+                $stats['terminations_this_month'] = (clone $employeeBase)
+                    ->whereBetween('termination_date', [$monthStart, $monthEnd])
+                    ->count();
+            }
+
+            if (Schema::hasColumn('hrm_employees', 'date_of_birth')) {
+                $stats['upcoming_birthdays'] = (clone $employeeBase)
+                    ->whereNotNull('date_of_birth')
+                    ->whereRaw("DATE_FORMAT(date_of_birth, '%m-%d') between ? and ?", [
+                        now()->format('m-d'),
+                        now()->copy()->addDays(30)->format('m-d'),
+                    ])
+                    ->count();
+            }
+        }
+
+        if (Schema::hasTable('hrm_employment_contracts')) {
+            $noticeDays = (int) (DB::table('hrm_contract_settings')->value('default_renewal_notice_days') ?? 30);
+            $stats['expiring_contracts'] = DB::table('hrm_employment_contracts')
+                ->where('status', 'active')
+                ->whereNotNull('expiry_date')
+                ->whereBetween('expiry_date', [$today, now()->addDays($noticeDays)->toDateString()])
+                ->count();
+        } elseif (Schema::hasColumn('hrm_employees', 'probation_end_date')) {
+            $expiringProbation = DB::table('hrm_employees')
+                ->select('hrm_employees.id', 'users.name', 'hrm_employees.probation_end_date')
+                ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
+                ->whereNotNull('hrm_employees.probation_end_date')
+                ->whereBetween('hrm_employees.probation_end_date', [$today, now()->copy()->addDays(30)->toDateString()])
+                ->orderBy('hrm_employees.probation_end_date')
+                ->limit(5)
+                ->get();
+
+            $stats['expiring_contracts'] = $expiringProbation->count();
+
+            $alerts = $alerts->concat($expiringProbation->map(function ($row) {
+                return [
+                    'id' => 100000 + $row->id,
+                    'type' => 'contract_expiry',
+                    'title' => 'Ističe probni rad / ugovorni rok',
+                    'message' => trim(($row->name ?? 'Nepoznat zaposlenik') . ' ima rok isteka ' . $row->probation_end_date . '.'),
+                    'priority' => 'high',
+                    'status' => 'active',
+                    'employee_id' => $row->id,
+                    'employee_name' => $row->name,
+                    'due_date' => $row->probation_end_date,
+                    'created_at' => $row->probation_end_date,
+                ];
+            }));
+        }
+
+        if (Schema::hasTable('hrm_leaves')) {
+            $stats['pending_leaves'] = DB::table('hrm_leaves')->where('status', 'pending')->count();
+            $stats['on_leave_today'] = DB::table('hrm_leaves')
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', $today)
+                ->whereDate('end_date', '>=', $today)
+                ->count();
+
+            $pendingLeaves = DB::table('hrm_leaves')
+                ->select('hrm_leaves.id', 'hrm_leaves.start_date', 'hrm_leaves.end_date', 'users.name')
+                ->join('hrm_employees', 'hrm_leaves.employee_id', '=', 'hrm_employees.id')
+                ->join('users', 'hrm_employees.user_id', '=', 'users.id')
+                ->where('hrm_leaves.status', 'pending')
+                ->orderBy('hrm_leaves.created_at')
+                ->limit(5)
+                ->get();
+
+            $alerts = $alerts->concat($pendingLeaves->map(function ($row) {
+                return [
+                    'id' => 200000 + $row->id,
+                    'type' => 'leave_pending',
+                    'title' => 'Zahtjev za odsustvo čeka odobrenje',
+                    'message' => trim(($row->name ?? 'Nepoznat zaposlenik') . ' traži odsustvo od ' . $row->start_date . ' do ' . $row->end_date . '.'),
+                    'priority' => 'medium',
+                    'status' => 'active',
+                    'due_date' => $row->start_date,
+                    'created_at' => $row->start_date,
+                ];
+            }));
+        }
+
+        if (Schema::hasTable('hrm_evaluations')) {
+            $stats['pending_evaluations'] = DB::table('hrm_evaluations')
+                ->whereIn('status', ['draft', 'pending', 'in_progress'])
+                ->count();
+        }
+
+        if (Schema::hasTable('hrm_onboarding_processes')) {
+            $stats['onboarding_in_progress'] = DB::table('hrm_onboarding_processes')
+                ->whereIn('status', ['pending', 'in_progress', 'active'])
+                ->count();
+
+            $onboardingItems = DB::table('hrm_onboarding_processes')
+                ->select('hrm_onboarding_processes.id', 'hrm_onboarding_processes.start_date', 'users.name')
+                ->leftJoin('hrm_employees', 'hrm_onboarding_processes.employee_id', '=', 'hrm_employees.id')
+                ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
+                ->whereIn('hrm_onboarding_processes.status', ['pending', 'in_progress', 'active'])
+                ->orderByDesc('hrm_onboarding_processes.updated_at')
+                ->limit(4)
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'id' => 'onboarding-' . $row->id,
+                        'type' => 'onboarding',
+                        'title' => 'Onboarding u toku',
+                        'description' => trim(($row->name ?? 'Nepoznat zaposlenik') . ' ima aktivan onboarding proces.'),
+                        'date' => $row->start_date,
+                        'created_at' => $row->start_date,
+                    ];
+                });
+
+            $recentActivities = $recentActivities->concat($onboardingItems);
+        }
+
+        if (Schema::hasTable('ats_candidates')) {
+            $candidateItems = DB::table('ats_candidates')
+                ->select('ats_candidates.id', 'ats_candidates.first_name', 'ats_candidates.last_name', 'ats_candidates.applied_date', 'ats_candidates.status')
+                ->orderByDesc('ats_candidates.created_at')
+                ->limit(4)
+                ->get()
+                ->map(function ($row) {
+                    $fullName = trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+
+                    return [
+                        'id' => 'candidate-' . $row->id,
+                        'type' => 'candidate',
+                        'title' => 'Nova ATS aktivnost',
+                        'description' => trim(($fullName ?: 'Kandidat') . ' je u statusu ' . ($row->status ?? 'new') . '.'),
+                        'date' => $row->applied_date ?: now()->toDateString(),
+                        'created_at' => $row->applied_date ?: now()->toDateString(),
+                    ];
+                });
+
+            $recentActivities = $recentActivities->concat($candidateItems);
+        }
+
+        if (Schema::hasTable('ats_interviews')) {
+            $upcomingInterviews = DB::table('ats_interviews')
+                ->select(
+                    'ats_interviews.id',
+                    'ats_interviews.scheduled_date',
+                    'ats_interviews.status',
+                    DB::raw("CONCAT(ats_candidates.first_name, ' ', ats_candidates.last_name) as candidate_name")
+                )
+                ->join('ats_candidates', 'ats_interviews.candidate_id', '=', 'ats_candidates.id')
+                ->whereDate('ats_interviews.scheduled_date', '>=', $today)
+                ->where('ats_interviews.status', 'scheduled')
+                ->orderBy('ats_interviews.scheduled_date')
+                ->limit(5)
+                ->get();
+
+            $alerts = $alerts->concat($upcomingInterviews->map(function ($row) {
+                return [
+                    'id' => 300000 + $row->id,
+                    'type' => 'interview',
+                    'title' => 'Zakazan intervju',
+                    'message' => trim(($row->candidate_name ?? 'Kandidat') . ' ima intervju ' . $row->scheduled_date . '.'),
+                    'priority' => 'low',
+                    'status' => 'active',
+                    'due_date' => $row->scheduled_date,
+                    'created_at' => $row->scheduled_date,
+                ];
+            }));
+        }
+
+        $recentActivities = $recentActivities
+            ->sortByDesc('created_at')
+            ->take(6)
+            ->values();
+
+        $alerts = $alerts
+            ->sortBy(function ($item) {
+                $priorityRank = match ($item['priority'] ?? 'low') {
+                    'urgent' => 0,
+                    'high' => 1,
+                    'medium' => 2,
+                    default => 3,
+                };
+
+                return sprintf(
+                    '%s-%s',
+                    $priorityRank,
+                    $item['due_date'] ?? $item['created_at'] ?? '9999-12-31'
+                );
+            })
+            ->take(8)
+            ->values();
+
+        return response()->json([
+            'stats' => $stats,
+            'recent_activities' => $recentActivities,
+            'alerts' => $alerts,
+        ]);
+    }
+
+    public function getAlerts(Request $request)
+    {
+        $dashboard = $this->getDashboard($request)->getData(true);
+
+        return response()->json($dashboard['alerts'] ?? []);
+    }
+
     /**
      * Get all employees
      */

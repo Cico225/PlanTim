@@ -28,6 +28,11 @@ import type {
   TimeEntryFilters,
   HRStore,
   HRWorkPosition,
+  EmploymentContract,
+  EmploymentContractTemplate,
+  EmploymentContractFilters,
+  EmploymentContractSettings,
+  EmploymentContractSummary,
 } from '../types/hrm';
 import type { PaginatedResponse } from '../types';
 
@@ -92,7 +97,7 @@ export const deleteDepartment = (id: number) =>
   apiService.delete(`/hrm/departments/${id}`);
 
 // ============================================
-// CONTRACTS
+// CONTRACTS (legacy endpoints)
 // ============================================
 export const getContracts = (filters?: { employee_id?: number; status?: string }) =>
   apiService.get<PaginatedResponse<HRContract>>('/hrm/contracts', filters);
@@ -102,6 +107,42 @@ export const getContractTypes = () =>
 
 export const createContract = (data: Partial<HRContract>) =>
   apiService.post<HRContract>('/hrm/contracts', data);
+
+// ============================================
+// EMPLOYMENT CONTRACTS
+// ============================================
+export const getEmploymentContractTemplates = () =>
+  apiService.get<EmploymentContractTemplate[]>('/hrm/contracts/templates');
+
+export const getEmploymentContractSettings = () =>
+  apiService.get<EmploymentContractSettings>('/hrm/contracts/settings');
+
+export const updateEmploymentContractSettings = (data: EmploymentContractSettings) =>
+  apiService.put<EmploymentContractSettings>('/hrm/contracts/settings', data);
+
+export const getEmploymentContractSummary = () =>
+  apiService.get<EmploymentContractSummary>('/hrm/contracts/summary');
+
+export const getEmploymentContracts = (filters?: EmploymentContractFilters) =>
+  apiService.get<PaginatedResponse<EmploymentContract>>('/hrm/contracts', filters);
+
+export const getEmploymentContract = (id: number) =>
+  apiService.get<{ contract: EmploymentContract; renewals: unknown[] }>(`/hrm/contracts/${id}`);
+
+export const createEmploymentContract = (data: Record<string, unknown>) =>
+  apiService.post<EmploymentContract>('/hrm/contracts', data);
+
+export const updateEmploymentContract = (id: number, data: Record<string, unknown>) =>
+  apiService.put<EmploymentContract>(`/hrm/contracts/${id}`, data);
+
+export const renewEmploymentContract = (id: number, data: Record<string, unknown>) =>
+  apiService.post<EmploymentContract>(`/hrm/contracts/${id}/renew`, data);
+
+export const generateEmploymentContractDocument = (id: number) =>
+  apiService.post<EmploymentContract>(`/hrm/contracts/${id}/generate-document`);
+
+export const downloadEmploymentContractDocument = (id: number) =>
+  apiService.download(`/hrm/contracts/${id}/download-document`, `ugovor-${id}`);
 
 // ============================================
 // ONBOARDING

@@ -145,8 +145,96 @@ export interface HRWorkPosition {
 }
 
 // ============================================
-// HRM CONTRACT
+// EMPLOYMENT CONTRACTS
 // ============================================
+export type LegalEntity = 'fbih' | 'rs' | 'bd';
+export type JobRole = 'store_manager' | 'deputy_manager' | 'salesperson';
+export type ContractDocumentKind = 'full_contract' | 'annex';
+export type EmploymentContractStatus = 'draft' | 'active' | 'expired' | 'terminated' | 'superseded';
+
+export interface EmploymentContractTemplate {
+  id: number;
+  code: string;
+  name: string;
+  legal_entity: LegalEntity;
+  job_role: JobRole;
+  document_kind: ContractDocumentKind;
+  template_file: string;
+  output_format: 'docx' | 'pdf';
+  is_active: boolean;
+}
+
+export interface EmploymentContract {
+  id: number;
+  employee_id: number;
+  employee_user_name?: string;
+  store_id?: number;
+  store_label?: string;
+  template_id: number;
+  template_name?: string;
+  parent_contract_id?: number;
+  contract_number?: string;
+  protocol_number?: string;
+  legal_entity: LegalEntity;
+  job_role: JobRole;
+  document_kind: ContractDocumentKind;
+  annex_number?: number;
+  status: EmploymentContractStatus;
+  employment_term: 'indefinite' | 'fixed';
+  contract_sign_date?: string;
+  work_start_date?: string;
+  work_end_date?: string;
+  effective_date?: string;
+  expiry_date?: string;
+  auto_renew: boolean;
+  renewal_notice_days?: number;
+  salary_gross?: number;
+  salary_net?: number;
+  currency: string;
+  position_title?: string;
+  store_name?: string;
+  store_city?: string;
+  employee_full_name?: string;
+  employee_origin?: string;
+  employee_address?: string;
+  employee_education?: string;
+  custom_fields?: Record<string, unknown>;
+  generated_document_path?: string;
+  output_format?: 'docx' | 'pdf';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmploymentContractFilters {
+  search?: string;
+  store_id?: number;
+  legal_entity?: LegalEntity;
+  job_role?: JobRole;
+  status?: EmploymentContractStatus | string;
+  employee_id?: number;
+  template_id?: number;
+  expiring_within_days?: number;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface EmploymentContractSettings {
+  default_renewal_notice_days: number;
+  auto_create_renewal_draft: boolean;
+}
+
+export interface EmploymentContractSummary {
+  total: number;
+  active: number;
+  expiring_soon: number;
+  draft: number;
+  by_entity: Array<{ legal_entity: LegalEntity; total: number }>;
+}
+
+// Legacy contract types (older API surface)
 export interface HRContract {
   id: number;
   employee_id: number;
@@ -168,6 +256,16 @@ export interface HRContract {
   document_path?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface HRContractType {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  is_indefinite: boolean;
+  default_duration_months?: number;
+  is_active: boolean;
 }
 
 export interface HRStore {
@@ -207,16 +305,6 @@ export interface HRWorkPosition {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
-
-export interface HRContractType {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
-  is_indefinite: boolean;
-  default_duration_months?: number;
-  is_active: boolean;
 }
 
 // ============================================

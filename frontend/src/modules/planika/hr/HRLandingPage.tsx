@@ -424,35 +424,159 @@ function HRPanelAnimation({
   className?: string;
 }) {
   const soft = `${color}22`;
+  const med = `${color}44`;
 
-  if (section === 'employees' || section === 'dashboard') {
+  // 1 — Dashboard: animated bar chart with pulsing metric cards
+  if (section === 'dashboard') {
+    const bars = [
+      { x: 32, h: 48 },
+      { x: 56, h: 62 },
+      { x: 80, h: 38 },
+      { x: 104, h: 56 },
+      { x: 128, h: 44 },
+    ];
     return (
       <div className={className}>
         <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
-          <motion.rect
-            x="16"
-            y="16"
-            width="168"
-            height="88"
-            rx="20"
-            fill={soft}
-            animate={{ opacity: [0.7, 1, 0.7] }}
-            transition={{ duration: 2.8, repeat: Infinity }}
-          />
-          {[0, 1, 2].map((i) => (
-            <motion.g
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          {bars.map((b, i) => (
+            <motion.rect
               key={i}
-              animate={{ y: [0, -2, 0] }}
-              transition={{ duration: 2 + i * 0.2, delay: i * 0.15, repeat: Infinity }}
-            >
-              <circle cx={48 + i * 52} cy="48" r="14" fill="white" />
-              <circle cx={48 + i * 52} cy="44" r="6" fill={color} opacity={0.85 - i * 0.15} />
-              <path
-                d={`M${36 + i * 52} 62 Q${48 + i * 52} 52 ${60 + i * 52} 62`}
-                fill={color}
-                opacity={0.35}
+              x={b.x}
+              width="16"
+              rx="4"
+              fill={color}
+              opacity={0.7}
+              initial={{ y: 94, height: 0 }}
+              animate={{ y: 94 - b.h, height: b.h }}
+              transition={{ duration: 0.8, delay: i * 0.12, repeat: Infinity, repeatType: 'reverse', repeatDelay: 1.5 }}
+            />
+          ))}
+          <motion.rect x="150" y="28" width="30" height="14" rx="5" fill="white" animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+          <rect x="155" y="32" width="20" height="3" rx="1.5" fill={color} opacity={0.6} />
+          <motion.rect x="150" y="50" width="30" height="14" rx="5" fill="white" animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 2, delay: 0.4, repeat: Infinity }} />
+          <rect x="155" y="54" width="14" height="3" rx="1.5" fill={color} opacity={0.4} />
+        </svg>
+      </div>
+    );
+  }
+
+  // 2 — ATS: funnel with candidates flowing through stages
+  if (section === 'ats') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3.2, repeat: Infinity }} />
+          <path d="M30 30 L170 30 L140 95 L60 95 Z" fill="white" opacity={0.85} />
+          {[0, 1, 2].map((i) => (
+            <motion.line key={i} x1={52 + i * 22} y1="30" x2={68 + i * 10} y2="95" stroke={color} strokeWidth="1" opacity={0.2} />
+          ))}
+          {[0, 1, 2].map((i) => (
+            <motion.circle
+              key={`dot-${i}`}
+              r="5"
+              fill={color}
+              opacity={0.85 - i * 0.2}
+              initial={{ cx: 60 + i * 30, cy: 34 }}
+              animate={{ cx: 80 + i * 10, cy: 90 }}
+              transition={{ duration: 2.5, delay: i * 0.6, repeat: Infinity, repeatDelay: 0.5 }}
+            />
+          ))}
+          <rect x="75" y="88" width="50" height="5" rx="2.5" fill={color} opacity={0.3} />
+        </svg>
+      </div>
+    );
+  }
+
+  // 3 — Onboarding: checklist with items checking off one by one
+  if (section === 'onboarding') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.65, 1, 0.65] }} transition={{ duration: 2.8, repeat: Infinity }} />
+          <rect x="40" y="24" width="120" height="72" rx="12" fill="white" />
+          {[0, 1, 2, 3].map((i) => (
+            <g key={i}>
+              <motion.rect
+                x="52"
+                y={34 + i * 16}
+                width="12"
+                height="12"
+                rx="3"
+                fill="none"
+                stroke={color}
+                strokeWidth="2"
+                animate={{ fill: ['transparent', med, 'transparent'] }}
+                transition={{ duration: 3, delay: i * 0.7, repeat: Infinity }}
               />
-              <rect x={34 + i * 52} y="78" width="28" height="8" rx="4" fill="white" />
+              <motion.path
+                d={`M${55} ${40 + i * 16} L${58} ${43 + i * 16} L${62} ${37 + i * 16}`}
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: [0, 1, 0], opacity: [0, 1, 0] }}
+                transition={{ duration: 3, delay: i * 0.7, repeat: Infinity }}
+              />
+              <rect x="72" y={37 + i * 16} width={56 - i * 8} height="5" rx="2.5" fill={color} opacity={0.25 + i * 0.05} />
+            </g>
+          ))}
+          <motion.circle cx="150" cy="80" r="8" fill={color} opacity={0.15} animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+          <motion.path d="M146 80 L149 83 L155 76" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 2, repeat: Infinity }} />
+        </svg>
+      </div>
+    );
+  }
+
+  // 4 — Contracts: document with signature pen drawing
+  if (section === 'contracts') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.65, 1, 0.65] }} transition={{ duration: 3, repeat: Infinity }} />
+          <motion.rect x="50" y="22" width="72" height="80" rx="8" fill="white" animate={{ y: [0, -2, 0] }} transition={{ duration: 2.5, repeat: Infinity }} />
+          <rect x="60" y="32" width="52" height="4" rx="2" fill={color} opacity={0.7} />
+          <rect x="60" y="42" width="40" height="3" rx="1.5" fill={color} opacity={0.3} />
+          <rect x="60" y="50" width="46" height="3" rx="1.5" fill={color} opacity={0.25} />
+          <rect x="60" y="58" width="34" height="3" rx="1.5" fill={color} opacity={0.2} />
+          <motion.path
+            d="M64 80 Q72 72 80 80 Q88 88 96 78"
+            fill="none"
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: [0, 1, 1, 0] }}
+            transition={{ duration: 3.5, repeat: Infinity, times: [0, 0.5, 0.8, 1] }}
+          />
+          <motion.g animate={{ x: [0, 32, 32, 0], y: [0, -2, -2, 0] }} transition={{ duration: 3.5, repeat: Infinity, times: [0, 0.5, 0.8, 1] }}>
+            <path d="M60 82 L56 96 L64 88 Z" fill={color} opacity={0.6} />
+            <rect x="58" y="70" width="4" height="16" rx="1" fill={color} opacity={0.5} transform="rotate(-25 60 78)" />
+          </motion.g>
+          <motion.rect x="132" y="30" width="36" height="44" rx="8" fill="white" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+          <rect x="138" y="38" width="24" height="3" rx="1.5" fill={color} opacity={0.35} />
+          <rect x="138" y="46" width="18" height="3" rx="1.5" fill={color} opacity={0.25} />
+          <circle cx="150" cy="62" r="6" fill={color} opacity={0.15} />
+        </svg>
+      </div>
+    );
+  }
+
+  // 5 — Employees: profile cards with avatar bobbing
+  if (section === 'employees') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          {[0, 1, 2].map((i) => (
+            <motion.g key={i} animate={{ y: [0, -4, 0] }} transition={{ duration: 2.2 + i * 0.3, delay: i * 0.2, repeat: Infinity }}>
+              <rect x={30 + i * 52} y="28" width="44" height="64" rx="12" fill="white" />
+              <circle cx={52 + i * 52} cy="48" r="10" fill={color} opacity={0.15} />
+              <circle cx={52 + i * 52} cy="46" r="5" fill={color} opacity={0.65 - i * 0.1} />
+              <path d={`M${42 + i * 52} 58 Q${52 + i * 52} 52 ${62 + i * 52} 58`} fill={color} opacity={0.25} />
+              <rect x={40 + i * 52} y="66" width="24" height="4" rx="2" fill={color} opacity={0.3} />
+              <rect x={44 + i * 52} y="74" width="16" height="3" rx="1.5" fill={color} opacity={0.18} />
             </motion.g>
           ))}
         </svg>
@@ -460,32 +584,50 @@ function HRPanelAnimation({
     );
   }
 
+  // 6 — Departments: org chart tree with pulsing nodes
   if (section === 'departments') {
     return (
       <div className={className}>
         <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
-          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.75, 1, 0.75] }} transition={{ duration: 3, repeat: Infinity }} />
-          <rect x="78" y="28" width="44" height="24" rx="8" fill="white" />
-          <motion.rect x="34" y="68" width="36" height="22" rx="8" fill="white" animate={{ y: [0, -2, 0] }} transition={{ duration: 2.2, repeat: Infinity }} />
-          <motion.rect x="82" y="68" width="36" height="22" rx="8" fill="white" animate={{ y: [0, -2, 0] }} transition={{ duration: 2.2, delay: 0.15, repeat: Infinity }} />
-          <motion.rect x="130" y="68" width="36" height="22" rx="8" fill="white" animate={{ y: [0, -2, 0] }} transition={{ duration: 2.2, delay: 0.3, repeat: Infinity }} />
-          <path d="M100 52 L52 68 M100 52 L100 68 M100 52 L148 68" stroke={color} strokeWidth="2" fill="none" />
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.65, 1, 0.65] }} transition={{ duration: 3, repeat: Infinity }} />
+          <motion.rect x="78" y="24" width="44" height="22" rx="8" fill="white" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+          <circle cx="100" cy="35" r="4" fill={color} opacity={0.7} />
+          <path d="M100 46 L52 62 M100 46 L100 62 M100 46 L148 62" stroke={color} strokeWidth="1.5" fill="none" opacity={0.4} />
+          {[52, 100, 148].map((cx, i) => (
+            <motion.g key={i} animate={{ y: [0, -3, 0] }} transition={{ duration: 2, delay: i * 0.25, repeat: Infinity }}>
+              <rect x={cx - 18} y="62" width="36" height="18" rx="6" fill="white" />
+              <circle cx={cx} cy="71" r="3" fill={color} opacity={0.5 + i * 0.1} />
+            </motion.g>
+          ))}
+          {[36, 68, 84, 116, 132, 164].map((cx, i) => (
+            <motion.circle key={i} cx={cx} cy="96" r="3.5" fill={color} opacity={0.2 + (i % 3) * 0.1} animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.8, delay: i * 0.15, repeat: Infinity }} />
+          ))}
+          <path d="M52 80 L36 92 M52 80 L68 92 M100 80 L84 92 M100 80 L116 92 M148 80 L132 92 M148 80 L164 92" stroke={color} strokeWidth="1" fill="none" opacity={0.25} />
         </svg>
       </div>
     );
   }
 
-  if (section === 'ats' || section === 'onboarding') {
+  // 7 — Attendance: clock face with rotating hand + time grid
+  if (section === 'attendance') {
     return (
       <div className={className}>
         <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
-          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.75, 1, 0.75] }} transition={{ duration: 2.6, repeat: Infinity }} />
-          {[0, 1, 2, 3].map((i) => (
-            <motion.g key={i} animate={{ x: [0, 3, 0] }} transition={{ duration: 2.4, delay: i * 0.12, repeat: Infinity }}>
-              <rect x={28 + i * 38} y="34" width="30" height="52" rx="10" fill="white" />
-              <rect x={34 + i * 38} y="42" width="18" height="5" rx="2.5" fill={color} opacity={0.9 - i * 0.12} />
-              <rect x={34 + i * 38} y="54" width="14" height="4" rx="2" fill={color} opacity={0.35} />
-              <circle cx={43 + i * 38} cy="72" r="5" fill={color} opacity={0.7} />
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          <circle cx="68" cy="60" r="30" fill="white" />
+          <circle cx="68" cy="60" r="27" fill="none" stroke={color} strokeWidth="1" opacity={0.2} />
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
+            const a = (i * 30 * Math.PI) / 180;
+            return <circle key={i} cx={68 + Math.sin(a) * 23} cy={60 - Math.cos(a) * 23} r="1.5" fill={color} opacity={0.35} />;
+          })}
+          <motion.line x1="68" y1="60" x2="68" y2="40" stroke={color} strokeWidth="2.5" strokeLinecap="round" animate={{ rotate: 360 }} style={{ originX: '68px', originY: '60px' }} transition={{ duration: 10, repeat: Infinity, ease: 'linear' }} />
+          <motion.line x1="68" y1="60" x2="68" y2="46" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity={0.5} animate={{ rotate: 360 }} style={{ originX: '68px', originY: '60px' }} transition={{ duration: 60, repeat: Infinity, ease: 'linear' }} />
+          <circle cx="68" cy="60" r="2.5" fill={color} />
+          <rect x="112" y="30" width="60" height="60" rx="10" fill="white" />
+          {[0, 1, 2, 3, 4].map((i) => (
+            <motion.g key={i}>
+              <rect x="118" y={38 + i * 10} width="48" height="6" rx="3" fill={color} opacity={0.08} />
+              <motion.rect x="118" y={38 + i * 10} width={20 + ((i * 13) % 30)} height="6" rx="3" fill={color} opacity={0.35} animate={{ width: [20 + ((i * 13) % 30), 30 + ((i * 7) % 20), 20 + ((i * 13) % 30)] }} transition={{ duration: 3, delay: i * 0.3, repeat: Infinity }} />
             </motion.g>
           ))}
         </svg>
@@ -493,115 +635,280 @@ function HRPanelAnimation({
     );
   }
 
-  if (section === 'contracts' || section === 'decisions' || section === 'reports') {
+  // 8 — Leaves: calendar with days highlighting
+  if (section === 'leaves') {
     return (
       <div className={className}>
         <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
-          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.75, 1, 0.75] }} transition={{ duration: 2.8, repeat: Infinity }} />
-          <motion.rect x="40" y="30" width="70" height="60" rx="12" fill="white" animate={{ y: [0, -2, 0] }} transition={{ duration: 2.4, repeat: Infinity }} />
-          <rect x="50" y="40" width="50" height="5" rx="2.5" fill={color} />
-          <rect x="50" y="52" width="36" height="4" rx="2" fill={color} opacity={0.35} />
-          <rect x="50" y="62" width="42" height="4" rx="2" fill={color} opacity={0.25} />
-          <motion.rect x="120" y="36" width="44" height="48" rx="12" fill="white" animate={{ x: [0, 2, 0] }} transition={{ duration: 2.6, repeat: Infinity }} />
-          <motion.path
-            d="M132 60 L140 68 L156 48"
-            fill="none"
-            stroke={color}
-            strokeWidth="3"
-            strokeLinecap="round"
-            initial={{ pathLength: 0.2 }}
-            animate={{ pathLength: [0.2, 1, 0.2] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        </svg>
-      </div>
-    );
-  }
-
-  if (section === 'attendance' || section === 'leaves') {
-    return (
-      <div className={className}>
-        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
-          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.75, 1, 0.75] }} transition={{ duration: 2.8, repeat: Infinity }} />
-          <circle cx="70" cy="60" r="28" fill="white" />
-          <motion.line
-            x1="70"
-            y1="60"
-            x2="70"
-            y2="42"
-            stroke={color}
-            strokeWidth="3"
-            strokeLinecap="round"
-            animate={{ rotate: 360 }}
-            style={{ originX: '70px', originY: '60px' }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-          />
-          <rect x="112" y="34" width="56" height="52" rx="12" fill="white" />
-          {[0, 1, 2].map((row) =>
-            [0, 1, 2].map((col) => (
-              <motion.circle
-                key={`${row}-${col}`}
-                cx={126 + col * 14}
-                cy={50 + row * 14}
-                r="3.5"
-                fill={color}
-                opacity={0.35 + ((row + col) % 3) * 0.2}
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 1.8, delay: (row + col) * 0.1, repeat: Infinity }}
-              />
-            ))
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          <rect x="32" y="24" width="136" height="76" rx="12" fill="white" />
+          <rect x="32" y="24" width="136" height="18" rx="12" fill={color} opacity={0.15} />
+          <rect x="32" y="40" width="136" height="2" rx="1" fill={color} opacity={0.1} />
+          {[0, 1, 2, 3, 4, 5, 6].map((col) =>
+            [0, 1, 2, 3].map((row) => {
+              const highlighted = (col === 2 && row === 1) || (col === 3 && row === 1) || (col === 4 && row === 1) || (col === 1 && row === 2);
+              return (
+                <motion.rect
+                  key={`${col}-${row}`}
+                  x={38 + col * 18}
+                  y={46 + row * 13}
+                  width="12"
+                  height="9"
+                  rx="2.5"
+                  fill={highlighted ? color : color}
+                  opacity={highlighted ? 0.5 : 0.08}
+                  animate={highlighted ? { opacity: [0.3, 0.6, 0.3] } : {}}
+                  transition={highlighted ? { duration: 2, delay: col * 0.2, repeat: Infinity } : {}}
+                />
+              );
+            })
           )}
         </svg>
       </div>
     );
   }
 
-  if (section === 'education' || section === 'talent' || section === 'evaluations') {
+  // 9 — Evaluations: gauge/meter with needle swinging
+  if (section === 'evaluations') {
     return (
       <div className={className}>
         <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
-          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.75, 1, 0.75] }} transition={{ duration: 2.8, repeat: Infinity }} />
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          <path d="M50 85 A50 50 0 0 1 150 85" fill="none" stroke={color} strokeWidth="6" opacity={0.12} strokeLinecap="round" />
           <motion.path
-            d="M40 70 L100 40 L160 70 L100 100 Z"
-            fill="white"
-            animate={{ y: [0, -2, 0] }}
-            transition={{ duration: 2.4, repeat: Infinity }}
+            d="M50 85 A50 50 0 0 1 150 85"
+            fill="none"
+            stroke={color}
+            strokeWidth="6"
+            strokeLinecap="round"
+            opacity={0.6}
+            initial={{ pathLength: 0.2 }}
+            animate={{ pathLength: [0.2, 0.75, 0.2] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <path d="M100 40 L100 100" stroke={color} strokeWidth="2" />
-          <motion.circle
-            cx="148"
-            cy="48"
-            r="10"
-            fill={color}
-            animate={{ scale: [1, 1.15, 1] }}
-            transition={{ duration: 1.8, repeat: Infinity }}
+          <motion.line
+            x1="100"
+            y1="85"
+            x2="100"
+            y2="48"
+            stroke={color}
+            strokeWidth="3"
+            strokeLinecap="round"
+            animate={{ rotate: [-60, 60, -60] }}
+            style={{ originX: '100px', originY: '85px' }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <path d="M148 42 L150 47 L155 47 L151 50 L153 55 L148 52 L143 55 L145 50 L141 47 L146 47 Z" fill="white" />
+          <circle cx="100" cy="85" r="5" fill={color} opacity={0.7} />
+          {[0, 1, 2].map((i) => (
+            <motion.g key={i} animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, delay: i * 0.4, repeat: Infinity }}>
+              <rect x={40 + i * 44} y="96" width="32" height="6" rx="3" fill="white" />
+              <rect x={44 + i * 44} y="97.5" width={12 + i * 4} height="3" rx="1.5" fill={color} opacity={0.3 + i * 0.1} />
+            </motion.g>
+          ))}
         </svg>
       </div>
     );
   }
 
-  // offboarding default
+  // 10 — Education: graduation cap with floating books
+  if (section === 'education') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          <motion.g animate={{ y: [0, -3, 0] }} transition={{ duration: 2.5, repeat: Infinity }}>
+            <path d="M60 55 L100 35 L140 55 L100 75 Z" fill="white" />
+            <path d="M60 55 L100 75 L140 55" fill="none" stroke={color} strokeWidth="1.5" opacity={0.4} />
+            <rect x="98" y="35" width="4" height="50" rx="2" fill={color} opacity={0.3} />
+            <circle cx="100" cy="88" r="4" fill={color} opacity={0.35} />
+          </motion.g>
+          {[0, 1, 2].map((i) => (
+            <motion.g key={i} animate={{ y: [0, -4, 0], rotate: [0, 3, 0] }} transition={{ duration: 2, delay: 0.5 + i * 0.4, repeat: Infinity }}>
+              <rect x={30 + i * 18} y={40 + i * 6} width="14" height="28" rx="3" fill={color} opacity={0.2 + i * 0.1} />
+              <rect x={33 + i * 18} y={46 + i * 6} width="8" height="2" rx="1" fill="white" opacity={0.8} />
+            </motion.g>
+          ))}
+          <motion.rect x="148" y="42" width="22" height="32" rx="6" fill="white" animate={{ y: [0, -2, 0] }} transition={{ duration: 2.2, delay: 0.3, repeat: Infinity }} />
+          <rect x="152" y="50" width="14" height="3" rx="1.5" fill={color} opacity={0.4} />
+          <rect x="152" y="56" width="10" height="2" rx="1" fill={color} opacity={0.2} />
+        </svg>
+      </div>
+    );
+  }
+
+  // 11 — Talent: star constellation with connecting lines
+  if (section === 'talent') {
+    const stars = [
+      { cx: 50, cy: 40 },
+      { cx: 90, cy: 30 },
+      { cx: 140, cy: 45 },
+      { cx: 70, cy: 70 },
+      { cx: 120, cy: 75 },
+      { cx: 160, cy: 68 },
+    ];
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          {[
+            [0, 1], [1, 2], [0, 3], [3, 4], [4, 5], [1, 4], [2, 5],
+          ].map(([a, b], i) => (
+            <motion.line
+              key={i}
+              x1={stars[a].cx}
+              y1={stars[a].cy}
+              x2={stars[b].cx}
+              y2={stars[b].cy}
+              stroke={color}
+              strokeWidth="1"
+              opacity={0.2}
+              animate={{ opacity: [0.1, 0.35, 0.1] }}
+              transition={{ duration: 2.5, delay: i * 0.2, repeat: Infinity }}
+            />
+          ))}
+          {stars.map((s, i) => (
+            <motion.g key={i} animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 2, delay: i * 0.3, repeat: Infinity }}>
+              <circle cx={s.cx} cy={s.cy} r="8" fill="white" />
+              <path
+                d={`M${s.cx} ${s.cy - 5} L${s.cx + 1.5} ${s.cy - 1.5} L${s.cx + 5} ${s.cy - 1.5} L${s.cx + 2.5} ${s.cy + 1} L${s.cx + 3.5} ${s.cy + 5} L${s.cx} ${s.cy + 2.5} L${s.cx - 3.5} ${s.cy + 5} L${s.cx - 2.5} ${s.cy + 1} L${s.cx - 5} ${s.cy - 1.5} L${s.cx - 1.5} ${s.cy - 1.5} Z`}
+                fill={color}
+                opacity={0.6 + (i % 3) * 0.1}
+              />
+            </motion.g>
+          ))}
+        </svg>
+      </div>
+    );
+  }
+
+  // 12 — Decisions: gavel with stamp animation
+  if (section === 'decisions') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          <rect x="36" y="30" width="60" height="64" rx="10" fill="white" />
+          <rect x="44" y="38" width="44" height="4" rx="2" fill={color} opacity={0.6} />
+          <rect x="44" y="48" width="36" height="3" rx="1.5" fill={color} opacity={0.25} />
+          <rect x="44" y="56" width="40" height="3" rx="1.5" fill={color} opacity={0.2} />
+          <motion.g
+            animate={{ rotate: [0, -25, 0] }}
+            style={{ originX: '148px', originY: '80px' }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <rect x="140" y="40" width="16" height="42" rx="4" fill={color} opacity={0.5} />
+            <rect x="134" y="36" width="28" height="12" rx="4" fill={color} opacity={0.7} />
+          </motion.g>
+          <rect x="120" y="82" width="52" height="8" rx="4" fill={color} opacity={0.2} />
+          <motion.circle
+            cx="66"
+            cy="78"
+            r="10"
+            fill={color}
+            opacity={0.12}
+            animate={{ scale: [0, 1.2, 1], opacity: [0, 0.25, 0.12] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+          />
+          <motion.text x="62" y="82" fontSize="10" fill={color} opacity={0.5} fontWeight="bold" animate={{ opacity: [0, 0.6, 0.6, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+            ✓
+          </motion.text>
+        </svg>
+      </div>
+    );
+  }
+
+  // 13 — Offboarding: person walking out with door
+  if (section === 'offboarding') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          <rect x="110" y="28" width="50" height="68" rx="8" fill="white" />
+          <motion.rect x="110" y="28" width="30" height="68" rx="8" fill={color} opacity={0.1} animate={{ width: [30, 10, 30] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }} />
+          <circle cx="133" cy="62" r="3" fill={color} opacity={0.5} />
+          <motion.g animate={{ x: [0, -30, -30], opacity: [1, 1, 0] }} transition={{ duration: 3, repeat: Infinity, times: [0, 0.6, 1] }}>
+            <circle cx="80" cy="48" r="10" fill="white" />
+            <circle cx="80" cy="46" r="5" fill={color} opacity={0.6} />
+            <path d="M68 68 Q80 56 92 68" fill={color} opacity={0.25} />
+            <rect x="70" y="72" width="20" height="14" rx="4" fill={color} opacity={0.15} />
+          </motion.g>
+          <motion.path
+            d="M52 60 L40 60"
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            animate={{ opacity: [0, 0.6, 0], x: [-10, -30, -30] }}
+            transition={{ duration: 3, repeat: Infinity, times: [0, 0.6, 1] }}
+          />
+          <motion.path
+            d="M40 55 L34 60 L40 65"
+            fill="none"
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            animate={{ opacity: [0, 0.6, 0], x: [-10, -30, -30] }}
+            transition={{ duration: 3, repeat: Infinity, times: [0, 0.6, 1] }}
+          />
+        </svg>
+      </div>
+    );
+  }
+
+  // 14 — Reports: pie chart + table rows
+  if (section === 'reports') {
+    return (
+      <div className={className}>
+        <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
+          <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+          <circle cx="70" cy="60" r="28" fill="white" />
+          <motion.path
+            d="M70 60 L70 32 A28 28 0 0 1 96 50 Z"
+            fill={color}
+            opacity={0.6}
+            animate={{ opacity: [0.4, 0.7, 0.4] }}
+            transition={{ duration: 2.5, repeat: Infinity }}
+          />
+          <motion.path
+            d="M70 60 L96 50 A28 28 0 0 1 82 86 Z"
+            fill={color}
+            opacity={0.35}
+            animate={{ opacity: [0.2, 0.45, 0.2] }}
+            transition={{ duration: 2.5, delay: 0.4, repeat: Infinity }}
+          />
+          <motion.path
+            d="M70 60 L82 86 A28 28 0 1 1 70 32 Z"
+            fill={color}
+            opacity={0.18}
+            animate={{ opacity: [0.1, 0.25, 0.1] }}
+            transition={{ duration: 2.5, delay: 0.8, repeat: Infinity }}
+          />
+          <rect x="112" y="30" width="60" height="60" rx="10" fill="white" />
+          {[0, 1, 2, 3, 4].map((i) => (
+            <motion.rect
+              key={i}
+              x="118"
+              y={38 + i * 10}
+              width={40 - i * 4}
+              height="5"
+              rx="2.5"
+              fill={color}
+              opacity={0.15 + i * 0.06}
+              animate={{ width: [40 - i * 4, 50 - i * 3, 40 - i * 4] }}
+              transition={{ duration: 3, delay: i * 0.2, repeat: Infinity }}
+            />
+          ))}
+        </svg>
+      </div>
+    );
+  }
+
+  // fallback
   return (
     <div className={className}>
       <svg viewBox="0 0 200 120" className="h-full w-full" aria-hidden>
-        <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.75, 1, 0.75] }} transition={{ duration: 2.8, repeat: Infinity }} />
-        <motion.g animate={{ x: [0, 8, 0] }} transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}>
-          <circle cx="70" cy="50" r="14" fill="white" />
-          <circle cx="70" cy="46" r="6" fill={color} />
-          <path d="M56 72 Q70 58 84 72" fill={color} opacity={0.35} />
-          <rect x="58" y="78" width="24" height="8" rx="4" fill="white" />
-        </motion.g>
-        <motion.path
-          d="M110 60 H150"
-          stroke={color}
-          strokeWidth="3"
-          strokeLinecap="round"
-          animate={{ pathLength: [0.3, 1, 0.3] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        />
-        <path d="M140 50 L154 60 L140 70" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <motion.rect x="16" y="16" width="168" height="88" rx="20" fill={soft} animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity }} />
+        <motion.circle cx="100" cy="60" r="20" fill="white" animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+        <circle cx="100" cy="60" r="8" fill={color} opacity={0.4} />
       </svg>
     </div>
   );

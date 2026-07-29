@@ -176,7 +176,7 @@ class PlanikaModuleRegistry
                 'description' => 'Ugovori o radu',
                 'icon' => 'FiFileText',
                 'route' => '/planika/hr/contracts',
-                'available_permissions' => [],
+                'available_permissions' => ['view', 'manage', 'renew', 'generate'],
                 'is_active' => true,
                 'is_plugin' => true,
                 'sort_order' => 136,
