@@ -1,8 +1,9 @@
-import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { PLANIKA_SUBMODULES } from '../constants';
 import PlanikaSubmoduleAnimation from '../components/PlanikaSubmoduleAnimation';
+import { Link } from 'react-router-dom';
+import { BookOpen } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 export default function PlanikaOverview() {
   const { t } = useTranslation();
@@ -41,13 +42,22 @@ export default function PlanikaOverview() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          {t('planika.title')}
-        </h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
-          Specijalizovani modul za Planika operacije
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {t('planika.title')}
+          </h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">
+            Specijalizovani modul za Planika operacije
+          </p>
+        </div>
+        <Link
+          to="/uputstvo"
+          className="inline-flex items-center gap-2 self-start rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-medium text-orange-800 transition hover:bg-orange-100 dark:border-orange-800/50 dark:bg-orange-950/40 dark:text-orange-200 dark:hover:bg-orange-950/60"
+        >
+          <BookOpen className="h-4 w-4" />
+          Korisničko uputstvo
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">

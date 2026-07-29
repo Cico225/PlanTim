@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\DMSController;
 use App\Http\Controllers\Api\LMSController;
 use App\Http\Controllers\Api\HRMController;
 use App\Http\Controllers\Api\HRMContractsController;
+use App\Http\Controllers\Api\HRMEducationController;
+use App\Http\Controllers\Api\HRMTalentController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\GDPRController;
 use App\Http\Controllers\Api\AdminController;
@@ -400,6 +402,40 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/onboarding/{id}/tasks', [HRMController::class, 'getOnboardingProcessTasks']);
         Route::put('/onboarding/{id}/tasks/{taskId}', [HRMController::class, 'updateOnboardingTask']);
         Route::put('/onboarding/{id}/status', [HRMController::class, 'updateOnboardingProcessStatus']);
+
+        Route::prefix('education')->group(function () {
+            Route::get('/summary', [HRMEducationController::class, 'summary']);
+            Route::get('/programs', [HRMEducationController::class, 'programs']);
+            Route::post('/programs', [HRMEducationController::class, 'storeProgram']);
+            Route::put('/programs/{id}', [HRMEducationController::class, 'updateProgram']);
+            Route::delete('/programs/{id}', [HRMEducationController::class, 'deleteProgram']);
+            Route::get('/enrollments', [HRMEducationController::class, 'enrollments']);
+            Route::post('/enrollments', [HRMEducationController::class, 'storeEnrollment']);
+            Route::put('/enrollments/{id}', [HRMEducationController::class, 'updateEnrollment']);
+            Route::get('/certificates', [HRMEducationController::class, 'certificates']);
+            Route::post('/certificates', [HRMEducationController::class, 'storeCertificate']);
+            Route::delete('/certificates/{id}', [HRMEducationController::class, 'deleteCertificate']);
+            Route::get('/development-plans', [HRMEducationController::class, 'developmentPlans']);
+            Route::post('/development-plans', [HRMEducationController::class, 'storeDevelopmentPlan']);
+            Route::put('/development-plans/{id}', [HRMEducationController::class, 'updateDevelopmentPlan']);
+            Route::delete('/development-plans/{id}', [HRMEducationController::class, 'deleteDevelopmentPlan']);
+        });
+
+        Route::prefix('talent')->group(function () {
+            Route::get('/summary', [HRMTalentController::class, 'summary']);
+            Route::get('/profiles', [HRMTalentController::class, 'profiles']);
+            Route::post('/profiles', [HRMTalentController::class, 'storeProfile']);
+            Route::put('/profiles/{id}', [HRMTalentController::class, 'updateProfile']);
+            Route::delete('/profiles/{id}', [HRMTalentController::class, 'deleteProfile']);
+            Route::get('/career-paths', [HRMTalentController::class, 'careerPaths']);
+            Route::post('/career-paths', [HRMTalentController::class, 'storeCareerPath']);
+            Route::put('/career-paths/{id}', [HRMTalentController::class, 'updateCareerPath']);
+            Route::delete('/career-paths/{id}', [HRMTalentController::class, 'deleteCareerPath']);
+            Route::get('/succession-plans', [HRMTalentController::class, 'successionPlans']);
+            Route::post('/succession-plans', [HRMTalentController::class, 'storeSuccessionPlan']);
+            Route::put('/succession-plans/{id}', [HRMTalentController::class, 'updateSuccessionPlan']);
+            Route::delete('/succession-plans/{id}', [HRMTalentController::class, 'deleteSuccessionPlan']);
+        });
     });
 
     // Retail Control Plans (Plan kontrola i obilazaka)
