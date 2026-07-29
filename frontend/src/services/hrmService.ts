@@ -33,6 +33,15 @@ import type {
   EmploymentContractFilters,
   EmploymentContractSettings,
   EmploymentContractSummary,
+  EducationSummary,
+  EducationProgram,
+  EducationEnrollment,
+  EducationCertificate,
+  DevelopmentPlan,
+  TalentSummary,
+  TalentProfile,
+  CareerPath,
+  SuccessionPlan,
 } from '../types/hrm';
 import type { PaginatedResponse } from '../types';
 
@@ -143,6 +152,96 @@ export const generateEmploymentContractDocument = (id: number) =>
 
 export const downloadEmploymentContractDocument = (id: number) =>
   apiService.download(`/hrm/contracts/${id}/download-document`, `ugovor-${id}`);
+
+// ============================================
+// EDUCATION
+// ============================================
+export const getEducationSummary = () =>
+  apiService.get<EducationSummary>('/hrm/education/summary');
+
+export const getEducationPrograms = (filters?: Record<string, unknown>) =>
+  apiService.get<PaginatedResponse<EducationProgram>>('/hrm/education/programs', filters);
+
+export const createEducationProgram = (data: Record<string, unknown>) =>
+  apiService.post<EducationProgram>('/hrm/education/programs', data);
+
+export const updateEducationProgram = (id: number, data: Record<string, unknown>) =>
+  apiService.put<EducationProgram>(`/hrm/education/programs/${id}`, data);
+
+export const deleteEducationProgram = (id: number) =>
+  apiService.delete(`/hrm/education/programs/${id}`);
+
+export const getEducationEnrollments = (filters?: Record<string, unknown>) =>
+  apiService.get<PaginatedResponse<EducationEnrollment>>('/hrm/education/enrollments', filters);
+
+export const createEducationEnrollment = (data: Record<string, unknown>) =>
+  apiService.post<EducationEnrollment>('/hrm/education/enrollments', data);
+
+export const updateEducationEnrollment = (id: number, data: Record<string, unknown>) =>
+  apiService.put<EducationEnrollment>(`/hrm/education/enrollments/${id}`, data);
+
+export const getEducationCertificates = (filters?: Record<string, unknown>) =>
+  apiService.get<PaginatedResponse<EducationCertificate>>('/hrm/education/certificates', filters);
+
+export const createEducationCertificate = (data: Record<string, unknown>) =>
+  apiService.post<EducationCertificate>('/hrm/education/certificates', data);
+
+export const deleteEducationCertificate = (id: number) =>
+  apiService.delete(`/hrm/education/certificates/${id}`);
+
+export const getDevelopmentPlans = (filters?: Record<string, unknown>) =>
+  apiService.get<PaginatedResponse<DevelopmentPlan>>('/hrm/education/development-plans', filters);
+
+export const createDevelopmentPlan = (data: Record<string, unknown>) =>
+  apiService.post<DevelopmentPlan>('/hrm/education/development-plans', data);
+
+export const updateDevelopmentPlan = (id: number, data: Record<string, unknown>) =>
+  apiService.put<DevelopmentPlan>(`/hrm/education/development-plans/${id}`, data);
+
+export const deleteDevelopmentPlan = (id: number) =>
+  apiService.delete(`/hrm/education/development-plans/${id}`);
+
+// ============================================
+// TALENT MANAGEMENT
+// ============================================
+export const getTalentSummary = () =>
+  apiService.get<TalentSummary>('/hrm/talent/summary');
+
+export const getTalentProfiles = (filters?: Record<string, unknown>) =>
+  apiService.get<PaginatedResponse<TalentProfile>>('/hrm/talent/profiles', filters);
+
+export const createTalentProfile = (data: Record<string, unknown>) =>
+  apiService.post<TalentProfile>('/hrm/talent/profiles', data);
+
+export const updateTalentProfile = (id: number, data: Record<string, unknown>) =>
+  apiService.put<TalentProfile>(`/hrm/talent/profiles/${id}`, data);
+
+export const deleteTalentProfile = (id: number) =>
+  apiService.delete(`/hrm/talent/profiles/${id}`);
+
+export const getCareerPaths = (filters?: Record<string, unknown>) =>
+  apiService.get<PaginatedResponse<CareerPath>>('/hrm/talent/career-paths', filters);
+
+export const createCareerPath = (data: Record<string, unknown>) =>
+  apiService.post<CareerPath>('/hrm/talent/career-paths', data);
+
+export const updateCareerPath = (id: number, data: Record<string, unknown>) =>
+  apiService.put<CareerPath>(`/hrm/talent/career-paths/${id}`, data);
+
+export const deleteCareerPath = (id: number) =>
+  apiService.delete(`/hrm/talent/career-paths/${id}`);
+
+export const getSuccessionPlans = (filters?: Record<string, unknown>) =>
+  apiService.get<PaginatedResponse<SuccessionPlan>>('/hrm/talent/succession-plans', filters);
+
+export const createSuccessionPlan = (data: Record<string, unknown>) =>
+  apiService.post<SuccessionPlan>('/hrm/talent/succession-plans', data);
+
+export const updateSuccessionPlan = (id: number, data: Record<string, unknown>) =>
+  apiService.put<SuccessionPlan>(`/hrm/talent/succession-plans/${id}`, data);
+
+export const deleteSuccessionPlan = (id: number) =>
+  apiService.delete(`/hrm/talent/succession-plans/${id}`);
 
 // ============================================
 // ONBOARDING

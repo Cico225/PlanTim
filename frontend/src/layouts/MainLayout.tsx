@@ -40,6 +40,7 @@ import {
   FiSearch,
   FiDollarSign,
   FiCreditCard,
+  FiBookOpen,
 } from 'react-icons/fi';
 
 type PlanikaNavItem = {
@@ -851,6 +852,16 @@ export default function MainLayout() {
                 className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400"
               />
             </div>
+
+            {/* Korisničko uputstvo */}
+            <Link
+              to="/uputstvo"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-primary-600 shadow-sm transition hover:border-primary-300 hover:bg-primary-50 dark:border-dark-600 dark:bg-dark-800 dark:text-primary-400 dark:hover:bg-dark-700 sm:h-10 sm:w-10"
+              title="Korisničko uputstvo"
+              aria-label="Korisničko uputstvo"
+            >
+              <FiBookOpen size={18} />
+            </Link>
 
             {/* Edel — AI pomoćnik */}
             <button

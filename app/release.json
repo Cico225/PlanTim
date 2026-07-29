@@ -1,8 +1,9 @@
 {
-    "version": "1.2.7",
+    "version": "1.2.8",
     "version_name": "Release 2026-07-29",
-    "release_notes": "Nove funkcionalnosti u modulu HR",
+    "release_notes": "Implementacija korisničkog uputstva",
     "changelog": [
+        "Implementacija korisničkog uputstva",
         "Nove funkcionalnosti u modulu HR",
         "Popravak dizajna na Ljudskim resursima",
         "Dorada funkcionalnosti Reklamacije.",

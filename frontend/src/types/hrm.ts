@@ -1002,6 +1002,168 @@ export interface TimeEntryFilters {
   per_page?: number;
 }
 
+// ============================================
+// EDUCATION
+// ============================================
+export type EducationType = 'internal' | 'external' | 'online' | 'workshop';
+export type EducationProgramStatus = 'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
+export type EducationEnrollmentStatus = 'planned' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+export type DevelopmentPlanStatus = 'draft' | 'active' | 'completed' | 'cancelled';
+
+export interface EducationProgram {
+  id: number;
+  title: string;
+  description?: string | null;
+  education_type: EducationType;
+  topic?: string | null;
+  provider?: string | null;
+  location?: string | null;
+  duration_hours?: number | null;
+  cost?: number | null;
+  currency?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  max_participants?: number | null;
+  status: EducationProgramStatus;
+  issues_certificate: boolean;
+  notes?: string | null;
+  enrollments_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EducationEnrollment {
+  id: number;
+  program_id: number;
+  employee_id: number;
+  status: EducationEnrollmentStatus;
+  enrolled_at?: string | null;
+  completed_at?: string | null;
+  rating?: number | null;
+  feedback?: string | null;
+  notes?: string | null;
+  program_title?: string;
+  education_type?: EducationType;
+  employee_name?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EducationCertificate {
+  id: number;
+  employee_id: number;
+  program_id?: number | null;
+  enrollment_id?: number | null;
+  title: string;
+  issuer?: string | null;
+  certificate_number?: string | null;
+  issued_at?: string | null;
+  expires_at?: string | null;
+  notes?: string | null;
+  employee_name?: string;
+  program_title?: string;
+  created_at?: string;
+}
+
+export interface DevelopmentPlan {
+  id: number;
+  employee_id: number;
+  title: string;
+  goals?: string | null;
+  activities?: string[] | null;
+  start_date?: string | null;
+  target_date?: string | null;
+  status: DevelopmentPlanStatus;
+  progress_percent: number;
+  notes?: string | null;
+  mentor_id?: number | null;
+  employee_name?: string;
+  mentor_name?: string;
+  created_at?: string;
+}
+
+export interface EducationSummary {
+  programs: number;
+  open_programs: number;
+  enrollments: number;
+  completed_enrollments: number;
+  certificates: number;
+  development_plans: number;
+}
+
+// ============================================
+// TALENT MANAGEMENT
+// ============================================
+export type TalentLevel = 'low' | 'medium' | 'high';
+export type TalentReadiness = 'ready_now' | '1_2_years' | '3_plus_years';
+export type CareerHorizon = 'short' | 'medium' | 'long';
+export type CareerPathStatus = 'draft' | 'active' | 'achieved' | 'cancelled';
+export type SuccessionStatus = 'active' | 'completed' | 'cancelled';
+
+export interface TalentProfile {
+  id: number;
+  employee_id: number;
+  performance_level: TalentLevel;
+  potential_level: TalentLevel;
+  in_talent_pool: boolean;
+  readiness?: TalentReadiness | null;
+  competencies?: string[] | null;
+  development_activities?: string[] | null;
+  strengths?: string | null;
+  development_areas?: string | null;
+  goals?: string | null;
+  review_date?: string | null;
+  next_review_date?: string | null;
+  notes?: string | null;
+  employee_name?: string;
+  employee_position?: string;
+  department_name?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CareerPath {
+  id: number;
+  employee_id: number;
+  current_position?: string | null;
+  target_position?: string | null;
+  target_work_position_id?: number | null;
+  horizon?: CareerHorizon | null;
+  status: CareerPathStatus;
+  milestones?: string[] | null;
+  notes?: string | null;
+  target_date?: string | null;
+  employee_name?: string;
+  target_work_position_name?: string;
+  created_at?: string;
+}
+
+export interface SuccessionPlan {
+  id: number;
+  position_title: string;
+  work_position_id?: number | null;
+  incumbent_employee_id?: number | null;
+  successor_employee_id: number;
+  readiness: TalentReadiness;
+  priority: number;
+  status: SuccessionStatus;
+  development_actions?: string | null;
+  notes?: string | null;
+  incumbent_name?: string;
+  successor_name?: string;
+  work_position_name?: string;
+  created_at?: string;
+}
+
+export interface TalentSummary {
+  talent_pool: number;
+  high_potential: number;
+  career_paths: number;
+  succession_plans: number;
+  nine_box: { performance_level: TalentLevel; potential_level: TalentLevel; total: number }[];
+}
+
+
 
 
 

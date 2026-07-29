@@ -43,6 +43,8 @@ import ATSOffers from '../components/ATSOffers';
 import OrganizationalStructure from '../components/OrganizationalStructure';
 import Onboarding from '../components/Onboarding';
 import EmploymentContracts from '../components/EmploymentContracts';
+import Education from '../components/Education';
+import TalentManagement from '../components/TalentManagement';
 
 // Tab components - inline implementations
 type TabKey = 'dashboard' | 'employees' | 'onboarding' | 'contracts' | 'decisions' | 
@@ -1987,100 +1989,6 @@ function ATSList() {
   );
 }
 
-function EducationList() {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <GraduationCap className="w-6 h-6 text-purple-500" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edukacije</h3>
-      </div>
-      <p className="text-gray-500 dark:text-gray-400 mb-4">Upravljanje obrazovanjem, treningom i razvojem zaposlenika</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <GraduationCap className="w-5 h-5 text-purple-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Kursevi i trening programi</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Pregled dostupnih kurseva i trening programa</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Users className="w-5 h-5 text-blue-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Prijave na edukacije</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Pregled prijava zaposlenika na edukacije</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Award className="w-5 h-5 text-yellow-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Certifikati</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Izdati certifikati i sertifikati</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <TrendingUp className="w-5 h-5 text-green-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Plan razvoja</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Individualni planovi razvoja zaposlenika</p>
-        </button>
-      </div>
-      <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          Modul za upravljanje obrazovanjem i razvojem zaposlenika. Omogućava praćenje kurseva, treninga, sertifikata i individualnih planova razvoja.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function TalentManagementList() {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <Star className="w-6 h-6 text-yellow-500" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Talent Management</h3>
-      </div>
-      <p className="text-gray-500 dark:text-gray-400 mb-4">Upravljanje talentima, nasledstvom i karijernim putanjama</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Star className="w-5 h-5 text-yellow-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Talent Pool</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Baza talenata i identifikacija ključnih zaposlenika</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <TrendingUp className="w-5 h-5 text-blue-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Karijerne putanje</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Planiranje i praćenje karijernih putanja</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Users className="w-5 h-5 text-purple-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Nasleđivanje pozicija</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Planiranje nasleđivanja ključnih pozicija</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <BarChart3 className="w-5 h-5 text-green-500" />
-            <span className="font-medium text-gray-900 dark:text-white">9-Box matrica</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Matrica performansi i potencijala</p>
-        </button>
-      </div>
-      <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          Modul za upravljanje talentima omogućava identifikaciju, razvoj i zadržavanje ključnih talenata u organizaciji.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function HRReports() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -2151,8 +2059,8 @@ export default function HRMOverview({
       case 'decisions': return <DecisionsList />;
       case 'attendance': return <AttendanceList />;
       case 'leaves': return <LeavesList />;
-      case 'education': return <EducationList />;
-      case 'talent': return <TalentManagementList />;
+      case 'education': return <Education />;
+      case 'talent': return <TalentManagement />;
       case 'evaluations': return <EvaluationsList />;
       case 'offboarding': return <OffboardingList />;
       case 'reports': return <HRReports />;

@@ -57,6 +57,9 @@ import ActiveContractsPage from './modules/planika/finance/ActiveContractsPage';
 import RetailComplaintsModuleEntry from './modules/planika/maloprodaja/RetailComplaintsModuleEntry';
 import HRModuleEntry from './modules/planika/hr/HRModuleEntry';
 
+// User Guide
+import UserGuide from './modules/guide/UserGuide';
+
 // AI
 import AIOverview from './modules/ai/pages/AIOverview';
 
@@ -134,6 +137,7 @@ function App() {
             <Route path="/gdpr/*" element={<GDPROverview />} />
             <Route path="/office365/*" element={<Office365Overview />} />
             <Route path="/planika" element={<PlanikaOverview />} />
+            <Route path="/uputstvo" element={<UserGuide />} />
             <Route path="/planika/finance/krediti/*" element={<FinanceModuleEntry />} />
             <Route path="/planika/finance/ugovori" element={<ActiveContractsPage />} />
             <Route path="/planika/retail/reklamacije/*" element={<RetailComplaintsModuleEntry />} />
