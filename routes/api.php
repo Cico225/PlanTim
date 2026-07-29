@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\DMSController;
 use App\Http\Controllers\Api\LMSController;
 use App\Http\Controllers\Api\HRMController;
+use App\Http\Controllers\Api\HRMContractsController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\GDPRController;
 use App\Http\Controllers\Api\AdminController;
@@ -306,28 +307,23 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // HRM
     Route::prefix('hrm')->group(function () {
         // Dashboard
-        Route::get('/dashboard', function() {
-            return response()->json([
-                'stats' => [
-                    'total_employees' => 0,
-                    'active_employees' => 0,
-                    'on_leave_today' => 0,
-                    'pending_leaves' => 0,
-                    'pending_evaluations' => 0,
-                    'expiring_contracts' => 0,
-                    'onboarding_in_progress' => 0,
-                    'offboarding_in_progress' => 0,
-                    'new_hires_this_month' => 0,
-                    'terminations_this_month' => 0,
-                ],
-                'recent_activities' => [],
-                'alerts' => [],
-            ]);
-        });
+        Route::get('/dashboard', [HRMController::class, 'getDashboard']);
         
         // Alerts
-        Route::get('/alerts', function(Request $request) {
-            return response()->json([]);
+        Route::get('/alerts', [HRMController::class, 'getAlerts']);
+
+        Route::prefix('contracts')->group(function () {
+            Route::get('/templates', [HRMContractsController::class, 'templates']);
+            Route::get('/settings', [HRMContractsController::class, 'settings']);
+            Route::put('/settings', [HRMContractsController::class, 'updateSettings']);
+            Route::get('/summary', [HRMContractsController::class, 'summary']);
+            Route::get('/', [HRMContractsController::class, 'index']);
+            Route::post('/', [HRMContractsController::class, 'store']);
+            Route::get('/{id}', [HRMContractsController::class, 'show']);
+            Route::put('/{id}', [HRMContractsController::class, 'update']);
+            Route::post('/{id}/renew', [HRMContractsController::class, 'renew']);
+            Route::post('/{id}/generate-document', [HRMContractsController::class, 'generateDocument']);
+            Route::get('/{id}/download-document', [HRMContractsController::class, 'downloadDocument']);
         });
         
         Route::get('/employees', [HRMController::class, 'index']);

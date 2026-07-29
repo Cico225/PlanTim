@@ -1,8 +1,9 @@
 {
-    "version": "1.2.6",
-    "version_name": "Release 2026-07-28",
-    "release_notes": "Popravak dizajna na Ljudskim resursima",
+    "version": "1.2.7",
+    "version_name": "Release 2026-07-29",
+    "release_notes": "Nove funkcionalnosti u modulu HR",
     "changelog": [
+        "Nove funkcionalnosti u modulu HR",
         "Popravak dizajna na Ljudskim resursima",
         "Dorada funkcionalnosti Reklamacije.",
         "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije.",
