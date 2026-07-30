@@ -64,13 +64,13 @@ export default function LMSSearch() {
   const handleResultClick = (type: string, id: number, courseId?: number) => {
     switch (type) {
       case 'course':
-        navigate(`/lms/courses/${id}`);
+        navigate(`/lms/maloprodaja/courses/${id}`);
         break;
       case 'lesson':
-        navigate(`/lms/courses/${courseId}/lesson/${id}`);
+        navigate(`/lms/maloprodaja/courses/${courseId}/lesson/${id}`);
         break;
       case 'quiz':
-        navigate(`/lms/courses/${courseId}/quiz/${id}`);
+        navigate(`/lms/maloprodaja/courses/${courseId}/quiz/${id}`);
         break;
     }
   };

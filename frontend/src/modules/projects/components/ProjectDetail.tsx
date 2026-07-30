@@ -5,11 +5,13 @@ import { projectsService, Project, Task } from '@/services/projectsService';
 import toast from 'react-hot-toast';
 import CreateTaskModal from './CreateTaskModal';
 import TaskDetailModal from './TaskDetailModal';
+import { useAuthStore } from '@/store/authStore';
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuthStore();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -360,6 +362,7 @@ export default function ProjectDetail() {
           onClose={closeTaskModal}
           projectId={Number(projectId)}
           taskId={selectedTaskId}
+          canManage={Boolean(user?.id && project?.owner_id && user.id === project.owner_id)}
           onTaskUpdated={() => {
             fetchTasks();
             fetchProject();

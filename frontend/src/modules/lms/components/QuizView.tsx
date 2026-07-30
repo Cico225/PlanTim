@@ -172,7 +172,7 @@ export default function QuizView() {
     return (
       <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
         <button
-          onClick={() => navigate(`/lms/courses/${courseId}`)}
+          onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}`)}
           className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
         >
           <FiArrowLeft className="w-4 h-4" />
@@ -321,7 +321,7 @@ export default function QuizView() {
               </button>
             )}
             <button
-              onClick={() => navigate(`/lms/courses/${courseId}`)}
+              onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}`)}
               className="btn-secondary"
             >
               Nazad na kurs
@@ -335,7 +335,7 @@ export default function QuizView() {
   return (
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
       <button
-        onClick={() => navigate(`/lms/courses/${courseId}`)}
+        onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}`)}
         className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
       >
         <FiArrowLeft className="w-4 h-4" />

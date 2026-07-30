@@ -59,7 +59,7 @@ export default function MyCourses() {
             Niste upisani u nijedan kurs
           </h3>
           <button
-            onClick={() => navigate('/lms')}
+            onClick={() => navigate('/lms/maloprodaja/katalog')}
             className="btn-primary mt-4"
           >
             Pronađi kurseve
@@ -71,7 +71,7 @@ export default function MyCourses() {
             <div
               key={enrollment.id}
               className="card hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => navigate(`/lms/courses/${enrollment.course_id}`)}
+              onClick={() => navigate(`/lms/maloprodaja/courses/${enrollment.course_id}`)}
             >
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
