@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FiTrendingUp, FiAward, FiStar, FiUser } from 'react-icons/fi';
+import { motion } from 'framer-motion';
+import { FiTrendingUp, FiAward, FiStar } from 'react-icons/fi';
 import { lmsService } from '@/services/lmsService';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
@@ -10,6 +11,15 @@ interface LeaderboardEntry {
   total_points: number;
   rank: number;
 }
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, delay: Math.min(i * 0.04, 0.4), ease: [0.22, 1, 0.36, 1] },
+  }),
+};
 
 export default function Leaderboard() {
   const { user } = useAuthStore();
@@ -28,7 +38,7 @@ export default function Leaderboard() {
       const data = await lmsService.getLeaderboard(period, 20);
       setLeaderboard(data.leaderboard || []);
       setCurrentUserRank(data.current_user_rank || null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load leaderboard:', error);
       toast.error('Neuspješno učitavanje ljestvice');
     } finally {
@@ -39,177 +49,202 @@ export default function Leaderboard() {
   const getRankStyle = (rank: number) => {
     switch (rank) {
       case 1:
-        return 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white';
+        return 'bg-gradient-to-br from-amber-400 to-yellow-500 text-amber-950 shadow-amber-400/30';
       case 2:
-        return 'bg-gradient-to-r from-gray-300 to-gray-400 text-gray-800';
+        return 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-800 shadow-slate-400/30';
       case 3:
-        return 'bg-gradient-to-r from-amber-600 to-amber-700 text-white';
+        return 'bg-gradient-to-br from-orange-500 to-amber-700 text-white shadow-orange-500/30';
       default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white';
+        return 'bg-white text-amber-800 ring-1 ring-amber-100 dark:bg-dark-900 dark:text-amber-200 dark:ring-amber-900/40';
     }
   };
 
-  const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return '🥇';
-      case 2:
-        return '🥈';
-      case 3:
-        return '🥉';
-      default:
-        return null;
-    }
-  };
+  const myPoints = leaderboard.find((e) => e.id === user?.id)?.total_points || 0;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-2 border-amber-200 border-t-amber-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-w-0 space-y-4 overflow-x-hidden p-3 sm:space-y-6 sm:p-4 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white sm:text-3xl">
-            <FiTrendingUp className="text-purple-500" />
-            Ljestvica
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Rang lista korisnika po osvojenim bodovima
-          </p>
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45 }}
+        className="relative overflow-hidden rounded-3xl border border-amber-100 bg-gradient-to-br from-white via-amber-50/50 to-orange-50/30 p-6 shadow-sm dark:border-amber-900/40 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900 sm:p-8"
+      >
+        <div
+          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-orange-400/15 blur-3xl"
+          aria-hidden
+        />
+
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-xl">
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
+              Maloprodaja
+            </p>
+            <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white sm:text-4xl">
+              <FiTrendingUp className="text-amber-500" />
+              Ljestvica
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400 sm:text-base">
+              Rang lista korisnika po osvojenim bodovima.
+            </p>
+          </div>
+
+          <div className="inline-flex rounded-xl border border-amber-200/70 bg-white/70 p-1 shadow-sm backdrop-blur dark:border-amber-900/40 dark:bg-dark-900/50">
+            {(
+              [
+                { value: 'week', label: 'Sedmica' },
+                { value: 'month', label: 'Mjesec' },
+                { value: 'all', label: 'Ukupno' },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPeriod(option.value)}
+                className={`rounded-lg px-3 py-2 text-xs font-medium transition sm:px-4 sm:text-sm ${
+                  period === option.value
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-amber-50 dark:text-gray-300 dark:hover:bg-dark-700'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Period Filter */}
-        <div className="grid w-full grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800 sm:flex sm:w-auto sm:gap-2">
-          {[
-            { value: 'week', label: 'Sedmica' },
-            { value: 'month', label: 'Mjesec' },
-            { value: 'all', label: 'Ukupno' },
-          ].map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setPeriod(option.value as any)}
-              className={`rounded-md px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-2 sm:text-sm ${
-                period === option.value
-                  ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Current user rank card */}
-      {currentUserRank && (
-        <div className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-white shadow-lg sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {currentUserRank && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="relative mt-6 grid gap-4 rounded-2xl border border-white/60 bg-gradient-to-r from-amber-500 to-orange-500 p-4 text-white shadow-lg shadow-amber-500/20 sm:grid-cols-2 sm:p-5"
+          >
             <div>
-              <p className="text-blue-100">Vaša pozicija</p>
-              <div className="flex flex-wrap items-baseline gap-2">
+              <p className="text-sm text-amber-100">Vaša pozicija</p>
+              <div className="mt-1 flex flex-wrap items-baseline gap-2">
                 <span className="text-3xl font-bold sm:text-4xl">#{currentUserRank}</span>
-                <span className="text-sm text-blue-200 sm:text-base">od {leaderboard.length} korisnika</span>
+                <span className="text-sm text-amber-100">od {leaderboard.length} korisnika</span>
               </div>
             </div>
             <div className="sm:text-right">
-              <p className="text-blue-100">Vaši bodovi</p>
-              <div className="flex items-center gap-2">
-                <FiStar className="h-5 w-5 sm:h-6 sm:w-6" />
-                <span className="text-2xl font-bold sm:text-3xl">
-                  {leaderboard.find(e => e.id === user?.id)?.total_points || 0}
-                </span>
+              <p className="text-sm text-amber-100">Vaši bodovi</p>
+              <div className="mt-1 flex items-center gap-2 sm:justify-end">
+                <FiStar className="h-5 w-5" />
+                <span className="text-2xl font-bold sm:text-3xl">{myPoints.toLocaleString()}</span>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </motion.div>
 
-      {/* Leaderboard List */}
-      <div className="card overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="overflow-hidden rounded-3xl border border-amber-100/80 bg-gradient-to-br from-white via-white to-amber-50/40 shadow-sm dark:border-amber-900/30 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900"
+      >
         {leaderboard.length === 0 ? (
-          <div className="p-12 text-center">
-            <FiAward className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Nema podataka
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
+          <div className="px-6 py-16 text-center">
+            <FiAward className="mx-auto mb-3 h-14 w-14 text-amber-400 opacity-70" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nema podataka</h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Još nema korisnika na ljestvici za odabrani period.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {leaderboard.map((entry) => {
+          <div className="divide-y divide-amber-100/80 dark:divide-amber-900/30">
+            {leaderboard.map((entry, index) => {
               const isCurrentUser = entry.id === user?.id;
-              const rankIcon = getRankIcon(entry.rank);
-              
+
               return (
-                <div 
+                <motion.div
                   key={entry.id}
-                  className={`flex items-center gap-3 p-3 transition-colors sm:p-4 ${
-                    isCurrentUser 
-                      ? 'bg-blue-50 dark:bg-blue-900/20' 
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  custom={index}
+                  variants={fadeUp}
+                  initial="hidden"
+                  animate="show"
+                  className={`flex items-center gap-3 p-3 sm:p-4 ${
+                    isCurrentUser
+                      ? 'bg-amber-50/80 dark:bg-amber-950/30'
+                      : 'hover:bg-amber-50/40 dark:hover:bg-dark-900/40'
                   }`}
                 >
-                  {/* Rank */}
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-bold sm:h-12 sm:w-12 sm:text-lg ${getRankStyle(entry.rank)}`}>
-                    {rankIcon || entry.rank}
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold shadow-md sm:h-12 sm:w-12 sm:text-base ${getRankStyle(entry.rank)}`}
+                  >
+                    {entry.rank}
                   </div>
 
-                  {/* User info */}
                   <div className="min-w-0 flex-1">
-                    <h3 className={`truncate font-semibold ${
-                      isCurrentUser 
-                        ? 'text-blue-600 dark:text-blue-400' 
-                        : 'text-gray-900 dark:text-white'
-                    }`}>
+                    <h3
+                      className={`truncate font-semibold ${
+                        isCurrentUser
+                          ? 'text-amber-700 dark:text-amber-300'
+                          : 'text-gray-900 dark:text-white'
+                      }`}
+                    >
                       {entry.name}
-                      {isCurrentUser && <span className="ml-1 text-sm font-normal">(Vi)</span>}
+                      {isCurrentUser && (
+                        <span className="ml-1 text-sm font-normal text-amber-600/80">(Vi)</span>
+                      )}
                     </h3>
                   </div>
 
-                  {/* Points */}
-                  <div className="flex shrink-0 items-center gap-1 text-right sm:gap-2">
-                    <FiStar className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                      entry.rank <= 3 ? 'text-yellow-500' : 'text-gray-400'
-                    }`} />
+                  <div className="flex shrink-0 items-center gap-1.5 text-right">
+                    <FiStar
+                      className={`h-4 w-4 ${entry.rank <= 3 ? 'text-amber-500' : 'text-gray-400'}`}
+                    />
                     <span className="text-base font-bold text-gray-900 dark:text-white sm:text-lg">
                       {entry.total_points.toLocaleString()}
                     </span>
-                    <span className="hidden text-sm text-gray-500 dark:text-gray-400 sm:inline">bodova</span>
+                    <span className="hidden text-sm text-gray-500 sm:inline">bodova</span>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
         )}
-      </div>
+      </motion.div>
 
-      {/* Info */}
-      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-          Kako osvojiti bodove?
-        </h3>
-        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-          <li>• Završite lekciju: <span className="font-medium">+10 bodova</span></li>
-          <li>• Položite kviz: <span className="font-medium">+20 bodova</span></li>
-          <li>• Završite kurs: <span className="font-medium">+50 bodova</span></li>
-          <li>• Pogledajte video do kraja: <span className="font-medium">+5 bodova</span></li>
-          <li>• Osvojite bedž: <span className="font-medium">+10-500 bodova</span></li>
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="rounded-2xl border border-amber-100/80 bg-white/80 p-5 shadow-sm dark:border-amber-900/30 dark:bg-dark-800"
+      >
+        <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">Kako osvojiti bodove?</h3>
+        <ul className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
+          <li>
+            Završite lekciju: <span className="font-medium text-amber-700 dark:text-amber-300">+10 bodova</span>
+          </li>
+          <li>
+            Položite kviz: <span className="font-medium text-amber-700 dark:text-amber-300">+20 bodova</span>
+          </li>
+          <li>
+            Završite kurs: <span className="font-medium text-amber-700 dark:text-amber-300">+50 bodova</span>
+          </li>
+          <li>
+            Pogledajte video do kraja:{' '}
+            <span className="font-medium text-amber-700 dark:text-amber-300">+5 bodova</span>
+          </li>
+          <li>
+            Osvojite bedž:{' '}
+            <span className="font-medium text-amber-700 dark:text-amber-300">+10–500 bodova</span>
+          </li>
         </ul>
-      </div>
+      </motion.div>
     </div>
   );
 }
-
-
-
-
-
-

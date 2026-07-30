@@ -98,7 +98,7 @@ export default function CourseDetail() {
       {/* Course Header */}
       <div className="card p-4 sm:p-6">
         <button
-          onClick={() => navigate('/lms')}
+          onClick={() => navigate('/lms/maloprodaja/katalog')}
           className="text-blue-600 dark:text-blue-400 mb-4 hover:underline"
         >
           ← Nazad na kurseve
@@ -146,7 +146,7 @@ export default function CourseDetail() {
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             {isManager && (
               <button
-                onClick={() => navigate(`/lms/manage/${course.id}/edit`)}
+                onClick={() => navigate(`/lms/maloprodaja/manage/${course.id}/edit`)}
                 className="btn-secondary flex w-full items-center justify-center gap-2 sm:w-auto"
               >
                 <FiEdit className="w-4 h-4" />
@@ -176,7 +176,7 @@ export default function CourseDetail() {
             </h2>
             {isManager && (
               <button
-                onClick={() => navigate(`/lms/courses/${courseId}/lessons/new`)}
+                onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}/lessons/new`)}
                 className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto"
               >
                 <FiPlus className="w-4 h-4" />
@@ -190,7 +190,7 @@ export default function CourseDetail() {
               <div
                 key={lesson.id}
                 className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 sm:p-4"
-                onClick={() => navigate(`/lms/courses/${courseId}/lessons/${lesson.id}`)}
+                onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}/lessons/${lesson.id}`)}
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600 dark:bg-blue-900 dark:text-blue-400 sm:h-10 sm:w-10">
@@ -234,7 +234,7 @@ export default function CourseDetail() {
             </h2>
             {isManager && (
               <button
-                onClick={() => navigate(`/lms/courses/${courseId}/quizzes/new`)}
+                onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}/quizzes/new`)}
                 className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto"
               >
                 <FiPlus className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function CourseDetail() {
               <div
                 key={quiz.id}
                 className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 sm:p-4"
-                onClick={() => navigate(`/lms/courses/${courseId}/quizzes/${quiz.id}`)}
+                onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}/quizzes/${quiz.id}`)}
               >
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate font-semibold text-gray-900 dark:text-white">

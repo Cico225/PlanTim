@@ -194,7 +194,7 @@ export default function CourseForm() {
       }
       
       console.log('🚀 Navigating to /lms/manage');
-      navigate('/lms/manage');
+      navigate('/lms/maloprodaja/manage');
     } catch (error: any) {
       console.error('❌ Failed to save course:', error);
       console.error('❌ Error response:', error.response?.data);
@@ -303,7 +303,7 @@ export default function CourseForm() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-4">
         <button
-          onClick={() => navigate('/lms/manage')}
+          onClick={() => navigate('/lms/maloprodaja/manage')}
           className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
         >
           <FiArrowLeft className="w-4 h-4" />
@@ -628,7 +628,7 @@ export default function CourseForm() {
           <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
-              onClick={() => navigate('/lms/manage')}
+              onClick={() => navigate('/lms/maloprodaja/manage')}
               className="btn-secondary"
             >
               Otkaži

@@ -133,7 +133,7 @@ export default function QuizForm() {
         toast.success('Kviz uspješno kreiran');
       }
       
-      navigate(`/lms/courses/${courseId}`);
+      navigate(`/lms/maloprodaja/courses/${courseId}`);
     } catch (error: any) {
       console.error('Failed to save quiz:', error);
       toast.error('Neuspješno čuvanje kviza');
@@ -200,7 +200,7 @@ export default function QuizForm() {
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
       <div className="max-w-5xl mx-auto">
       <button
-        onClick={() => navigate(`/lms/courses/${courseId}`)}
+        onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}`)}
         className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
       >
         <FiArrowLeft className="w-4 h-4" />
@@ -490,7 +490,7 @@ export default function QuizForm() {
           <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
-              onClick={() => navigate(`/lms/courses/${courseId}`)}
+              onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}`)}
               className="btn-secondary"
             >
               Otkaži

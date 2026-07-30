@@ -448,45 +448,53 @@ export default function MainLayout() {
         } ${sidebarCollapsed ? 'w-20' : 'w-72'} overflow-visible`}
         data-sidebar-open={sidebarOpen}
       >
-        <div className={`h-full flex flex-col bg-gradient-to-b from-white via-white to-gray-50 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900 backdrop-blur-xl transition-all duration-300 border-r border-gray-200/50 dark:border-dark-700/50`}>
+        <div className="relative flex h-full flex-col border-r border-gray-200/50 bg-gradient-to-b from-white via-white to-gray-50 backdrop-blur-xl transition-all duration-300 dark:border-dark-700/50 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900">
+          {/* Desktop collapse / expand toggle — always visible on the sidebar edge */}
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="absolute -right-3 top-[1.35rem] z-50 hidden h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-md transition hover:scale-110 hover:border-primary-300 hover:text-primary-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-primary-500 dark:hover:text-primary-400 lg:flex"
+            title={sidebarCollapsed ? t('navigation.expand') : t('navigation.collapse')}
+            aria-label={sidebarCollapsed ? t('navigation.expand') : t('navigation.collapse')}
+          >
+            {sidebarCollapsed ? <FiChevronRight size={16} /> : <FiChevronLeft size={16} />}
+          </button>
+
           {/* Logo Section with Gradient */}
-          <div className="relative h-16 flex items-center justify-between px-6 bg-gradient-to-r from-primary-600 to-primary-500 dark:from-primary-700 dark:to-primary-600">
-            <div className="flex items-center gap-3 group">
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.innerWidth >= 1024) {
-                    setSidebarCollapsed(!sidebarCollapsed);
-                  }
-                }}
-                className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:scale-110 transition-transform duration-200 lg:cursor-pointer"
-                title={t('navigation.collapse')}
+          <div
+            className={`relative flex h-16 items-center bg-gradient-to-r from-primary-600 to-primary-500 dark:from-primary-700 dark:to-primary-600 ${
+              sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'
+            }`}
+          >
+            <div className={`flex items-center ${sidebarCollapsed ? '' : 'min-w-0 gap-2'}`}>
+              <Link
+                to="/dashboard"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm transition-transform duration-200 hover:scale-110"
+                title="PlanTim"
               >
-                <span className="text-white font-bold text-xl">P</span>
-              </button>
+                <span className="text-xl font-bold text-white">P</span>
+              </Link>
               {!sidebarCollapsed && (
-                <Link to="/dashboard" className="flex items-center gap-2">
-                  <span className="text-white font-bold text-xl tracking-tight">PlanTim</span>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <Link
+                    to="/dashboard"
+                    className="shrink-0 text-xl font-bold tracking-tight text-white"
+                  >
+                    PlanTim
+                  </Link>
                   <VersionDisplay className="text-white/80" showUpdateBadge={false} />
-                </Link>
+                </div>
               )}
             </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="hidden lg:flex w-8 h-8 items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all duration-200"
-                title={sidebarCollapsed ? t('navigation.expand') : t('navigation.collapse')}
-              >
-                {sidebarCollapsed ? <FiChevronRight size={16} /> : <FiChevronLeft size={16} />}
-              </button>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors"
-              >
-                <FiX size={18} />
-              </button>
-            </div>
+
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white transition-colors hover:bg-white/30 lg:hidden"
+              aria-label={t('navigation.collapse')}
+            >
+              <FiX size={18} />
+            </button>
           </div>
 
           {/* Scroll Shadow Indicator */}

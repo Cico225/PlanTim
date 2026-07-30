@@ -62,7 +62,7 @@ export default function LMSAdminReports() {
       console.error('Failed to load reports:', error);
       if (error.response?.status === 403) {
         toast.error('Nemate pristup izvještajima');
-        navigate('/lms');
+        navigate('/lms/maloprodaja/katalog');
       } else {
         toast.error('Neuspješno učitavanje izvještaja');
       }
@@ -159,7 +159,7 @@ export default function LMSAdminReports() {
                         {course.title}
                       </h3>
                       <button
-                        onClick={() => navigate(`/lms/courses/${course.id}`)}
+                        onClick={() => navigate(`/lms/maloprodaja/courses/${course.id}`)}
                         className="text-blue-600 hover:text-blue-700 flex-shrink-0"
                       >
                         <FiEye className="w-4 h-4" />

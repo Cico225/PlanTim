@@ -30,6 +30,9 @@ import DMSOverview from './modules/dms/pages/DMSOverview';
 
 // LMS
 import LMSOverview from './modules/lms/pages/LMSOverview';
+import LMSLandingPage from './modules/lms/pages/LMSLandingPage';
+import LMSDirekcijaPage from './modules/lms/pages/LMSDirekcijaPage';
+import LMSLegacyRedirect from './modules/lms/pages/LMSLegacyRedirect';
 
 // HRM is now accessed through Planika module at /planika/hr
 // import HRMOverview from './modules/hrm/pages/HRMOverview';
@@ -126,7 +129,19 @@ function App() {
             <Route path="/crm/*" element={<CRMOverview />} />
             <Route path="/projects/*" element={<ProjectsOverview />} />
             <Route path="/dms/*" element={<DMSOverview />} />
-            <Route path="/lms/*" element={<LMSOverview />} />
+            <Route path="/lms" element={<LMSLandingPage />} />
+            <Route path="/lms/direkcija" element={<LMSDirekcijaPage />} />
+            <Route path="/lms/maloprodaja/*" element={<LMSOverview />} />
+            {/* Legacy LMS deep links → maloprodaja */}
+            <Route path="/lms/dashboard" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/my-courses" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/leaderboard" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/badges" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/certificates" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/search" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/manage/*" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/reports" element={<LMSLegacyRedirect />} />
+            <Route path="/lms/courses/*" element={<LMSLegacyRedirect />} />
             {/* HRM is now accessible through Planika module at /planika/hr */}
             <Route path="/hrm/*" element={<Navigate to="/planika/hr" replace />} />
             <Route path="/maloprodaja/*" element={<MaloprodajaOverview />} />

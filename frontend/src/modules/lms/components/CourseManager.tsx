@@ -80,7 +80,7 @@ export default function CourseManager() {
           </p>
         </div>
         <button
-          onClick={() => navigate('/lms/manage/new')}
+          onClick={() => navigate('/lms/maloprodaja/manage/new')}
           className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto"
         >
           <FiPlus className="w-4 h-4" />
@@ -112,21 +112,21 @@ export default function CourseManager() {
             </p>
             <div className="flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
               <button
-                onClick={() => navigate(`/lms/courses/${course.id}`)}
+                onClick={() => navigate(`/lms/maloprodaja/courses/${course.id}`)}
                 className="rounded p-2 text-blue-600 dark:text-blue-400"
                 title="Pregled"
               >
                 <FiEye className="w-5 h-5" />
               </button>
               <button
-                onClick={() => navigate(`/lms/manage/${course.id}/edit`)}
+                onClick={() => navigate(`/lms/maloprodaja/manage/${course.id}/edit`)}
                 className="rounded p-2 text-yellow-600 dark:text-yellow-400"
                 title="Uredi"
               >
                 <FiEdit className="w-5 h-5" />
               </button>
               <button
-                onClick={() => navigate(`/lms/courses/${course.id}`)}
+                onClick={() => navigate(`/lms/maloprodaja/courses/${course.id}`)}
                 className="rounded p-2 text-blue-600 dark:text-blue-400"
                 title="Dodaj sadržaj"
               >
@@ -191,21 +191,21 @@ export default function CourseManager() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => navigate(`/lms/courses/${course.id}`)}
+                        onClick={() => navigate(`/lms/maloprodaja/courses/${course.id}`)}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                         title="Pregled"
                       >
                         <FiEye className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => navigate(`/lms/manage/${course.id}/edit`)}
+                        onClick={() => navigate(`/lms/maloprodaja/manage/${course.id}/edit`)}
                         className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
                         title="Uredi"
                       >
                         <FiEdit className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => navigate(`/lms/courses/${course.id}`)}
+                        onClick={() => navigate(`/lms/maloprodaja/courses/${course.id}`)}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                         title="Dodaj sadržaj"
                       >

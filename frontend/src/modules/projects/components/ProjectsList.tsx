@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPlus, FiFolder, FiEdit, FiTrash2, FiTrendingUp, FiCheckSquare, FiGrid, FiList, FiFilter } from 'react-icons/fi';
+import { FiPlus, FiFolder, FiEdit, FiTrash2, FiTrendingUp, FiGrid, FiList, FiFilter } from 'react-icons/fi';
 import { projectsService, Project } from '@/services/projectsService';
-import CreateTaskModal from './CreateTaskModal';
 import AdvancedSearchModal from './AdvancedSearchModal';
 import toast from 'react-hot-toast';
 
@@ -12,7 +11,6 @@ export default function ProjectsList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [advancedFilters, setAdvancedFilters] = useState<any>({});
@@ -136,14 +134,6 @@ export default function ProjectsList() {
               <span className="hidden xs:inline">Lista</span>
             </button>
           </div>
-          <button
-            onClick={() => setShowCreateTaskModal(true)}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
-          >
-            <FiCheckSquare size={18} />
-            <span className="hidden sm:inline">Lični zadatak</span>
-            <span className="sm:hidden">Zadatak</span>
-          </button>
           <Link
             to="/projects/project-management/new"
             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base"
@@ -154,16 +144,6 @@ export default function ProjectsList() {
           </Link>
         </div>
       </div>
-
-      {/* Create Personal Task Modal */}
-      <CreateTaskModal
-        isOpen={showCreateTaskModal}
-        onClose={() => setShowCreateTaskModal(false)}
-        onTaskCreated={() => {
-          setShowCreateTaskModal(false);
-          toast.success('Lični zadatak uspješno kreiran');
-        }}
-      />
 
       {/* Search */}
       <div className="flex gap-2 sm:gap-4">
