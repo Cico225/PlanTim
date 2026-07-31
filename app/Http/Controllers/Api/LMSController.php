@@ -1961,6 +1961,237 @@ class LMSController extends Controller
     }
 
     /**
+     * Update an existing lesson
+     */
+    public function updateLesson(Request $request, $courseId, $lessonId)
+    {
+        try {
+            if (!Schema::hasTable('lms_lessons')) {
+                return response()->json(['message' => 'Lessons table not found'], 500);
+            }
+
+            $course = Schema::hasTable('lms_courses')
+                ? DB::table('lms_courses')->where('id', $courseId)->first()
+                : null;
+
+            if (!$course) {
+                return response()->json(['message' => 'Course not found'], 404);
+            }
+
+            $lesson = DB::table('lms_lessons')
+                ->where('id', $lessonId)
+                ->where('course_id', $courseId)
+                ->first();
+
+            if (!$lesson) {
+                return response()->json(['message' => 'Lesson not found'], 404);
+            }
+
+            $user = $request->user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            $isAdminOrManager = false;
+            if (method_exists($user, 'hasAnyRole')) {
+                try {
+                    $isAdminOrManager = $user->hasAnyRole(['admin', 'manager']);
+                } catch (\Exception $e) {
+                    Log::warning('LMS: Failed to check user role in updateLesson', ['error' => $e->getMessage()]);
+                }
+            }
+            if (!$isAdminOrManager && isset($user->role)) {
+                $isAdminOrManager = in_array(strtolower($user->role), ['admin', 'manager']);
+            }
+            $isInstructor = isset($course->instructor_id) && (int) $course->instructor_id === (int) $user->id;
+            if (!$isAdminOrManager && !$isInstructor) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'content' => 'nullable|string',
+                'video_url' => 'nullable|string|max:500',
+                'image_url' => 'nullable|string|max:500',
+                'document_url' => 'nullable|string|max:500',
+                'duration' => 'nullable|integer|min:0',
+                'order' => 'required|integer|min:1',
+                'is_published' => 'boolean',
+                'is_preview' => 'boolean',
+                'type' => 'nullable|string|max:50',
+                'additional_files' => 'nullable|array',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $data = $validator->validated();
+            $existingColumns = Schema::getColumnListing('lms_lessons');
+            $columnMappings = [
+                'duration' => 'duration_minutes',
+            ];
+
+            $updateData = [];
+            foreach ($data as $key => $value) {
+                $actualColumn = $columnMappings[$key] ?? $key;
+
+                if ($key === 'is_published') {
+                    if (in_array('is_published', $existingColumns)) {
+                        $updateData['is_published'] = (bool) $value;
+                    }
+                    if (in_array('is_preview', $existingColumns)) {
+                        $updateData['is_preview'] = !(bool) $value;
+                    }
+                    continue;
+                }
+
+                if ($key === 'additional_files') {
+                    if (!in_array('additional_files', $existingColumns)) {
+                        continue;
+                    }
+                    if (is_array($value)) {
+                        $filtered = array_values(array_filter($value, function ($file) {
+                            return !empty($file) && is_string($file) && trim($file) !== '';
+                        }));
+                        $updateData['additional_files'] = json_encode($filtered);
+                    } else {
+                        $updateData['additional_files'] = json_encode([]);
+                    }
+                    continue;
+                }
+
+                if (in_array($actualColumn, $existingColumns)) {
+                    $updateData[$actualColumn] = $value;
+                }
+            }
+
+            if (in_array('updated_at', $existingColumns)) {
+                $updateData['updated_at'] = now();
+            }
+
+            DB::table('lms_lessons')
+                ->where('id', $lessonId)
+                ->where('course_id', $courseId)
+                ->update($updateData);
+
+            $updated = DB::table('lms_lessons')->where('id', $lessonId)->first();
+            $lessonData = (array) $updated;
+
+            if (isset($lessonData['additional_files']) && is_string($lessonData['additional_files'])) {
+                $lessonData['additional_files'] = json_decode($lessonData['additional_files'], true) ?? [];
+            }
+            if (isset($lessonData['duration_minutes'])) {
+                $lessonData['duration'] = $lessonData['duration_minutes'];
+            }
+            if (isset($lessonData['is_preview']) && !isset($lessonData['is_published'])) {
+                $lessonData['is_published'] = !$lessonData['is_preview'];
+            }
+
+            return response()->json($lessonData);
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to update lesson', [
+                'error' => $e->getMessage(),
+                'course_id' => $courseId,
+                'lesson_id' => $lessonId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Greška pri ažuriranju lekcije',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a lesson from a course
+     */
+    public function deleteLesson(Request $request, $courseId, $lessonId)
+    {
+        try {
+            if (!Schema::hasTable('lms_lessons')) {
+                return response()->json(['message' => 'Lessons table not found'], 500);
+            }
+
+            $course = Schema::hasTable('lms_courses')
+                ? DB::table('lms_courses')->where('id', $courseId)->first()
+                : null;
+
+            if (!$course) {
+                return response()->json(['message' => 'Course not found'], 404);
+            }
+
+            $lesson = DB::table('lms_lessons')
+                ->where('id', $lessonId)
+                ->where('course_id', $courseId)
+                ->first();
+
+            if (!$lesson) {
+                return response()->json(['message' => 'Lesson not found'], 404);
+            }
+
+            $user = $request->user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            $isAdminOrManager = false;
+            if (method_exists($user, 'hasAnyRole')) {
+                try {
+                    $isAdminOrManager = $user->hasAnyRole(['admin', 'manager']);
+                } catch (\Exception $e) {
+                    Log::warning('LMS: Failed to check user role in deleteLesson', ['error' => $e->getMessage()]);
+                }
+            }
+            if (!$isAdminOrManager && isset($user->role)) {
+                $isAdminOrManager = in_array(strtolower($user->role), ['admin', 'manager']);
+            }
+
+            $isInstructor = isset($course->instructor_id) && (int) $course->instructor_id === (int) $user->id;
+
+            if (!$isAdminOrManager && !$isInstructor) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            DB::beginTransaction();
+            try {
+                if (Schema::hasTable('lms_lesson_progress')) {
+                    DB::table('lms_lesson_progress')->where('lesson_id', $lessonId)->delete();
+                }
+                if (Schema::hasTable('lms_lesson_attachments')) {
+                    DB::table('lms_lesson_attachments')->where('lesson_id', $lessonId)->delete();
+                }
+                if (Schema::hasTable('lms_video_progress')) {
+                    DB::table('lms_video_progress')->where('lesson_id', $lessonId)->delete();
+                }
+
+                DB::table('lms_lessons')->where('id', $lessonId)->where('course_id', $courseId)->delete();
+
+                DB::commit();
+
+                return response()->json(['message' => 'Lekcija je uspješno obrisana']);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to delete lesson', [
+                'error' => $e->getMessage(),
+                'course_id' => $courseId,
+                'lesson_id' => $lessonId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Greška pri brisanju lekcije',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
      * Mark lesson as completed
      */
     public function completeLesson(Request $request, $courseId, $lessonId)
@@ -2874,6 +3105,240 @@ class LMSController extends Controller
             return response()->json([
                 'message' => 'Greška pri čuvanju kviza',
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update quiz and replace questions
+     */
+    public function updateQuiz(Request $request, $courseId, $quizId)
+    {
+        try {
+            if (!Schema::hasTable('lms_courses') || !Schema::hasTable('lms_quizzes')) {
+                return response()->json(['message' => 'Quizzes table not found'], 500);
+            }
+
+            $course = DB::table('lms_courses')->where('id', $courseId)->first();
+            if (!$course) {
+                return response()->json(['message' => 'Course not found'], 404);
+            }
+
+            $quiz = DB::table('lms_quizzes')
+                ->where('id', $quizId)
+                ->where('course_id', $courseId)
+                ->first();
+
+            if (!$quiz) {
+                return response()->json(['message' => 'Quiz not found'], 404);
+            }
+
+            $user = $request->user();
+            $isAdminOrManager = false;
+            if ($user && method_exists($user, 'hasAnyRole')) {
+                try {
+                    $isAdminOrManager = $user->hasAnyRole(['admin', 'manager']);
+                } catch (\Exception $e) {
+                    Log::warning('LMS: Failed to check user role in updateQuiz', ['error' => $e->getMessage()]);
+                }
+            }
+            if (!$isAdminOrManager && isset($user->role)) {
+                $isAdminOrManager = in_array(strtolower($user->role), ['admin', 'manager']);
+            }
+            if (!$isAdminOrManager && (!isset($course->instructor_id) || (int) $course->instructor_id !== (int) $user->id)) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'passing_score' => 'required|integer|min:0|max:100',
+                'time_limit' => 'nullable|integer|min:0',
+                'max_attempts' => 'nullable|integer|min:1',
+                'order' => 'required|integer|min:1',
+                'is_published' => 'boolean',
+                'questions' => 'required|array|min:1',
+                'questions.*.question' => 'required|string',
+                'questions.*.type' => 'required|in:multiple_choice,true_false,short_answer',
+                'questions.*.options' => 'required_if:questions.*.type,multiple_choice|array',
+                'questions.*.correct_answer' => 'required|string',
+                'questions.*.points' => 'required|integer|min:1',
+                'questions.*.order' => 'required|integer|min:1',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $data = $validator->validated();
+            $questions = $data['questions'];
+            unset($data['questions']);
+            $data['is_published'] = $data['is_published'] ?? false;
+
+            if (!Schema::hasTable('lms_quiz_questions')) {
+                return response()->json(['message' => 'Quiz questions table not found'], 500);
+            }
+
+            DB::beginTransaction();
+            try {
+                $existingColumns = Schema::getColumnListing('lms_quizzes');
+                $updateData = [];
+                foreach ($data as $key => $value) {
+                    if (in_array($key, $existingColumns)) {
+                        $updateData[$key] = $value;
+                    }
+                }
+                if (in_array('updated_at', $existingColumns)) {
+                    $updateData['updated_at'] = now();
+                }
+
+                DB::table('lms_quizzes')->where('id', $quizId)->update($updateData);
+                DB::table('lms_quiz_questions')->where('quiz_id', $quizId)->delete();
+
+                $questionColumns = Schema::getColumnListing('lms_quiz_questions');
+                foreach ($questions as $questionData) {
+                    $questionInsert = [
+                        'quiz_id' => $quizId,
+                        'question' => $questionData['question'],
+                        'type' => $questionData['type'],
+                        'correct_answer' => $questionData['correct_answer'],
+                        'points' => $questionData['points'],
+                        'order' => $questionData['order'],
+                    ];
+                    if (isset($questionData['options']) && in_array('options', $questionColumns)) {
+                        $questionInsert['options'] = json_encode($questionData['options']);
+                    }
+                    if (in_array('created_at', $questionColumns)) {
+                        $questionInsert['created_at'] = now();
+                    }
+                    if (in_array('updated_at', $questionColumns)) {
+                        $questionInsert['updated_at'] = now();
+                    }
+
+                    $filtered = [];
+                    foreach ($questionInsert as $key => $value) {
+                        if (in_array($key, $questionColumns)) {
+                            $filtered[$key] = $value;
+                        }
+                    }
+                    DB::table('lms_quiz_questions')->insert($filtered);
+                }
+
+                DB::commit();
+
+                $updatedQuiz = DB::table('lms_quizzes')->where('id', $quizId)->first();
+                $quizQuestions = DB::table('lms_quiz_questions')
+                    ->where('quiz_id', $quizId)
+                    ->orderBy('order')
+                    ->get()
+                    ->map(function ($q) {
+                        $qData = (array) $q;
+                        if (isset($qData['options']) && $qData['options']) {
+                            $qData['options'] = json_decode($qData['options'], true);
+                        }
+                        return $qData;
+                    });
+
+                $quizData = (array) $updatedQuiz;
+                $quizData['questions'] = $quizQuestions->toArray();
+
+                return response()->json($quizData);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to update quiz', [
+                'error' => $e->getMessage(),
+                'course_id' => $courseId,
+                'quiz_id' => $quizId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Greška pri ažuriranju kviza',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete quiz and related data
+     */
+    public function deleteQuiz(Request $request, $courseId, $quizId)
+    {
+        try {
+            if (!Schema::hasTable('lms_quizzes')) {
+                return response()->json(['message' => 'Quizzes table not found'], 500);
+            }
+
+            $course = Schema::hasTable('lms_courses')
+                ? DB::table('lms_courses')->where('id', $courseId)->first()
+                : null;
+
+            if (!$course) {
+                return response()->json(['message' => 'Course not found'], 404);
+            }
+
+            $quiz = DB::table('lms_quizzes')
+                ->where('id', $quizId)
+                ->where('course_id', $courseId)
+                ->first();
+
+            if (!$quiz) {
+                return response()->json(['message' => 'Quiz not found'], 404);
+            }
+
+            $user = $request->user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            $isAdminOrManager = false;
+            if (method_exists($user, 'hasAnyRole')) {
+                try {
+                    $isAdminOrManager = $user->hasAnyRole(['admin', 'manager']);
+                } catch (\Exception $e) {
+                    Log::warning('LMS: Failed to check user role in deleteQuiz', ['error' => $e->getMessage()]);
+                }
+            }
+            if (!$isAdminOrManager && isset($user->role)) {
+                $isAdminOrManager = in_array(strtolower($user->role), ['admin', 'manager']);
+            }
+            $isInstructor = isset($course->instructor_id) && (int) $course->instructor_id === (int) $user->id;
+            if (!$isAdminOrManager && !$isInstructor) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            DB::beginTransaction();
+            try {
+                if (Schema::hasTable('lms_quiz_attempts')) {
+                    DB::table('lms_quiz_attempts')->where('quiz_id', $quizId)->delete();
+                }
+                if (Schema::hasTable('lms_quiz_questions')) {
+                    DB::table('lms_quiz_questions')->where('quiz_id', $quizId)->delete();
+                }
+
+                DB::table('lms_quizzes')->where('id', $quizId)->where('course_id', $courseId)->delete();
+
+                DB::commit();
+
+                return response()->json(['message' => 'Kviz je uspješno obrisan']);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to delete quiz', [
+                'error' => $e->getMessage(),
+                'course_id' => $courseId,
+                'quiz_id' => $quizId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Greška pri brisanju kviza',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
     }
@@ -4156,6 +4621,386 @@ class LMSController extends Controller
             Log::error('LMS: Failed to get badges', ['error' => $e->getMessage()]);
             return response()->json(['badges' => []], 500);
         }
+    }
+
+    /**
+     * Admin: list all badges (including inactive)
+     */
+    public function adminListBadges(Request $request)
+    {
+        try {
+            if (!$this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (!Schema::hasTable('lms_badges')) {
+                return response()->json(['badges' => []]);
+            }
+
+            $badges = DB::table('lms_badges')->orderBy('id')->get();
+
+            return response()->json(['badges' => $badges]);
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to list badges for admin', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Greška pri učitavanju bedževa'], 500);
+        }
+    }
+
+    /**
+     * Admin: create badge
+     */
+    public function storeBadge(Request $request)
+    {
+        try {
+            if (!$this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (!Schema::hasTable('lms_badges')) {
+                return response()->json(['message' => 'Badges table not found'], 500);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'slug' => 'nullable|string|max:255',
+                'description' => 'nullable|string',
+                'icon' => 'nullable|string|max:100',
+                'color' => 'nullable|string|max:50',
+                'type' => 'required|in:course_completion,points,streak,quiz_master,special',
+                'requirement_value' => 'nullable|integer|min:0',
+                'points_reward' => 'nullable|integer|min:0',
+                'is_active' => 'boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $data = $validator->validated();
+            $slug = $data['slug'] ?? Str::slug($data['name']);
+            if (DB::table('lms_badges')->where('slug', $slug)->exists()) {
+                $slug = $slug . '-' . Str::random(4);
+            }
+
+            $columns = Schema::getColumnListing('lms_badges');
+            $insert = [
+                'name' => $data['name'],
+                'slug' => $slug,
+                'description' => $data['description'] ?? null,
+                'icon' => $data['icon'] ?? 'FiAward',
+                'color' => $data['color'] ?? '#f97316',
+                'type' => $data['type'],
+                'requirement_value' => $data['requirement_value'] ?? null,
+                'points_reward' => $data['points_reward'] ?? 10,
+                'is_active' => $data['is_active'] ?? true,
+            ];
+
+            if (in_array('created_at', $columns)) {
+                $insert['created_at'] = now();
+            }
+            if (in_array('updated_at', $columns)) {
+                $insert['updated_at'] = now();
+            }
+
+            $filtered = array_intersect_key($insert, array_flip($columns));
+            $id = DB::table('lms_badges')->insertGetId($filtered);
+            $badge = DB::table('lms_badges')->where('id', $id)->first();
+
+            return response()->json($badge, 201);
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to create badge', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Greška pri kreiranju bedža'], 500);
+        }
+    }
+
+    /**
+     * Admin: update badge
+     */
+    public function updateBadge(Request $request, $badgeId)
+    {
+        try {
+            if (!$this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (!Schema::hasTable('lms_badges')) {
+                return response()->json(['message' => 'Badges table not found'], 500);
+            }
+
+            $badge = DB::table('lms_badges')->where('id', $badgeId)->first();
+            if (!$badge) {
+                return response()->json(['message' => 'Badge not found'], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'slug' => 'nullable|string|max:255',
+                'description' => 'nullable|string',
+                'icon' => 'nullable|string|max:100',
+                'color' => 'nullable|string|max:50',
+                'type' => 'required|in:course_completion,points,streak,quiz_master,special',
+                'requirement_value' => 'nullable|integer|min:0',
+                'points_reward' => 'nullable|integer|min:0',
+                'is_active' => 'boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $data = $validator->validated();
+            $slug = $data['slug'] ?? Str::slug($data['name']);
+            if (DB::table('lms_badges')->where('slug', $slug)->where('id', '!=', $badgeId)->exists()) {
+                $slug = $slug . '-' . $badgeId;
+            }
+
+            $columns = Schema::getColumnListing('lms_badges');
+            $update = [
+                'name' => $data['name'],
+                'slug' => $slug,
+                'description' => $data['description'] ?? null,
+                'icon' => $data['icon'] ?? 'FiAward',
+                'color' => $data['color'] ?? '#f97316',
+                'type' => $data['type'],
+                'requirement_value' => $data['requirement_value'] ?? null,
+                'points_reward' => $data['points_reward'] ?? 10,
+                'is_active' => $data['is_active'] ?? true,
+            ];
+            if (in_array('updated_at', $columns)) {
+                $update['updated_at'] = now();
+            }
+
+            $filtered = array_intersect_key($update, array_flip($columns));
+            DB::table('lms_badges')->where('id', $badgeId)->update($filtered);
+
+            return response()->json(DB::table('lms_badges')->where('id', $badgeId)->first());
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to update badge', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Greška pri ažuriranju bedža'], 500);
+        }
+    }
+
+    /**
+     * Admin: delete badge
+     */
+    public function deleteBadge(Request $request, $badgeId)
+    {
+        try {
+            if (!$this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (!Schema::hasTable('lms_badges')) {
+                return response()->json(['message' => 'Badges table not found'], 500);
+            }
+
+            $badge = DB::table('lms_badges')->where('id', $badgeId)->first();
+            if (!$badge) {
+                return response()->json(['message' => 'Badge not found'], 404);
+            }
+
+            DB::beginTransaction();
+            try {
+                if (Schema::hasTable('lms_user_badges')) {
+                    DB::table('lms_user_badges')->where('badge_id', $badgeId)->delete();
+                }
+                DB::table('lms_badges')->where('id', $badgeId)->delete();
+                DB::commit();
+
+                return response()->json(['message' => 'Bedž je uspješno obrisan']);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to delete badge', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Greška pri brisanju bedža'], 500);
+        }
+    }
+
+    /**
+     * Admin: list all issued certificates
+     */
+    public function adminListCertificates(Request $request)
+    {
+        try {
+            if (!$this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (!Schema::hasTable('lms_certificates')) {
+                return response()->json(['certificates' => []]);
+            }
+
+            $query = DB::table('lms_certificates')->select('lms_certificates.*');
+
+            if (Schema::hasTable('lms_courses')) {
+                $query->leftJoin('lms_courses', 'lms_certificates.course_id', '=', 'lms_courses.id')
+                    ->addSelect('lms_courses.title as course_title');
+            }
+            if (Schema::hasTable('users')) {
+                $query->leftJoin('users', 'lms_certificates.user_id', '=', 'users.id')
+                    ->addSelect('users.name as user_name', 'users.email as user_email');
+            }
+
+            if (Schema::hasColumn('lms_certificates', 'issued_at')) {
+                $query->orderByDesc('lms_certificates.issued_at');
+            } else {
+                $query->orderByDesc('lms_certificates.id');
+            }
+
+            $certificates = $query->get();
+
+            return response()->json(['certificates' => $certificates]);
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to list certificates for admin', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Greška pri učitavanju certifikata'], 500);
+        }
+    }
+
+    /**
+     * Admin: manually issue certificate for user/course
+     */
+    public function adminIssueCertificate(Request $request)
+    {
+        try {
+            if (!$this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (!Schema::hasTable('lms_certificates')) {
+                return response()->json(['message' => 'Certificates table not found'], 500);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'course_id' => 'required|integer',
+                'user_id' => 'required|integer',
+                'final_score' => 'nullable|numeric|min:0|max:100',
+                'grade' => 'nullable|string|max:10',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $data = $validator->validated();
+            $course = Schema::hasTable('lms_courses')
+                ? DB::table('lms_courses')->where('id', $data['course_id'])->first()
+                : null;
+            if (!$course) {
+                return response()->json(['message' => 'Course not found'], 404);
+            }
+
+            $user = DB::table('users')->where('id', $data['user_id'])->first();
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], 404);
+            }
+
+            $existing = DB::table('lms_certificates')
+                ->where('course_id', $data['course_id'])
+                ->where('user_id', $data['user_id'])
+                ->first();
+
+            if ($existing) {
+                return response()->json([
+                    'message' => 'Certifikat već postoji za ovog korisnika i kurs',
+                    'certificate' => $existing,
+                    'already_earned' => true,
+                ]);
+            }
+
+            $columns = Schema::getColumnListing('lms_certificates');
+            $insert = [
+                'course_id' => $data['course_id'],
+                'user_id' => $data['user_id'],
+                'certificate_number' => 'CERT-' . strtoupper(Str::random(10)),
+                'issued_at' => now(),
+            ];
+            if (in_array('final_score', $columns)) {
+                $insert['final_score'] = $data['final_score'] ?? null;
+            }
+            if (in_array('grade', $columns)) {
+                $insert['grade'] = $data['grade'] ?? null;
+            }
+
+            $filtered = array_intersect_key($insert, array_flip($columns));
+            $id = DB::table('lms_certificates')->insertGetId($filtered);
+            $certificate = DB::table('lms_certificates')->where('id', $id)->first();
+
+            return response()->json([
+                'message' => 'Certifikat je uspješno izdan',
+                'certificate' => $certificate,
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to issue certificate', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Greška pri izdavanju certifikata'], 500);
+        }
+    }
+
+    /**
+     * Admin: delete / revoke certificate
+     */
+    public function adminDeleteCertificate(Request $request, $certificateId)
+    {
+        try {
+            if (!$this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if (!Schema::hasTable('lms_certificates')) {
+                return response()->json(['message' => 'Certificates table not found'], 500);
+            }
+
+            $certificate = DB::table('lms_certificates')->where('id', $certificateId)->first();
+            if (!$certificate) {
+                return response()->json(['message' => 'Certificate not found'], 404);
+            }
+
+            DB::table('lms_certificates')->where('id', $certificateId)->delete();
+
+            return response()->json(['message' => 'Certifikat je uspješno obrisan']);
+        } catch (\Exception $e) {
+            Log::error('LMS: Failed to delete certificate', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Greška pri brisanju certifikata'], 500);
+        }
+    }
+
+    /**
+     * Check if user can manage LMS admin content
+     */
+    private function userCanManageLms($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if (method_exists($user, 'hasAnyRole')) {
+            try {
+                if ($user->hasAnyRole(['admin', 'manager', 'super-admin', 'super_admin'])) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // fall through
+            }
+        }
+
+        if (isset($user->role) && in_array(strtolower((string) $user->role), ['admin', 'manager'], true)) {
+            return true;
+        }
+
+        if (method_exists($user, 'can')) {
+            try {
+                return $user->can('lms.manage')
+                    || $user->can('lms.manage_courses')
+                    || $user->can('lms.maloprodaja.manage')
+                    || $user->can('lms.create')
+                    || $user->can('lms.update');
+            } catch (\Throwable $e) {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     /**

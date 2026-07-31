@@ -16,6 +16,8 @@ import Leaderboard from '../components/Leaderboard';
 import BadgesPage from '../components/BadgesPage';
 import LMSSearch from '../components/LMSSearch';
 import LMSAdminReports from '../components/LMSAdminReports';
+import BadgeManager from '../components/BadgeManager';
+import CertificateManager from '../components/CertificateManager';
 import LMSMaloprodajaLandingPage, { useIsLmsAdmin } from './LMSMaloprodajaLandingPage';
 import { LMS_RETAIL_BASE } from '../lmsPaths';
 
@@ -89,6 +91,22 @@ export default function LMSOverview() {
             }
           />
           <Route
+            path="manage/badges"
+            element={
+              <LmsAdminOnly>
+                <BadgeManager />
+              </LmsAdminOnly>
+            }
+          />
+          <Route
+            path="manage/certificates"
+            element={
+              <LmsAdminOnly>
+                <CertificateManager />
+              </LmsAdminOnly>
+            }
+          />
+          <Route
             path="manage"
             element={
               <LmsAdminOnly>
@@ -121,9 +139,25 @@ export default function LMSOverview() {
               </LmsAdminOnly>
             }
           />
+          <Route
+            path="courses/:courseId/lessons/:lessonId/edit"
+            element={
+              <LmsAdminOnly>
+                <LessonForm />
+              </LmsAdminOnly>
+            }
+          />
           <Route path="courses/:courseId/lessons/:lessonId" element={<LessonView />} />
           <Route
             path="courses/:courseId/quizzes/new"
+            element={
+              <LmsAdminOnly>
+                <QuizForm />
+              </LmsAdminOnly>
+            }
+          />
+          <Route
+            path="courses/:courseId/quizzes/:quizId/edit"
             element={
               <LmsAdminOnly>
                 <QuizForm />

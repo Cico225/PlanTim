@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fi';
 import type { IconType } from 'react-icons';
 import { useAuthStore } from '@/store/authStore';
+import { useUserModules } from '@/hooks/useUserModules';
 import { lmsService } from '@/services/lmsService';
 import { LMS_RETAIL_BASE, lmsRetailPath } from '../lmsPaths';
 
@@ -129,6 +130,28 @@ const PANELS: RetailPanel[] = [
     audience: 'admin',
   },
   {
+    id: 'manage-badges',
+    path: lmsRetailPath('/manage/badges'),
+    title: 'Upravljanje bedževima',
+    subtitle: 'Administracija',
+    description: 'Kreiraj, uredi i aktiviraj bedževe koje zaposlenici mogu osvojiti.',
+    action: 'Upravljaj bedževima',
+    icon: FiAward,
+    color: 'orange',
+    audience: 'admin',
+  },
+  {
+    id: 'manage-certificates',
+    path: lmsRetailPath('/manage/certificates'),
+    title: 'Upravljanje certifikatima',
+    subtitle: 'Administracija',
+    description: 'Pregled izdanih certifikata, ručno izdavanje i opoziv.',
+    action: 'Upravljaj certifikatima',
+    icon: FiFileText,
+    color: 'lime',
+    audience: 'admin',
+  },
+  {
     id: 'reports',
     path: lmsRetailPath('/reports'),
     title: 'Izvještaji',
@@ -203,27 +226,38 @@ const colorStyles: Record<
   },
 };
 
-/** Admin / manager role ili eksplicitno ovlaštenje za upravljanje LMS-om. */
+/** Admin / manager role, Spatie LMS manage dozvole, ili pristup LMS admin podmodulu. */
 export function useIsLmsAdmin() {
   const { user } = useAuthStore();
+  const { modules } = useUserModules();
   const role = user?.role?.toLowerCase() || '';
   const roles = (user as { roles?: string[] })?.roles || [];
   const hasRole =
     role === 'admin' ||
     role === 'manager' ||
     roles.some((r) => ['admin', 'manager'].includes(String(r).toLowerCase()));
+
   const hasPerm = user?.permissions?.some((p) => {
     const key = String(p).toLowerCase();
     return (
       key === 'lms.manage' ||
       key.includes('lms.manage') ||
+      key === 'lms.manage_courses' ||
+      key === 'lms.maloprodaja.manage' ||
+      key === 'lms.maloprodaja.reports' ||
+      key === 'lms.view_reports' ||
       key === 'lms.create' ||
       key === 'lms.update' ||
       key.includes('lms.create') ||
       key.includes('lms.update')
     );
   });
-  return Boolean(hasRole || hasPerm);
+
+  const hasModuleGrant = modules.some((m) =>
+    ['lms.maloprodaja.manage', 'lms.maloprodaja.reports'].includes(m.name)
+  );
+
+  return Boolean(hasRole || hasPerm || hasModuleGrant);
 }
 
 export default function LMSMaloprodajaLandingPage() {
@@ -396,12 +430,6 @@ export default function LMSMaloprodajaLandingPage() {
             <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400 sm:text-base">
               Kreiranje kurseva, lekcija i kvizova te analitika napretka zaposlenika.
             </p>
-
-            <HorizontalTimeline
-              panels={adminPanels}
-              onOpen={(path) => navigate(path)}
-              tone="admin"
-            />
           </div>
 
           <PanelGrid
@@ -661,7 +689,7 @@ function LMSPanelArt({
     );
   }
 
-  if (id === 'manage' || id === 'reports') {
+  if (id === 'manage' || id === 'manage-badges' || id === 'manage-certificates' || id === 'reports') {
     return (
       <div className={className}>
         <svg viewBox="0 0 200 80" className="h-full w-full" aria-hidden>

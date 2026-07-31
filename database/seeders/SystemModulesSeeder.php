@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\LmsModuleRegistry;
 use App\Support\PlanikaModuleRegistry;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -65,11 +66,20 @@ class SystemModulesSeeder extends Seeder
             ],
             [
                 'name' => 'lms',
-                'display_name' => 'LMS',
-                'description' => 'Learning Management System',
+                'display_name' => 'Sistem za učenje (LMS)',
+                'description' => 'Learning Management System — direkcija i maloprodaja',
                 'icon' => 'FiBookOpen',
                 'route' => '/lms',
-                'available_permissions' => json_encode(['manage_courses', 'manage_lessons', 'track_progress', 'issue_certificates']),
+                'available_permissions' => json_encode([
+                    'manage_courses',
+                    'manage_lessons',
+                    'manage_quizzes',
+                    'manage_badges',
+                    'manage_certificates',
+                    'view_reports',
+                    'track_progress',
+                    'issue_certificates',
+                ]),
                 'is_active' => true,
                 'is_plugin' => false,
                 'sort_order' => 5,
@@ -191,5 +201,6 @@ class SystemModulesSeeder extends Seeder
         }
 
         PlanikaModuleRegistry::sync();
+        LmsModuleRegistry::sync();
     }
 }

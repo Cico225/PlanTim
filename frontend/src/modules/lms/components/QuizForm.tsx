@@ -126,8 +126,8 @@ export default function QuizForm() {
       };
 
       if (isEdit && quizId) {
-        toast.error('Ažuriranje kviza će biti dodato');
-        return;
+        await lmsService.updateQuiz(Number(courseId), Number(quizId), submitData);
+        toast.success('Kviz uspješno ažuriran');
       } else {
         await lmsService.createQuiz(Number(courseId), submitData);
         toast.success('Kviz uspješno kreiran');

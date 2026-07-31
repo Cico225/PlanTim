@@ -257,6 +257,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         
         // Badges
         Route::get('/badges', [LMSController::class, 'getBadges']);
+        Route::get('/admin/badges', [LMSController::class, 'adminListBadges']);
+        Route::post('/admin/badges', [LMSController::class, 'storeBadge']);
+        Route::put('/admin/badges/{badgeId}', [LMSController::class, 'updateBadge']);
+        Route::delete('/admin/badges/{badgeId}', [LMSController::class, 'deleteBadge']);
         
         // Courses
         Route::get('/courses', [LMSController::class, 'index']);
@@ -272,12 +276,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/courses/{courseId}/lessons', [LMSController::class, 'getLessons']);
         Route::get('/courses/{courseId}/lessons/{lessonId}', [LMSController::class, 'getLesson']);
         Route::post('/courses/{courseId}/lessons', [LMSController::class, 'storeLesson']);
+        Route::put('/courses/{courseId}/lessons/{lessonId}', [LMSController::class, 'updateLesson']);
+        Route::delete('/courses/{courseId}/lessons/{lessonId}', [LMSController::class, 'deleteLesson']);
         Route::post('/courses/{courseId}/lessons/{lessonId}/complete', [LMSController::class, 'completeLesson']);
         
         // Quizzes
         Route::get('/courses/{courseId}/quizzes', [LMSController::class, 'getQuizzes']);
         Route::get('/courses/{courseId}/quizzes/{quizId}', [LMSController::class, 'getQuiz']);
         Route::post('/courses/{courseId}/quizzes', [LMSController::class, 'storeQuiz']);
+        Route::put('/courses/{courseId}/quizzes/{quizId}', [LMSController::class, 'updateQuiz']);
+        Route::delete('/courses/{courseId}/quizzes/{quizId}', [LMSController::class, 'deleteQuiz']);
         Route::post('/courses/{courseId}/quizzes/{quizId}/submit', [LMSController::class, 'submitQuiz']);
         Route::get('/courses/{courseId}/quizzes/{quizId}/attempts', [LMSController::class, 'getQuizAttempts']);
         
@@ -285,6 +293,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/certificates', [LMSController::class, 'getCertificates']);
         Route::get('/certificates/available', [LMSController::class, 'getAvailableCertificates']);
         Route::post('/certificates/check/{courseId}', [LMSController::class, 'checkAndGenerateCertificate']);
+        Route::get('/admin/certificates', [LMSController::class, 'adminListCertificates']);
+        Route::post('/admin/certificates', [LMSController::class, 'adminIssueCertificate']);
+        Route::delete('/admin/certificates/{certificateId}', [LMSController::class, 'adminDeleteCertificate']);
         // These must be last to avoid catching /certificates/check/{courseId}
         Route::get('/certificates/{certificateId}/pdf', [LMSController::class, 'downloadCertificatePdf']);
         Route::get('/certificates/{certificateId}', [LMSController::class, 'getCertificate']);
