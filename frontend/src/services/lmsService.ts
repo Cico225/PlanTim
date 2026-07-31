@@ -201,6 +201,14 @@ class LMSService {
     return apiService.post<Lesson>(`/lms/courses/${courseId}/lessons`, data);
   }
 
+  async updateLesson(courseId: number, lessonId: number, data: Partial<Lesson>) {
+    return apiService.put<Lesson>(`/lms/courses/${courseId}/lessons/${lessonId}`, data);
+  }
+
+  async deleteLesson(courseId: number, lessonId: number) {
+    return apiService.delete(`/lms/courses/${courseId}/lessons/${lessonId}`);
+  }
+
   async completeLesson(courseId: number, lessonId: number) {
     return apiService.post(`/lms/courses/${courseId}/lessons/${lessonId}/complete`);
   }
@@ -217,6 +225,14 @@ class LMSService {
 
   async createQuiz(courseId: number, data: Partial<Quiz>) {
     return apiService.post<Quiz>(`/lms/courses/${courseId}/quizzes`, data);
+  }
+
+  async updateQuiz(courseId: number, quizId: number, data: Partial<Quiz>) {
+    return apiService.put<Quiz>(`/lms/courses/${courseId}/quizzes/${quizId}`, data);
+  }
+
+  async deleteQuiz(courseId: number, quizId: number) {
+    return apiService.delete(`/lms/courses/${courseId}/quizzes/${quizId}`);
   }
 
   async submitQuiz(courseId: number, quizId: number, answers: Array<{ question_id: number; answer: string }>, startedAt?: string) {
@@ -369,6 +385,51 @@ class LMSService {
     return apiService.get<{
       badges: Badge[];
     }>('/lms/badges');
+  }
+
+  async adminListBadges() {
+    return apiService.get<{ badges: Badge[] }>('/lms/admin/badges');
+  }
+
+  async createBadge(data: Partial<Badge>) {
+    return apiService.post<Badge>('/lms/admin/badges', data);
+  }
+
+  async updateBadge(badgeId: number, data: Partial<Badge>) {
+    return apiService.put<Badge>(`/lms/admin/badges/${badgeId}`, data);
+  }
+
+  async deleteBadge(badgeId: number) {
+    return apiService.delete(`/lms/admin/badges/${badgeId}`);
+  }
+
+  async adminListCertificates() {
+    return apiService.get<{
+      certificates: Array<
+        Certificate & {
+          course_title?: string;
+          user_name?: string;
+          user_email?: string;
+        }
+      >;
+    }>('/lms/admin/certificates');
+  }
+
+  async adminIssueCertificate(data: {
+    course_id: number;
+    user_id: number;
+    final_score?: number;
+    grade?: string;
+  }) {
+    return apiService.post<{
+      message: string;
+      certificate: Certificate;
+      already_earned?: boolean;
+    }>('/lms/admin/certificates', data);
+  }
+
+  async adminDeleteCertificate(certificateId: number) {
+    return apiService.delete(`/lms/admin/certificates/${certificateId}`);
   }
 
   async getPointsHistory(limit = 20) {
@@ -531,8 +592,9 @@ export interface Badge {
   icon?: string;
   color: string;
   type: string;
-  requirement_value?: number;
+  requirement_value?: number | null;
   points_reward: number;
+  is_active?: boolean;
   is_earned?: boolean;
   earned_at?: string;
 }

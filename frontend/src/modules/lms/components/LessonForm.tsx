@@ -119,8 +119,8 @@ export default function LessonForm() {
       });
 
       if (isEdit && lessonId) {
-        // Update would go here if we add update endpoint
-        toast.success('Ažuriranje lekcije će biti dodato');
+        await lmsService.updateLesson(Number(courseId), Number(lessonId), submitData);
+        toast.success('Lekcija uspješno ažurirana');
       } else {
         await lmsService.createLesson(Number(courseId), submitData);
         toast.success('Lekcija uspješno kreirana');

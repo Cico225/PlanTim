@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiBook, FiPlay, FiCheckCircle, FiClock, FiUser, FiPlus, FiEdit } from 'react-icons/fi';
+import { FiBook, FiPlay, FiCheckCircle, FiClock, FiUser, FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { lmsService, Course, Lesson, Quiz } from '@/services/lmsService';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
@@ -14,6 +14,8 @@ export default function CourseDetail() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [deletingLessonId, setDeletingLessonId] = useState<number | null>(null);
+  const [deletingQuizId, setDeletingQuizId] = useState<number | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -67,6 +69,52 @@ export default function CourseDetail() {
       toast.error(errorMessage);
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  const handleDeleteLesson = async (lesson: Lesson, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!courseId || !lesson.id) return;
+
+    const confirmed = window.confirm(
+      `Obrisati lekciju „${lesson.title}"? Ova radnja se ne može poništiti.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingLessonId(lesson.id);
+      await lmsService.deleteLesson(Number(courseId), lesson.id);
+      setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
+      toast.success('Lekcija je obrisana');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || error?.message || 'Neuspješno brisanje lekcije'
+      );
+    } finally {
+      setDeletingLessonId(null);
+    }
+  };
+
+  const handleDeleteQuiz = async (quiz: Quiz, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!courseId || !quiz.id) return;
+
+    const confirmed = window.confirm(
+      `Obrisati kviz „${quiz.title}"? Ova radnja se ne može poništiti.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingQuizId(quiz.id);
+      await lmsService.deleteQuiz(Number(courseId), quiz.id);
+      setQuizzes((prev) => prev.filter((q) => q.id !== quiz.id));
+      toast.success('Kviz je obrisan');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || error?.message || 'Neuspješno brisanje kviza'
+      );
+    } finally {
+      setDeletingQuizId(null);
     }
   };
 
@@ -208,9 +256,37 @@ export default function CourseDetail() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 sm:gap-2">
                   {lesson.user_progress?.is_completed && (
                     <FiCheckCircle className="w-5 h-5 text-green-500" />
+                  )}
+                  {isManager && (
+                    <>
+                      <button
+                        type="button"
+                        title="Uredi lekciju"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/lms/maloprodaja/courses/${courseId}/lessons/${lesson.id}/edit`);
+                        }}
+                        className="rounded-lg p-2 text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                      >
+                        <FiEdit className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Obriši lekciju"
+                        disabled={deletingLessonId === lesson.id}
+                        onClick={(e) => handleDeleteLesson(lesson, e)}
+                        className="rounded-lg p-2 text-rose-600 transition hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                      >
+                        {deletingLessonId === lesson.id ? (
+                          <span className="block h-4 w-4 animate-spin rounded-full border-2 border-rose-300 border-t-rose-600" />
+                        ) : (
+                          <FiTrash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </>
                   )}
                   <FiPlay className="w-5 h-5 text-gray-400" />
                 </div>
@@ -258,9 +334,37 @@ export default function CourseDetail() {
                     Prolazni rezultat: {quiz.passing_score}%
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 sm:gap-2">
                   {quiz.latest_attempt?.passed && (
                     <FiCheckCircle className="w-5 h-5 text-green-500" />
+                  )}
+                  {isManager && (
+                    <>
+                      <button
+                        type="button"
+                        title="Uredi kviz"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/lms/maloprodaja/courses/${courseId}/quizzes/${quiz.id}/edit`);
+                        }}
+                        className="rounded-lg p-2 text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                      >
+                        <FiEdit className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Obriši kviz"
+                        disabled={deletingQuizId === quiz.id}
+                        onClick={(e) => handleDeleteQuiz(quiz, e)}
+                        className="rounded-lg p-2 text-rose-600 transition hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                      >
+                        {deletingQuizId === quiz.id ? (
+                          <span className="block h-4 w-4 animate-spin rounded-full border-2 border-rose-300 border-t-rose-600" />
+                        ) : (
+                          <FiTrash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </>
                   )}
                   <FiPlay className="w-5 h-5 text-gray-400" />
                 </div>

@@ -80,10 +80,7 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($maloprodajaPermissions as $name => $displayName) {
             Permission::updateOrCreate(
-                [
-                    'name' => $name,
-                    'guard_name' => 'web',
-                ]
+                ['name' => $name, 'guard_name' => 'web']
             );
         }
 
@@ -95,6 +92,48 @@ class RolePermissionSeeder extends Seeder
         ];
 
         foreach ($financePermissions as $name => $displayName) {
+            Permission::updateOrCreate(
+                ['name' => $name, 'guard_name' => 'web']
+            );
+        }
+
+        // Planika HR — doradjeni podmoduli
+        $hrPermissions = [
+            'planika.hr.view' => 'View HR hub',
+            'planika.hr.contracts.view' => 'View employment contracts',
+            'planika.hr.contracts.manage' => 'Manage employment contracts',
+            'planika.hr.contracts.renew' => 'Renew employment contracts',
+            'planika.hr.contracts.generate' => 'Generate employment contracts',
+            'planika.hr.education.view' => 'View education programs',
+            'planika.hr.education.manage' => 'Manage education programs',
+            'planika.hr.education.enroll' => 'Enroll employees in education',
+            'planika.hr.talent.view' => 'View talent management',
+            'planika.hr.talent.manage' => 'Manage talent pool',
+            'planika.hr.talent.assess' => 'Assess talent / 9-box',
+            'planika.hr.employees.view' => 'View employees',
+            'planika.hr.employees.manage' => 'Manage employees',
+            'planika.hr.reports.view' => 'View HR reports',
+        ];
+
+        foreach ($hrPermissions as $name => $displayName) {
+            Permission::updateOrCreate(
+                ['name' => $name, 'guard_name' => 'web']
+            );
+        }
+
+        // LMS — administracija i upravljanje kursevima
+        $lmsPermissions = [
+            'lms.manage_courses' => 'Manage LMS courses',
+            'lms.manage_lessons' => 'Manage LMS lessons',
+            'lms.manage_quizzes' => 'Manage LMS quizzes',
+            'lms.view_reports' => 'View LMS reports',
+            'lms.issue_certificates' => 'Issue LMS certificates',
+            'lms.maloprodaja.view' => 'View LMS Maloprodaja',
+            'lms.maloprodaja.manage' => 'Manage LMS Maloprodaja courses',
+            'lms.maloprodaja.reports' => 'View LMS Maloprodaja reports',
+        ];
+
+        foreach ($lmsPermissions as $name => $displayName) {
             Permission::updateOrCreate(
                 ['name' => $name, 'guard_name' => 'web']
             );
@@ -138,6 +177,21 @@ class RolePermissionSeeder extends Seeder
             'projects.view', 'projects.create', 'projects.update',
             'dms.view', 'dms.create', 'dms.update',
             'lms.view',
+            'lms.manage_courses',
+            'lms.manage_lessons',
+            'lms.manage_quizzes',
+            'lms.view_reports',
+            'lms.maloprodaja.view',
+            'lms.maloprodaja.manage',
+            'lms.maloprodaja.reports',
+            'planika.hr.view',
+            'planika.hr.contracts.view',
+            'planika.hr.contracts.manage',
+            'planika.hr.contracts.generate',
+            'planika.hr.education.view',
+            'planika.hr.education.manage',
+            'planika.hr.talent.view',
+            'planika.hr.talent.manage',
             'inbox.view', 'inbox.create',
             'notifications.view',
         ]);

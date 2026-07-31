@@ -390,7 +390,21 @@ class AdminController extends Controller
      */
     public function getPermissions()
     {
-        $permissions = Permission::all()->groupBy('module');
+        $permissions = Permission::all()->map(function ($permission) {
+            $parts = explode('.', (string) $permission->name);
+            $module = $parts[0] ?? 'general';
+
+            if ($module === 'planika' && isset($parts[1])) {
+                $module = 'planika.' . $parts[1];
+            } elseif ($module === 'lms' && isset($parts[1]) && !in_array($parts[1], ['view', 'create', 'update', 'delete', 'manage'], true)) {
+                // keep granular LMS under lms group (manage_courses, maloprodaja, ...)
+                $module = 'lms';
+            }
+
+            $permission->module = $module;
+
+            return $permission;
+        })->groupBy('module');
 
         return response()->json($permissions);
     }

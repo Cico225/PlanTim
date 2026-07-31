@@ -68,9 +68,22 @@ const PERMISSION_LABELS: Record<string, string> = {
   stores_manage: 'Upravljanje prodavnicama',
   reports_view: 'Pregled izvještaja',
   reports_view_all: 'Pregled svih izvještaja',
-  view_reports: 'Finansijski izvještaji',
+  view_reports: 'Pregled izvještaja',
   manage_budgets: 'Upravljanje budžetom',
   export: 'Izvoz podataka',
+  renew: 'Obnova ugovora',
+  generate: 'Generisanje ugovora',
+  enroll: 'Prijave na edukacije',
+  assess: 'Procjena talenata',
+  manage_courses: 'Upravljanje kursevima',
+  manage_lessons: 'Upravljanje lekcijama',
+  manage_quizzes: 'Upravljanje kvizovima',
+  manage_surprises: 'Upravljanje iznenađenjima',
+  manage_badges: 'Upravljanje bedževima',
+  manage_certificates: 'Upravljanje certifikatima',
+  track_progress: 'Praćenje napretka',
+  issue_certificates: 'Izdavanje certifikata',
+  export_reports: 'Izvoz izvještaja',
 };
 
 function labelForPermission(key: string): string {
