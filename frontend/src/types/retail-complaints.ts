@@ -1,6 +1,6 @@
-export type ComplaintStatus = 'zaprimljena' | 'ponovo_uslikati' | 'odbijena' | 'opravdana';
+export type ComplaintStatus = 'zaprimljena' | 'odobrena' | 'odbijena';
 
-export type ComplaintReviewAction = 'ponovo_uslikati' | 'odbijena' | 'opravdana';
+export type ComplaintReviewAction = 'odobrena' | 'odbijena';
 
 export interface RetailComplaint {
   id: number;
@@ -21,6 +21,7 @@ export interface RetailComplaint {
   purchase_date?: string | null;
   defect_description?: string | null;
   status: ComplaintStatus;
+  submitted_at?: string | null;
   admin_comment?: string | null;
   admin_response?: string | null;
   reviewed_by?: number | null;
@@ -65,9 +66,14 @@ export interface CreateComplaintPayload {
 
 export const COMPLAINT_STATUS_LABELS: Record<ComplaintStatus, string> = {
   zaprimljena: 'Zaprimljena',
-  ponovo_uslikati: 'Ponovo uslikati',
+  odobrena: 'Odobrena',
   odbijena: 'Odbijena',
-  opravdana: 'Opravdana',
+};
+
+export const COMPLAINT_STATUS_COLORS: Record<ComplaintStatus, string> = {
+  zaprimljena: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  odobrena: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  odbijena: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
 };
 
 export const PAYMENT_METHODS = [
@@ -76,3 +82,11 @@ export const PAYMENT_METHODS = [
   { value: 'kredit', label: 'Kredit' },
   { value: 'ostalo', label: 'Ostalo' },
 ] as const;
+
+export function isComplaintSubmitted(complaint: Pick<RetailComplaint, 'submitted_at' | 'status'>): boolean {
+  return Boolean(complaint.submitted_at) || complaint.status === 'odobrena' || complaint.status === 'odbijena';
+}
+
+export function canEditComplaintPhotos(complaint: Pick<RetailComplaint, 'status' | 'submitted_at'>): boolean {
+  return complaint.status === 'zaprimljena' && !complaint.submitted_at;
+}

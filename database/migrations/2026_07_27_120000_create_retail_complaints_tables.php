@@ -27,10 +27,10 @@ return new class extends Migration
                 $table->text('defect_description')->nullable();
                 $table->enum('status', [
                     'zaprimljena',
-                    'ponovo_uslikati',
+                    'odobrena',
                     'odbijena',
-                    'opravdana',
                 ])->default('zaprimljena');
+                $table->timestamp('submitted_at')->nullable();
                 $table->text('admin_comment')->nullable();
                 $table->text('admin_response')->nullable();
                 $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();

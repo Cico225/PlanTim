@@ -131,4 +131,57 @@ body {
   @apply bg-black-light/90;
 }
 
+/* Print: samo odabrani A4 dokument (zahtjev ili dopis) */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  body.printing-complaint-form .complaint-print-root,
+  body.printing-complaint-form .complaint-print-root * {
+    visibility: visible !important;
+  }
+
+  body.printing-complaint-form .complaint-print-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  body.printing-complaint-letter .complaint-letter-print-root,
+  body.printing-complaint-letter .complaint-letter-print-root * {
+    visibility: visible !important;
+  }
+
+  body.printing-complaint-letter .complaint-letter-print-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  .complaint-print-sheet,
+  .complaint-rejection-letter {
+    max-width: none !important;
+    width: 100% !important;
+  }
+}
 
