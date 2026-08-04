@@ -126,7 +126,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     steps: [
       { title: 'Plan obilaska', body: 'Kreirajte plan, dodajte prodavnicu i termin.' },
       { title: 'Kontrola', body: 'Unesite rezultat obilaska i napomene.' },
-      { title: 'Reklamacija', body: 'Nova reklamacija → podaci + fotografije → pratite status.' },
+      { title: 'Reklamacija', body: 'Unos + print (Zaprimljena) → fotografije → slanje u direkciju → Odobrena ili Odbijena.' },
     ],
   },
   {

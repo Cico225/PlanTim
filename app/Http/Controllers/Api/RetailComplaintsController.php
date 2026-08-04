@@ -264,6 +264,13 @@ class RetailComplaintsController extends Controller
             $query->where('c.status', $request->status);
         }
 
+        if ($request->boolean('for_review') && $this->canReview($user)) {
+            $query->where(function ($q) {
+                $q->whereNotNull('c.submitted_at')
+                    ->orWhereIn('c.status', ['odobrena', 'odbijena']);
+            });
+        }
+
         if ($request->filled('store_id') && $this->canViewAll($user)) {
             $query->where('c.store_id', $request->store_id);
         }
@@ -360,11 +367,20 @@ class RetailComplaintsController extends Controller
         $user = $request->user();
         $complaint = $this->findComplaintOrFail($request, $id, true);
 
-        $canUpdate = $this->canReview($user)
-            || (
-                $this->canCreate($user)
-                && (int) $complaint->store_id === (int) $this->getEmployeeStoreId($user)
-                && in_array($complaint->status, ['zaprimljena', 'ponovo_uslikati'], true)
+        $canUpdate =
+            (
+                $complaint->status === 'zaprimljena'
+                && empty($complaint->submitted_at)
+            )
+            && (
+                $this->canReview($user)
+                || (
+                    $this->canCreate($user)
+                    && (
+                        $this->canViewAll($user)
+                        || (int) $complaint->store_id === (int) $this->getEmployeeStoreId($user)
+                    )
+                )
             );
 
         if (!$canUpdate) {
@@ -383,7 +399,7 @@ class RetailComplaintsController extends Controller
             return response()->json(['errors' => ['photos' => ['Potrebna je barem jedna fotografija artikla.']]], 422);
         }
 
-        DB::table('planika_maloprodaja_complaints')->where('id', $id)->update([
+        $update = [
             'customer_name' => $data['customer_name'],
             'customer_address' => $data['customer_address'],
             'customer_phone' => $data['customer_phone'],
@@ -396,7 +412,15 @@ class RetailComplaintsController extends Controller
             'purchase_date' => $data['purchase_date'],
             'defect_description' => $data['defect_description'],
             'updated_at' => now(),
-        ]);
+        ];
+
+        // Pošalji u direkciju: ostaje status Zaprimljena, ali se bilježi submitted_at
+        if ($request->boolean('finalize')) {
+            $update['submitted_at'] = now();
+            $update['status'] = 'zaprimljena';
+        }
+
+        DB::table('planika_maloprodaja_complaints')->where('id', $id)->update($update);
 
         $fresh = $this->findComplaintOrFail($request, $id, true);
         return response()->json($this->formatComplaint($fresh));
@@ -416,11 +440,18 @@ class RetailComplaintsController extends Controller
         $user = $request->user();
         $complaint = $this->findComplaintOrFail($request, $id, true);
 
-        $canUpload = $this->canReview($user)
-            || (
-                $this->canCreate($user)
-                && (int) $complaint->store_id === (int) $this->getEmployeeStoreId($user)
-                && in_array($complaint->status, ['zaprimljena', 'ponovo_uslikati'], true)
+        $canUpload =
+            $complaint->status === 'zaprimljena'
+            && empty($complaint->submitted_at)
+            && (
+                $this->canReview($user)
+                || (
+                    $this->canCreate($user)
+                    && (
+                        $this->canViewAll($user)
+                        || (int) $complaint->store_id === (int) $this->getEmployeeStoreId($user)
+                    )
+                )
             );
 
         if (!$canUpload) {
@@ -442,18 +473,11 @@ class RetailComplaintsController extends Controller
 
             $this->deletePhotoFile($complaint->{$pathKey} ?? null);
 
-            $update = [
+            DB::table('planika_maloprodaja_complaints')->where('id', $id)->update([
                 $pathKey => $stored['path'],
                 $sizeKey => $stored['size'],
                 'updated_at' => now(),
-            ];
-
-            if (!$this->canReview($user) && $complaint->status === 'ponovo_uslikati') {
-                $update['status'] = 'zaprimljena';
-                $update['admin_comment'] = null;
-            }
-
-            DB::table('planika_maloprodaja_complaints')->where('id', $id)->update($update);
+            ]);
 
             $fresh = $this->findComplaintOrFail($request, $id, true);
             return response()->json($this->formatComplaint($fresh));
@@ -505,10 +529,21 @@ class RetailComplaintsController extends Controller
 
         $complaint = $this->findComplaintOrFail($request, $id, true);
 
+        if ($complaint->status !== 'zaprimljena') {
+            return response()->json(['error' => 'Reklamacija je već obrađena'], 422);
+        }
+
+        if (empty($complaint->submitted_at)) {
+            return response()->json(['error' => 'Reklamacija još nije poslana u direkciju'], 422);
+        }
+
+        if (!$this->hasAtLeastOnePhoto($complaint)) {
+            return response()->json(['error' => 'Reklamacija nema fotografije artikla'], 422);
+        }
+
         $validator = Validator::make($request->all(), [
-            'action' => 'required|in:ponovo_uslikati,odbijena,opravdana',
-            'admin_comment' => 'required_if:action,ponovo_uslikati|nullable|string',
-            'admin_response' => 'required_if:action,odbijena,opravdana|nullable|string',
+            'action' => 'required|in:odobrena,odbijena',
+            'admin_response' => 'required|string',
         ]);
 
         if ($validator->fails()) {
@@ -520,10 +555,8 @@ class RetailComplaintsController extends Controller
 
         DB::table('planika_maloprodaja_complaints')->where('id', $id)->update([
             'status' => $status,
-            'admin_comment' => $status === 'ponovo_uslikati' ? ($data['admin_comment'] ?? null) : null,
-            'admin_response' => in_array($status, ['odbijena', 'opravdana'], true)
-                ? ($data['admin_response'] ?? null)
-                : null,
+            'admin_comment' => null,
+            'admin_response' => $data['admin_response'] ?? null,
             'reviewed_by' => $user->id,
             'reviewed_at' => now(),
             'updated_at' => now(),

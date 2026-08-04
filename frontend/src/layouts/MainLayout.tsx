@@ -443,7 +443,7 @@ export default function MainLayout() {
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex">
       {/* Modern Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 transition-transform duration-300 ${
+        className={`print:hidden fixed inset-y-0 left-0 z-40 transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${sidebarCollapsed ? 'w-20' : 'w-72'} overflow-visible`}
         data-sidebar-open={sidebarOpen}
@@ -817,9 +817,9 @@ export default function MainLayout() {
       </aside>
 
       {/* Main Content */}
-      <div className={`flex min-w-0 flex-1 flex-col overflow-x-hidden transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'}`}>
+      <div className={`flex min-w-0 flex-1 flex-col overflow-x-hidden transition-all duration-300 print:ml-0 print:overflow-visible ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'}`}>
         {/* Modern Top bar */}
-        <header className="sticky top-0 z-30 grid h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-gray-200/50 bg-white/80 px-3 backdrop-blur-xl dark:border-dark-700/50 dark:bg-dark-800/80 sm:px-6 lg:flex lg:justify-between shadow-sm">
+        <header className="print:hidden sticky top-0 z-30 grid h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-gray-200/50 bg-white/80 px-3 backdrop-blur-xl dark:border-dark-700/50 dark:bg-dark-800/80 sm:px-6 lg:flex lg:justify-between shadow-sm">
           <div className="relative z-10 flex min-w-0 items-center gap-1.5 sm:gap-4">
             <button
               onClick={() => {
@@ -908,7 +908,7 @@ export default function MainLayout() {
         </header>
 
         {/* Page content */}
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6">
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6 print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>

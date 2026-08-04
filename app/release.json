@@ -1,8 +1,9 @@
 {
-    "version": "1.2.10",
-    "version_name": "Release 2026-07-31",
-    "release_notes": "Razvoj i dorada modula LMS",
+    "version": "1.2.11",
+    "version_name": "Release 2026-08-04",
+    "release_notes": "Dorada modula Reklamacije",
     "changelog": [
+        "Dorada modula Reklamacije",
         "Razvoj i dorada modula LMS",
         "DOrada modula sistem učenja",
         "Implementacija korisničkog uputstva",

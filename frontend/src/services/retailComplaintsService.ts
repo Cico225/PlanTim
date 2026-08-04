@@ -13,7 +13,7 @@ export const retailComplaintsService = {
     return apiService.get(`${BASE}/capabilities`);
   },
 
-  list(params?: { status?: string; store_id?: number; search?: string }): Promise<RetailComplaint[]> {
+  list(params?: { status?: string; store_id?: number; search?: string; for_review?: boolean }): Promise<RetailComplaint[]> {
     return apiService.get(BASE, params);
   },
 
