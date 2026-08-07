@@ -536,7 +536,7 @@ export default function UserManagement() {
                         <button
                           onClick={() => handleAssignRole(user)}
                           className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                          title="Dodeli Ulogu"
+                          title="Dodjeli ulogu"
                         >
                           <FiShield size={18} />
                         </button>
@@ -657,6 +657,13 @@ export default function UserManagement() {
                   >
                     <FiEdit2 size={16} />
                     <span>Uredi</span>
+                  </button>
+                  <button
+                    onClick={() => handleAssignRole(user)}
+                    className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                    title="Dodjeli ulogu"
+                  >
+                    <FiShield size={18} />
                   </button>
                   <button
                     onClick={() => handleDeleteUser(user.id)}

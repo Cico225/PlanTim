@@ -1,8 +1,9 @@
 {
-    "version": "1.2.11",
-    "version_name": "Release 2026-08-04",
-    "release_notes": "Dorada modula Reklamacije",
+    "version": "1.2.12",
+    "version_name": "Release 2026-08-07",
+    "release_notes": "DOrada modula HR",
     "changelog": [
+        "DOrada modula HR",
         "Dorada modula Reklamacije",
         "Razvoj i dorada modula LMS",
         "DOrada modula sistem učenja",
@@ -21,7 +22,6 @@
         "Animirane kartice Planika podmodula umjesto statičnih brojeva",
         "Brisanje kredita u Planika Finansije modulu",
         "Automatski backup baze i projekta s internim schedulerom",
-        "Podmoduli u meniju (Planika → Finansije → Krediti)",
-        "Informativni prozor verzije s animiranim changelogom"
+        "Podmoduli u meniju (Planika → Finansije → Krediti)"
     ]
 }

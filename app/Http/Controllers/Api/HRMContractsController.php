@@ -9,23 +9,261 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class HRMContractsController extends Controller
 {
+    private const TEMPLATE_DISK_DIR = 'hr-contract-templates';
+
     public function __construct(
         private readonly ContractDocumentService $documentService
     ) {
     }
 
-    public function templates()
+    public function templates(Request $request)
     {
-        $templates = DB::table('hrm_contract_templates')
-            ->where('is_active', true)
+        $query = DB::table('hrm_contract_templates')
             ->orderBy('legal_entity')
             ->orderBy('job_role')
-            ->get();
+            ->orderBy('name');
+
+        if (!$request->boolean('include_inactive')) {
+            $query->where('is_active', true);
+        }
+
+        $templates = $query->get()->map(fn ($template) => $this->formatTemplate($template));
 
         return response()->json($templates);
+    }
+
+    public function storeTemplate(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|max:20480',
+            'name' => 'required|string|max:255',
+            'legal_entity' => 'required|in:fbih,rs,bd',
+            'job_role' => 'required|in:store_manager,deputy_manager,salesperson',
+            'document_kind' => 'nullable|in:full_contract,annex',
+            'output_format' => 'nullable|in:docx,pdf',
+            'code' => 'nullable|string|max:80|unique:hrm_contract_templates,code',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Neispravni podaci.', 'errors' => $validator->errors()], 422);
+        }
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension() ?: '');
+        if (!in_array($extension, ['doc', 'docx', 'pdf'], true)) {
+            return response()->json([
+                'message' => 'Dozvoljeni formati šablona: DOC, DOCX, PDF.',
+            ], 422);
+        }
+
+        $storedName = $this->storeTemplateFile($file, $extension);
+
+        $outputFormat = $request->input('output_format')
+            ?: ($extension === 'docx' ? 'docx' : 'pdf');
+
+        $code = $request->input('code')
+            ?: $this->makeTemplateCode(
+                $request->input('legal_entity'),
+                $request->input('job_role')
+            );
+
+        $id = DB::table('hrm_contract_templates')->insertGetId([
+            'code' => $code,
+            'name' => $request->input('name'),
+            'legal_entity' => $request->input('legal_entity'),
+            'job_role' => $request->input('job_role'),
+            'document_kind' => $request->input('document_kind', 'full_contract'),
+            'template_file' => $storedName,
+            'output_format' => $outputFormat,
+            'placeholder_keys' => null,
+            'is_active' => $request->boolean('is_active', true),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $template = DB::table('hrm_contract_templates')->where('id', $id)->first();
+
+        return response()->json([
+            'message' => 'Šablon ugovora je učitan.',
+            'template' => $this->formatTemplate($template),
+        ], 201);
+    }
+
+    public function uploadTemplateFile(Request $request, $id)
+    {
+        $template = DB::table('hrm_contract_templates')->where('id', $id)->first();
+        if (!$template) {
+            return response()->json(['message' => 'Šablon nije pronađen.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|max:20480',
+            'name' => 'nullable|string|max:255',
+            'output_format' => 'nullable|in:docx,pdf',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Neispravni podaci.', 'errors' => $validator->errors()], 422);
+        }
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension() ?: '');
+        if (!in_array($extension, ['doc', 'docx', 'pdf'], true)) {
+            return response()->json([
+                'message' => 'Dozvoljeni formati šablona: DOC, DOCX, PDF.',
+            ], 422);
+        }
+
+        $storedName = $this->storeTemplateFile($file, $extension);
+
+        $this->deleteTemplateFileIfManaged($template->template_file);
+
+        $updates = [
+            'template_file' => $storedName,
+            'updated_at' => now(),
+        ];
+
+        if ($request->filled('name')) {
+            $updates['name'] = $request->input('name');
+        }
+
+        if ($request->filled('output_format')) {
+            $updates['output_format'] = $request->input('output_format');
+        } elseif (in_array($extension, ['docx', 'pdf'], true)) {
+            $updates['output_format'] = $extension === 'docx' ? 'docx' : 'pdf';
+        }
+
+        if ($request->has('is_active')) {
+            $updates['is_active'] = $request->boolean('is_active');
+        }
+
+        DB::table('hrm_contract_templates')->where('id', $id)->update($updates);
+
+        $updated = DB::table('hrm_contract_templates')->where('id', $id)->first();
+
+        return response()->json([
+            'message' => 'Datoteka šablona je ažurirana.',
+            'template' => $this->formatTemplate($updated),
+        ]);
+    }
+
+    public function downloadTemplate($id)
+    {
+        $template = DB::table('hrm_contract_templates')->where('id', $id)->first();
+        if (!$template) {
+            return response()->json(['message' => 'Šablon nije pronađen.'], 404);
+        }
+
+        $relative = self::TEMPLATE_DISK_DIR . '/' . ltrim($template->template_file, '/');
+        if (!Storage::disk('local')->exists($relative)) {
+            return response()->json(['message' => 'Datoteka šablona ne postoji na serveru.'], 404);
+        }
+
+        return Storage::disk('local')->download($relative, basename($template->template_file));
+    }
+
+    public function updateTemplate(Request $request, $id)
+    {
+        $template = DB::table('hrm_contract_templates')->where('id', $id)->first();
+        if (!$template) {
+            return response()->json(['message' => 'Šablon nije pronađen.'], 404);
+        }
+
+        $data = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'legal_entity' => 'sometimes|required|in:fbih,rs,bd',
+            'job_role' => 'sometimes|required|in:store_manager,deputy_manager,salesperson',
+            'document_kind' => 'sometimes|required|in:full_contract,annex',
+            'output_format' => 'sometimes|required|in:docx,pdf',
+            'is_active' => 'sometimes|required|boolean',
+        ]);
+
+        $data['updated_at'] = now();
+        DB::table('hrm_contract_templates')->where('id', $id)->update($data);
+
+        $updated = DB::table('hrm_contract_templates')->where('id', $id)->first();
+
+        return response()->json([
+            'message' => 'Šablon je ažuriran.',
+            'template' => $this->formatTemplate($updated),
+        ]);
+    }
+
+    private function formatTemplate(object $template): array
+    {
+        $relative = self::TEMPLATE_DISK_DIR . '/' . ltrim((string) $template->template_file, '/');
+        $exists = Storage::disk('local')->exists($relative);
+
+        return [
+            'id' => $template->id,
+            'code' => $template->code,
+            'name' => $template->name,
+            'legal_entity' => $template->legal_entity,
+            'job_role' => $template->job_role,
+            'document_kind' => $template->document_kind,
+            'template_file' => $template->template_file,
+            'file_name' => basename((string) $template->template_file),
+            'output_format' => $template->output_format,
+            'placeholder_keys' => $template->placeholder_keys
+                ? (is_string($template->placeholder_keys)
+                    ? json_decode($template->placeholder_keys, true)
+                    : $template->placeholder_keys)
+                : null,
+            'is_active' => (bool) $template->is_active,
+            'file_exists' => $exists,
+            'file_size' => $exists ? Storage::disk('local')->size($relative) : null,
+            'created_at' => $template->created_at,
+            'updated_at' => $template->updated_at,
+        ];
+    }
+
+    private function storeTemplateFile($file, string $extension): string
+    {
+        Storage::disk('local')->makeDirectory(self::TEMPLATE_DISK_DIR);
+
+        $safeBase = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) ?: 'sablon';
+        $storedName = $safeBase . '_' . now()->format('Ymd_His') . '_' . Str::lower(Str::random(4)) . '.' . $extension;
+
+        $file->storeAs(self::TEMPLATE_DISK_DIR, $storedName, 'local');
+
+        return $storedName;
+    }
+
+    private function makeTemplateCode(string $legalEntity, string $jobRole): string
+    {
+        $base = $legalEntity . '_' . $jobRole;
+        $code = $base;
+        $i = 2;
+
+        while (DB::table('hrm_contract_templates')->where('code', $code)->exists()) {
+            $code = $base . '_' . $i;
+            $i++;
+        }
+
+        return $code;
+    }
+
+    private function deleteTemplateFileIfManaged(?string $fileName): void
+    {
+        if (!$fileName) {
+            return;
+        }
+
+        // Keep seeded original names; only remove uniquely stored uploads.
+        if (!preg_match('/_\d{8}_\d{6}_[a-z0-9]{4}\./i', $fileName)) {
+            return;
+        }
+
+        $relative = self::TEMPLATE_DISK_DIR . '/' . ltrim($fileName, '/');
+        if (Storage::disk('local')->exists($relative)) {
+            Storage::disk('local')->delete($relative);
+        }
     }
 
     public function settings()
@@ -212,6 +450,138 @@ class HRMContractsController extends Controller
         }
 
         return response()->json($this->findContract($id));
+    }
+
+    public function bulkUpdate(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array|min:1|max:500',
+            'ids.*' => 'integer|exists:hrm_employment_contracts,id',
+            'employment_term' => 'nullable|in:indefinite,fixed',
+            'duration_months' => 'nullable|integer|min:1|max:60',
+            'duration_from' => 'nullable|in:work_start,effective,today',
+            'status' => 'nullable|in:draft,active,expired,terminated,superseded',
+            'auto_renew' => 'nullable|boolean',
+            'renewal_notice_days' => 'nullable|integer|min:1|max:365',
+            'expiry_date' => 'nullable|date',
+            'work_end_date' => 'nullable|date',
+            'salary_gross' => 'nullable|numeric|min:0',
+            'salary_net' => 'nullable|numeric|min:0',
+            'store_id' => 'nullable|exists:hrm_stores,id',
+            'notes' => 'nullable|string',
+            'generate_document' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Neispravni podaci za masovnu izmjenu.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $request->input('ids', []))));
+        $contracts = DB::table('hrm_employment_contracts')->whereIn('id', $ids)->get()->keyBy('id');
+
+        if ($contracts->isEmpty()) {
+            return response()->json(['message' => 'Nijedan ugovor nije pronađen.'], 404);
+        }
+
+        $shared = collect($request->only([
+            'employment_term', 'status', 'auto_renew', 'renewal_notice_days',
+            'expiry_date', 'work_end_date', 'salary_gross', 'salary_net', 'store_id', 'notes',
+        ]))->filter(fn ($value) => $value !== null && $value !== '')->all();
+
+        if (array_key_exists('auto_renew', $shared)) {
+            $shared['auto_renew'] = (bool) $shared['auto_renew'];
+        }
+
+        $durationMonths = $request->filled('duration_months')
+            ? (int) $request->input('duration_months')
+            : null;
+        $durationFrom = $request->input('duration_from', 'work_start');
+
+        if ($durationMonths !== null) {
+            $shared['employment_term'] = 'fixed';
+            unset($shared['expiry_date'], $shared['work_end_date']);
+        } elseif (($shared['employment_term'] ?? null) === 'indefinite') {
+            $shared['expiry_date'] = null;
+            $shared['work_end_date'] = null;
+        }
+
+        if ($shared === [] && $durationMonths === null) {
+            return response()->json([
+                'message' => 'Odaberite barem jedno polje za izmjenu.',
+            ], 422);
+        }
+
+        $updated = 0;
+        $failed = [];
+        $userId = $request->user()?->id;
+        $generate = $request->boolean('generate_document');
+
+        foreach ($ids as $id) {
+            $contract = $contracts->get($id);
+            if (!$contract) {
+                $failed[] = ['id' => $id, 'message' => 'Ugovor nije pronađen.'];
+                continue;
+            }
+
+            try {
+                $payload = $shared;
+
+                if ($durationMonths !== null) {
+                    $baseDate = match ($durationFrom) {
+                        'today' => now()->toDateString(),
+                        'effective' => $contract->effective_date
+                            ?: $contract->work_start_date
+                            ?: now()->toDateString(),
+                        default => $contract->work_start_date
+                            ?: $contract->effective_date
+                            ?: now()->toDateString(),
+                    };
+
+                    $endDate = \Carbon\Carbon::parse($baseDate)
+                        ->addMonthsNoOverflow($durationMonths)
+                        ->toDateString();
+
+                    $payload['employment_term'] = 'fixed';
+                    $payload['expiry_date'] = $endDate;
+                    $payload['work_end_date'] = $endDate;
+                }
+
+                if (($payload['employment_term'] ?? null) === 'indefinite') {
+                    $payload['expiry_date'] = null;
+                    $payload['work_end_date'] = null;
+                }
+
+                if (array_key_exists('store_id', $payload) && $payload['store_id']) {
+                    $store = DB::table('hrm_stores')->where('id', $payload['store_id'])->first();
+                    if ($store) {
+                        $payload['store_name'] = $store->name;
+                        $payload['store_city'] = $store->city ?? null;
+                    }
+                }
+
+                $payload['updated_by'] = $userId;
+                $payload['updated_at'] = now();
+
+                DB::table('hrm_employment_contracts')->where('id', $id)->update($payload);
+
+                if ($generate) {
+                    $this->generateDocumentInternal($id, $userId);
+                }
+
+                $updated++;
+            } catch (\Throwable $e) {
+                $failed[] = ['id' => $id, 'message' => $e->getMessage()];
+            }
+        }
+
+        return response()->json([
+            'message' => "Ažurirano ugovora: {$updated}.",
+            'updated' => $updated,
+            'failed' => $failed,
+        ]);
     }
 
     public function renew(Request $request, $id)

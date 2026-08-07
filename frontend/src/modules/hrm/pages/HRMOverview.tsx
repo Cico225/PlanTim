@@ -329,6 +329,8 @@ function EmployeesList() {
     mutationFn: createEmployee,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hrm-employees'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-alerts'] });
       setShowAddModal(false);
       // Reset form
     },
@@ -339,6 +341,8 @@ function EmployeesList() {
     onSuccess: (data) => {
       setImportResult(data);
       queryClient.invalidateQueries({ queryKey: ['hrm-employees'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-alerts'] });
       if (data.success && data.errors === 0) {
         setTimeout(() => {
           setShowImportModal(false);
@@ -359,8 +363,33 @@ function EmployeesList() {
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: deleteEmployee,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hrm-employees'] });
+    onSuccess: (_data, deletedId) => {
+      // Odmah ukloni iz lokalnog cache-a (svi filteri statusa)
+      queryClient.setQueriesData({ queryKey: ['hrm-employees'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.filter((emp: any) => emp.id !== deletedId);
+        }
+        if (Array.isArray(old.data)) {
+          return {
+            ...old,
+            data: old.data.filter((emp: any) => emp.id !== deletedId),
+            total: typeof old.total === 'number' ? Math.max(0, old.total - 1) : old.total,
+          };
+        }
+        return old;
+      });
+
+      queryClient.removeQueries({ queryKey: ['hrm-employee', deletedId] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-employees'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['hrm-dashboard'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['hrm-alerts'], refetchType: 'active' });
+
+      if (selectedEmployeeId === deletedId) {
+        setShowDetailModal(false);
+        setSelectedEmployeeId(null);
+      }
+
       toast.success('Zaposlenik je uspješno obrisan');
     },
     onError: (error: any) => {
@@ -479,7 +508,7 @@ function EmployeesList() {
                           setSelectedEmployeeId(emp.id);
                           setShowDetailModal(true);
                         }}
-                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
                       >
                         Detalji
                       </button>
@@ -489,10 +518,11 @@ function EmployeesList() {
                           handleDelete(emp.id, emp.name || 'Zaposlenik');
                         }}
                         disabled={deleteEmployeeMutation.isPending}
-                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Obriši zaposlenika"
                       >
                         <XCircle className="w-4 h-4" />
+                        Obriši
                       </button>
                     </div>
                   </td>
@@ -989,10 +1019,11 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
   const [formData, setFormData] = useState<any>({});
   const queryClient = useQueryClient();
 
-  const { data: employee, isLoading } = useQuery({
+  const { data: employee, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['hrm-employee', employeeId],
     queryFn: () => getEmployee(employeeId),
     enabled: !!employeeId,
+    retry: 1,
   });
 
   const { data: departmentsData } = useQuery({
@@ -1052,6 +1083,8 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hrm-employee', employeeId] });
       queryClient.invalidateQueries({ queryKey: ['hrm-employees'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-alerts'] });
       toast.success('Zaposlenik je uspješno ažuriran');
       setIsEditMode(false);
     },
@@ -1083,8 +1116,54 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
     );
   }
 
-  const emp = employee?.data || employee;
-  if (!emp) return null;
+  if (isError || !employee) {
+    const message =
+      (error as any)?.response?.data?.message ||
+      (error as any)?.message ||
+      'Zaposlenik nije pronađen ili se nije mogao učitati.';
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Greška pri učitavanju</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300">{message}</p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
+            >
+              Pokušaj ponovo
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200"
+            >
+              Zatvori
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const emp = (employee as any)?.data || employee;
+  if (!emp || !(emp as any).id) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Zaposlenik nije pronađen</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm"
+          >
+            Zatvori
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const departments = departmentsData?.data || departmentsData || [];
   const users = usersData?.data || [];

@@ -327,11 +327,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         Route::prefix('contracts')->group(function () {
             Route::get('/templates', [HRMContractsController::class, 'templates']);
+            Route::post('/templates', [HRMContractsController::class, 'storeTemplate']);
+            Route::put('/templates/{id}', [HRMContractsController::class, 'updateTemplate']);
+            Route::post('/templates/{id}/file', [HRMContractsController::class, 'uploadTemplateFile']);
+            Route::get('/templates/{id}/download', [HRMContractsController::class, 'downloadTemplate']);
             Route::get('/settings', [HRMContractsController::class, 'settings']);
             Route::put('/settings', [HRMContractsController::class, 'updateSettings']);
             Route::get('/summary', [HRMContractsController::class, 'summary']);
             Route::get('/', [HRMContractsController::class, 'index']);
             Route::post('/', [HRMContractsController::class, 'store']);
+            Route::post('/bulk-update', [HRMContractsController::class, 'bulkUpdate']);
             Route::get('/{id}', [HRMContractsController::class, 'show']);
             Route::put('/{id}', [HRMContractsController::class, 'update']);
             Route::post('/{id}/renew', [HRMContractsController::class, 'renew']);
