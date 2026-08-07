@@ -14,6 +14,20 @@ use App\Imports\EmployeesImport;
 
 class HRMController extends Controller
 {
+    /**
+     * Base query for non-deleted employees.
+     */
+    private function employeesQuery()
+    {
+        $query = DB::table('hrm_employees');
+
+        if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
+            $query->whereNull('hrm_employees.deleted_at');
+        }
+
+        return $query;
+    }
+
     public function getDashboard(Request $request)
     {
         $today = now()->toDateString();
@@ -39,22 +53,16 @@ class HRMController extends Controller
         $alerts = collect();
 
         if (Schema::hasTable('hrm_employees')) {
-            $employeeBase = DB::table('hrm_employees');
-
-            if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
-                $employeeBase->whereNull('deleted_at');
-            }
-
-            $stats['total_employees'] = (clone $employeeBase)->count();
-            $stats['active_employees'] = (clone $employeeBase)->where('status', 'active')->count();
-            $stats['offboarding_in_progress'] = (clone $employeeBase)->where('status', 'offboarding')->count();
+            $stats['total_employees'] = $this->employeesQuery()->count();
+            $stats['active_employees'] = $this->employeesQuery()->where('status', 'active')->count();
+            $stats['offboarding_in_progress'] = $this->employeesQuery()->where('status', 'offboarding')->count();
 
             if (Schema::hasColumn('hrm_employees', 'hire_date')) {
-                $stats['new_hires_this_month'] = (clone $employeeBase)
+                $stats['new_hires_this_month'] = $this->employeesQuery()
                     ->whereBetween('hire_date', [$monthStart, $monthEnd])
                     ->count();
 
-                $stats['upcoming_anniversaries'] = (clone $employeeBase)
+                $stats['upcoming_anniversaries'] = $this->employeesQuery()
                     ->whereNotNull('hire_date')
                     ->whereRaw("DATE_FORMAT(hire_date, '%m-%d') between ? and ?", [
                         now()->format('m-d'),
@@ -62,7 +70,7 @@ class HRMController extends Controller
                     ])
                     ->count();
 
-                $newHires = DB::table('hrm_employees')
+                $newHires = $this->employeesQuery()
                     ->select('hrm_employees.id', 'users.name', 'hrm_employees.hire_date')
                     ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
                     ->whereBetween('hrm_employees.hire_date', [$monthStart, $monthEnd])
@@ -84,13 +92,13 @@ class HRMController extends Controller
             }
 
             if (Schema::hasColumn('hrm_employees', 'termination_date')) {
-                $stats['terminations_this_month'] = (clone $employeeBase)
+                $stats['terminations_this_month'] = $this->employeesQuery()
                     ->whereBetween('termination_date', [$monthStart, $monthEnd])
                     ->count();
             }
 
             if (Schema::hasColumn('hrm_employees', 'date_of_birth')) {
-                $stats['upcoming_birthdays'] = (clone $employeeBase)
+                $stats['upcoming_birthdays'] = $this->employeesQuery()
                     ->whereNotNull('date_of_birth')
                     ->whereRaw("DATE_FORMAT(date_of_birth, '%m-%d') between ? and ?", [
                         now()->format('m-d'),
@@ -102,13 +110,20 @@ class HRMController extends Controller
 
         if (Schema::hasTable('hrm_employment_contracts')) {
             $noticeDays = (int) (DB::table('hrm_contract_settings')->value('default_renewal_notice_days') ?? 30);
-            $stats['expiring_contracts'] = DB::table('hrm_employment_contracts')
-                ->where('status', 'active')
-                ->whereNotNull('expiry_date')
-                ->whereBetween('expiry_date', [$today, now()->addDays($noticeDays)->toDateString()])
-                ->count();
+            $contractsQuery = DB::table('hrm_employment_contracts')
+                ->where('hrm_employment_contracts.status', 'active')
+                ->whereNotNull('hrm_employment_contracts.expiry_date')
+                ->whereBetween('hrm_employment_contracts.expiry_date', [$today, now()->addDays($noticeDays)->toDateString()]);
+
+            if (Schema::hasTable('hrm_employees') && Schema::hasColumn('hrm_employees', 'deleted_at')) {
+                $contractsQuery
+                    ->join('hrm_employees', 'hrm_employment_contracts.employee_id', '=', 'hrm_employees.id')
+                    ->whereNull('hrm_employees.deleted_at');
+            }
+
+            $stats['expiring_contracts'] = $contractsQuery->count();
         } elseif (Schema::hasColumn('hrm_employees', 'probation_end_date')) {
-            $expiringProbation = DB::table('hrm_employees')
+            $expiringProbation = $this->employeesQuery()
                 ->select('hrm_employees.id', 'users.name', 'hrm_employees.probation_end_date')
                 ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
                 ->whereNotNull('hrm_employees.probation_end_date')
@@ -136,18 +151,25 @@ class HRMController extends Controller
         }
 
         if (Schema::hasTable('hrm_leaves')) {
-            $stats['pending_leaves'] = DB::table('hrm_leaves')->where('status', 'pending')->count();
-            $stats['on_leave_today'] = DB::table('hrm_leaves')
-                ->where('status', 'approved')
-                ->whereDate('start_date', '<=', $today)
-                ->whereDate('end_date', '>=', $today)
+            $leaveBase = DB::table('hrm_leaves')
+                ->join('hrm_employees', 'hrm_leaves.employee_id', '=', 'hrm_employees.id');
+            if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
+                $leaveBase->whereNull('hrm_employees.deleted_at');
+            }
+
+            $stats['pending_leaves'] = (clone $leaveBase)->where('hrm_leaves.status', 'pending')->count();
+            $stats['on_leave_today'] = (clone $leaveBase)
+                ->where('hrm_leaves.status', 'approved')
+                ->whereDate('hrm_leaves.start_date', '<=', $today)
+                ->whereDate('hrm_leaves.end_date', '>=', $today)
                 ->count();
 
             $pendingLeaves = DB::table('hrm_leaves')
                 ->select('hrm_leaves.id', 'hrm_leaves.start_date', 'hrm_leaves.end_date', 'users.name')
                 ->join('hrm_employees', 'hrm_leaves.employee_id', '=', 'hrm_employees.id')
-                ->join('users', 'hrm_employees.user_id', '=', 'users.id')
+                ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
                 ->where('hrm_leaves.status', 'pending')
+                ->when(Schema::hasColumn('hrm_employees', 'deleted_at'), fn ($q) => $q->whereNull('hrm_employees.deleted_at'))
                 ->orderBy('hrm_leaves.created_at')
                 ->limit(5)
                 ->get();
@@ -182,6 +204,10 @@ class HRMController extends Controller
                 ->leftJoin('hrm_employees', 'hrm_onboarding_processes.employee_id', '=', 'hrm_employees.id')
                 ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
                 ->whereIn('hrm_onboarding_processes.status', ['pending', 'in_progress', 'active'])
+                ->when(Schema::hasColumn('hrm_employees', 'deleted_at'), fn ($q) => $q->where(function ($inner) {
+                    $inner->whereNull('hrm_employees.id')
+                        ->orWhereNull('hrm_employees.deleted_at');
+                }))
                 ->orderByDesc('hrm_onboarding_processes.updated_at')
                 ->limit(4)
                 ->get()
@@ -292,8 +318,18 @@ class HRMController extends Controller
      */
     public function index(Request $request)
     {
+        $nameExpr = "COALESCE(users.name, hrm_employees.employee_id, CONCAT('Zaposlenik #', hrm_employees.id))";
+        if (Schema::hasColumn('hrm_employees', 'first_name') && Schema::hasColumn('hrm_employees', 'last_name')) {
+            $nameExpr = "COALESCE(users.name, NULLIF(TRIM(CONCAT(COALESCE(hrm_employees.first_name, ''), ' ', COALESCE(hrm_employees.last_name, ''))), ''), hrm_employees.employee_id, CONCAT('Zaposlenik #', hrm_employees.id))";
+        }
+
         $query = DB::table('hrm_employees')
-            ->select('hrm_employees.*', 'users.name', 'users.email', 'hrm_departments.name as department_name')
+            ->select(
+                'hrm_employees.*',
+                DB::raw("{$nameExpr} as name"),
+                'users.email',
+                'hrm_departments.name as department_name'
+            )
             ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
             ->leftJoin('hrm_departments', 'hrm_employees.department_id', '=', 'hrm_departments.id')
             ->orderBy('hrm_employees.hire_date', 'desc');
@@ -342,16 +378,40 @@ class HRMController extends Controller
      */
     public function show($id)
     {
-        $employee = DB::table('hrm_employees')
-            ->select('hrm_employees.*', 'users.name', 'users.email', 'hrm_departments.name as department_name')
-            ->join('users', 'hrm_employees.user_id', '=', 'users.id')
+        $query = DB::table('hrm_employees')
+            ->select(
+                'hrm_employees.*',
+                'users.name as user_name',
+                'users.email as user_email',
+                'hrm_departments.name as department_name'
+            )
+            ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
             ->leftJoin('hrm_departments', 'hrm_employees.department_id', '=', 'hrm_departments.id')
-            ->where('hrm_employees.id', $id)
-            ->first();
+            ->where('hrm_employees.id', $id);
+
+        if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
+            $query->whereNull('hrm_employees.deleted_at');
+        }
+
+        $employee = $query->first();
 
         if (!$employee) {
-            return response()->json(['message' => 'Employee not found'], 404);
+            return response()->json(['message' => 'Zaposlenik nije pronađen'], 404);
         }
+
+        $employee = (array) $employee;
+        $fallbackName = null;
+        if (Schema::hasColumn('hrm_employees', 'first_name') || array_key_exists('first_name', $employee)) {
+            $fallbackName = trim(($employee['first_name'] ?? '') . ' ' . ($employee['last_name'] ?? ''));
+        }
+        $employee['name'] = $employee['user_name']
+            ?: ($fallbackName ?: null)
+            ?: ($employee['employee_id'] ?? null)
+            ?: ('Zaposlenik #' . $id);
+        $employee['email'] = $employee['user_email']
+            ?? $employee['email']
+            ?? null;
+        $employee['employee_number'] = $employee['employee_id'] ?? $employee['employee_number'] ?? null;
 
         return response()->json($employee);
     }
@@ -587,43 +647,37 @@ class HRMController extends Controller
     public function destroy($id)
     {
         $employee = DB::table('hrm_employees')->where('id', $id)->first();
-        
+
         if (!$employee) {
-            return response()->json(['message' => 'Employee not found'], 404);
+            return response()->json(['message' => 'Zaposlenik nije pronađen'], 404);
         }
 
-        // Check if table has deleted_at column for soft delete
-        $hasSoftDelete = DB::select("SHOW COLUMNS FROM hrm_employees LIKE 'deleted_at'");
-        
-        if (!empty($hasSoftDelete)) {
-            // Soft delete
-            DB::table('hrm_employees')
-                ->where('id', $id)
-                ->update(['deleted_at' => now()]);
-        } else {
-            // Hard delete - also delete associated user if cascade is not enabled
-            // Note: Foreign key constraint should handle this, but we'll be explicit
-            try {
-                DB::beginTransaction();
-                
-                // Delete employee record
-                DB::table('hrm_employees')->where('id', $id)->delete();
-                
-                // Delete user if no other employee references it
-                $userEmployeeCount = DB::table('hrm_employees')
-                    ->where('user_id', $employee->user_id)
-                    ->count();
-                
-                if ($userEmployeeCount === 0) {
-                    DB::table('users')->where('id', $employee->user_id)->delete();
-                }
-                
-                DB::commit();
-            } catch (\Exception $e) {
-                DB::rollBack();
-                Log::error('Error deleting employee: ' . $e->getMessage());
-                return response()->json(['message' => 'Greška pri brisanju zaposlenika: ' . $e->getMessage()], 500);
+        try {
+            DB::beginTransaction();
+
+            // Clear self-references (manager/mentor) so FK does not block delete
+            if (Schema::hasColumn('hrm_employees', 'manager_id')) {
+                DB::table('hrm_employees')->where('manager_id', $id)->update(['manager_id' => null]);
             }
+            if (Schema::hasColumn('hrm_employees', 'mentor_id')) {
+                DB::table('hrm_employees')->where('mentor_id', $id)->update(['mentor_id' => null]);
+            }
+
+            if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
+                DB::table('hrm_employees')
+                    ->where('id', $id)
+                    ->update(['deleted_at' => now(), 'updated_at' => now()]);
+            } else {
+                DB::table('hrm_employees')->where('id', $id)->delete();
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Error deleting employee: ' . $e->getMessage(), ['employee_id' => $id]);
+            return response()->json([
+                'message' => 'Greška pri brisanju zaposlenika. Provjerite da li postoje povezani zapisi.',
+            ], 500);
         }
 
         return response()->json(['message' => 'Zaposlenik je uspješno obrisan']);
@@ -694,7 +748,11 @@ class HRMController extends Controller
         try {
             $departments = DB::table('hrm_departments')
                 ->select('hrm_departments.*')
-                ->selectRaw('(SELECT COUNT(*) FROM hrm_employees WHERE hrm_employees.department_id = hrm_departments.id) as employees_count')
+                ->selectRaw(
+                    Schema::hasColumn('hrm_employees', 'deleted_at')
+                        ? "(SELECT COUNT(*) FROM hrm_employees WHERE hrm_employees.department_id = hrm_departments.id AND hrm_employees.deleted_at IS NULL) as employees_count"
+                        : "(SELECT COUNT(*) FROM hrm_employees WHERE hrm_employees.department_id = hrm_departments.id) as employees_count"
+                )
                 ->selectRaw('(SELECT name FROM users WHERE users.id = hrm_departments.manager_id) as manager_name')
                 ->selectRaw('(SELECT name FROM hrm_departments parent WHERE parent.id = hrm_departments.parent_department_id) as parent_department_name')
                 ->orderBy('hrm_departments.name', 'asc')
@@ -718,7 +776,11 @@ class HRMController extends Controller
         try {
             $department = DB::table('hrm_departments')
                 ->select('hrm_departments.*')
-                ->selectRaw('(SELECT COUNT(*) FROM hrm_employees WHERE hrm_employees.department_id = hrm_departments.id) as employees_count')
+                ->selectRaw(
+                    Schema::hasColumn('hrm_employees', 'deleted_at')
+                        ? "(SELECT COUNT(*) FROM hrm_employees WHERE hrm_employees.department_id = hrm_departments.id AND hrm_employees.deleted_at IS NULL) as employees_count"
+                        : "(SELECT COUNT(*) FROM hrm_employees WHERE hrm_employees.department_id = hrm_departments.id) as employees_count"
+                )
                 ->selectRaw('(SELECT name FROM users WHERE users.id = hrm_departments.manager_id) as manager_name')
                 ->selectRaw('(SELECT name FROM hrm_departments parent WHERE parent.id = hrm_departments.parent_department_id) as parent_department_name')
                 ->where('hrm_departments.id', $id)
@@ -808,7 +870,7 @@ class HRMController extends Controller
         }
 
         // Check if department has employees
-        $employeesCount = DB::table('hrm_employees')->where('department_id', $id)->count();
+        $employeesCount = $this->employeesQuery()->where('department_id', $id)->count();
         if ($employeesCount > 0) {
             return response()->json(['message' => 'Cannot delete department with employees'], 422);
         }

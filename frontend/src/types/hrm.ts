@@ -160,8 +160,14 @@ export interface EmploymentContractTemplate {
   job_role: JobRole;
   document_kind: ContractDocumentKind;
   template_file: string;
+  file_name?: string;
   output_format: 'docx' | 'pdf';
+  placeholder_keys?: string[] | null;
   is_active: boolean;
+  file_exists?: boolean;
+  file_size?: number | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EmploymentContract {

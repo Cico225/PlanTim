@@ -1,0 +1,13 @@
+{
+  "name": "plantim-test-uputstvo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node capture-and-make-pdf.mjs",
+    "pdf": "node capture-and-make-pdf.mjs --pdf-only"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "playwright": "^1.49.0"
+  }
+}

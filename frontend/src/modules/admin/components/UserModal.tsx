@@ -16,33 +16,54 @@ export default function UserModal({ user, onClose, onSuccess }: UserModalProps) 
     password: '',
     phone: '',
     is_active: true,
-    role: 'employee',
+    role: '',
   });
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
 
   useEffect(() => {
-    if (user) {
-      setFormData({
-        name: user.name || '',
-        email: user.email || '',
-        password: '',
-        phone: user.phone || '',
-        is_active: user.is_active ?? true,
-        role: user.roles?.[0] || 'employee',
-      });
-    }
-    fetchRoles();
-  }, [user]);
+    let cancelled = false;
 
-  const fetchRoles = async () => {
-    try {
-      const data = await apiService.get('/admin/roles');
-      setRoles(data);
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-    }
-  };
+    const load = async () => {
+      try {
+        const data = await apiService.get<any[]>('/admin/roles');
+        if (!cancelled) setRoles(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+      }
+
+      if (cancelled) return;
+
+      if (user) {
+        const currentRole =
+          typeof user.roles?.[0] === 'string'
+            ? user.roles[0]
+            : user.roles?.[0]?.name || '';
+        setFormData({
+          name: user.name || '',
+          email: user.email || '',
+          password: '',
+          phone: user.phone || '',
+          is_active: user.is_active ?? true,
+          role: currentRole,
+        });
+      } else {
+        setFormData({
+          name: '',
+          email: '',
+          password: '',
+          phone: '',
+          is_active: true,
+          role: '',
+        });
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

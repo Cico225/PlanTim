@@ -66,14 +66,10 @@ class ApiService {
                 '/app-version', 
                 '/inbox/can-send', 
                 '/inbox/unread-count',
-                '/hrm/', // HRM endpoints might not all be implemented yet
               ];
               const shouldSilence = silentEndpoints.some(ep => error.config?.url?.includes(ep));
               if (!shouldSilence && error.config?.url) {
-                // Only show error if it's not a silent endpoint
                 console.warn('404 error for:', error.config.url);
-                // Don't show toast - just log to console to avoid annoying users
-                // toast.error('Resurs nije pronađen.');
               }
               break;
 

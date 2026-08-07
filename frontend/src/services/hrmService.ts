@@ -120,8 +120,43 @@ export const createContract = (data: Partial<HRContract>) =>
 // ============================================
 // EMPLOYMENT CONTRACTS
 // ============================================
-export const getEmploymentContractTemplates = () =>
-  apiService.get<EmploymentContractTemplate[]>('/hrm/contracts/templates');
+export const getEmploymentContractTemplates = (includeInactive = false) =>
+  apiService.get<EmploymentContractTemplate[]>('/hrm/contracts/templates', {
+    include_inactive: includeInactive ? 1 : 0,
+  });
+
+export const uploadEmploymentContractTemplate = (
+  formData: FormData,
+  onProgress?: (progress: number) => void
+) =>
+  apiService.upload<{ message: string; template: EmploymentContractTemplate }>(
+    '/hrm/contracts/templates',
+    formData,
+    onProgress
+  );
+
+export const replaceEmploymentContractTemplateFile = (
+  id: number,
+  formData: FormData,
+  onProgress?: (progress: number) => void
+) =>
+  apiService.upload<{ message: string; template: EmploymentContractTemplate }>(
+    `/hrm/contracts/templates/${id}/file`,
+    formData,
+    onProgress
+  );
+
+export const downloadEmploymentContractTemplate = (id: number, filename?: string) =>
+  apiService.download(`/hrm/contracts/templates/${id}/download`, filename || `sablon-${id}`);
+
+export const updateEmploymentContractTemplate = (
+  id: number,
+  data: Partial<Pick<EmploymentContractTemplate, 'name' | 'legal_entity' | 'job_role' | 'document_kind' | 'output_format' | 'is_active'>>
+) =>
+  apiService.put<{ message: string; template: EmploymentContractTemplate }>(
+    `/hrm/contracts/templates/${id}`,
+    data
+  );
 
 export const getEmploymentContractSettings = () =>
   apiService.get<EmploymentContractSettings>('/hrm/contracts/settings');
@@ -143,6 +178,27 @@ export const createEmploymentContract = (data: Record<string, unknown>) =>
 
 export const updateEmploymentContract = (id: number, data: Record<string, unknown>) =>
   apiService.put<EmploymentContract>(`/hrm/contracts/${id}`, data);
+
+export const bulkUpdateEmploymentContracts = (data: {
+  ids: number[];
+  employment_term?: 'indefinite' | 'fixed';
+  duration_months?: number;
+  duration_from?: 'work_start' | 'effective' | 'today';
+  status?: string;
+  auto_renew?: boolean;
+  renewal_notice_days?: number;
+  expiry_date?: string;
+  work_end_date?: string;
+  salary_gross?: number;
+  salary_net?: number;
+  store_id?: number;
+  notes?: string;
+  generate_document?: boolean;
+}) =>
+  apiService.post<{ message: string; updated: number; failed: Array<{ id: number; message: string }> }>(
+    '/hrm/contracts/bulk-update',
+    data
+  );
 
 export const renewEmploymentContract = (id: number, data: Record<string, unknown>) =>
   apiService.post<EmploymentContract>(`/hrm/contracts/${id}/renew`, data);

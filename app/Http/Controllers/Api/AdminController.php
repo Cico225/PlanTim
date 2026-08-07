@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class AdminController extends Controller
 {
@@ -46,8 +47,10 @@ class AdminController extends Controller
         // Transform users to include roles as array of names
         $users->getCollection()->transform(function ($user) {
             $userArray = $user->toArray();
-            $userArray['roles'] = $user->getRoleNames()->toArray();
-            $userArray['permissions'] = $user->getAllPermissions()->pluck('name')->toArray();
+            // Always expose role names as plain strings (not role objects)
+            $roleNames = $user->getRoleNames()->values()->all();
+            $userArray['roles'] = array_map('strval', $roleNames);
+            $userArray['permissions'] = $user->getAllPermissions()->pluck('name')->values()->all();
             return $userArray;
         });
 
@@ -118,6 +121,8 @@ class AdminController extends Controller
             'email' => 'required|email|unique:users,email,' . $id,
             'password' => 'nullable|string|min:8',
             'is_active' => 'boolean',
+            'role' => 'nullable|string|exists:roles,name',
+            'phone' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -135,28 +140,43 @@ class AdminController extends Controller
             $updateData['password'] = Hash::make($request->input('password'));
         }
 
+        if ($request->has('phone') && Schema::hasColumn('users', 'phone')) {
+            $updateData['phone'] = $request->input('phone');
+        }
+
         DB::table('users')->where('id', $id)->update($updateData);
 
-        $user = DB::table('users')->find($id);
+        $userModel = \App\Models\User::findOrFail($id);
+
+        // Keep edit-user and assign-role in sync
+        if ($request->filled('role')) {
+            $userModel->syncRoles([$request->input('role')]);
+            app()[PermissionRegistrar::class]->forgetCachedPermissions();
+        }
 
         // Log activity
         if (auth()->check()) {
-            $userModel = \App\Models\User::find($id);
-            if ($userModel) {
-                activity('user')
-                    ->causedBy(auth()->user())
-                    ->performedOn($userModel)
-                    ->withProperties([
-                        'name' => $request->input('name'),
-                        'email' => $request->input('email'),
-                        'is_active' => $request->input('is_active', true),
-                        'password_changed' => $request->has('password') && $request->input('password'),
-                    ])
-                    ->log('updated user');
-            }
+            activity('user')
+                ->causedBy(auth()->user())
+                ->performedOn($userModel)
+                ->withProperties([
+                    'name' => $request->input('name'),
+                    'email' => $request->input('email'),
+                    'is_active' => $request->input('is_active', true),
+                    'role' => $request->input('role'),
+                    'password_changed' => $request->has('password') && $request->input('password'),
+                ])
+                ->log('updated user');
         }
 
-        return response()->json($user);
+        return response()->json([
+            'id' => $userModel->id,
+            'name' => $userModel->name,
+            'email' => $userModel->email,
+            'is_active' => (bool) $userModel->is_active,
+            'roles' => $userModel->getRoleNames()->toArray(),
+            'permissions' => $userModel->getAllPermissions()->pluck('name')->toArray(),
+        ]);
     }
 
     /**
@@ -258,7 +278,10 @@ class AdminController extends Controller
         }
 
         // Create role with is_system = false by default (user-created roles)
-        $roleData = ['name' => $request->input('name')];
+        $roleData = [
+            'name' => $request->input('name'),
+            'guard_name' => 'web',
+        ];
         
         // Only add is_system if column exists
         if (Schema::hasColumn('roles', 'is_system')) {
@@ -302,7 +325,11 @@ class AdminController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $role = Role::findById($id);
+        // Use find() — findById() also filters by current guard and fails under Sanctum API auth
+        $role = Role::find($id);
+        if (!$role) {
+            return response()->json(['message' => 'Uloga nije pronađena.'], 404);
+        }
         
         // Protect system roles from name changes (only if is_system column exists)
         if (Schema::hasColumn('roles', 'is_system')) {
@@ -321,6 +348,8 @@ class AdminController extends Controller
         if ($request->has('permissions')) {
             $role->syncPermissions($request->input('permissions'));
         }
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Log activity
         if (auth()->check()) {
@@ -346,32 +375,52 @@ class AdminController extends Controller
      */
     public function deleteRole($id)
     {
-        $role = Role::findById($id);
+        // Use find() — findById() also filters by current guard and fails under Sanctum API auth
+        $role = Role::find($id);
+        if (!$role) {
+            return response()->json(['message' => 'Uloga nije pronađena.'], 404);
+        }
         
         // Protect system roles from deletion (only if is_system column exists)
         if (Schema::hasColumn('roles', 'is_system')) {
             if (isset($role->is_system) && $role->is_system) {
                 return response()->json([
-                    'message' => 'Cannot delete system role. System roles are protected.'
+                    'message' => 'Sistem uloge ne mogu biti obrisane.'
                 ], 422);
             }
         }
         
-        // Check if role is in use
-        $usersCount = $role->users()->count();
+        // Check if role is in use (same source as getRoles list)
+        $usersCount = DB::table('model_has_roles')
+            ->where('role_id', $role->id)
+            ->where('model_type', 'App\\Models\\User')
+            ->count();
         if ($usersCount > 0) {
             return response()->json([
-                'message' => "Cannot delete role. It is assigned to {$usersCount} user(s)."
+                'message' => "Uloga se ne može obrisati. Dodijeljena je {$usersCount} korisniku/korisnicima."
             ], 422);
         }
 
-        // Get role data before deletion for logging
         $roleName = $role->name;
         $roleId = $role->id;
 
-        $role->delete();
+        try {
+            DB::transaction(function () use ($role) {
+                $role->syncPermissions([]);
+                if (Schema::hasTable('role_module_permissions')) {
+                    DB::table('role_module_permissions')->where('role_id', $role->id)->delete();
+                }
+                $role->delete();
+            });
+        } catch (\Throwable $e) {
+            \Log::error('Error deleting role: ' . $e->getMessage(), ['role_id' => $roleId]);
+            return response()->json([
+                'message' => 'Greška pri brisanju uloge. Provjerite da li je uloga još uvijek u upotrebi.',
+            ], 500);
+        }
 
-        // Log activity
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
         if (auth()->check()) {
             activity('role')
                 ->causedBy(auth()->user())
@@ -382,7 +431,7 @@ class AdminController extends Controller
                 ->log('deleted role');
         }
 
-        return response()->json(['message' => 'Role deleted successfully']);
+        return response()->json(['message' => 'Uloga uspješno obrisana']);
     }
 
     /**
