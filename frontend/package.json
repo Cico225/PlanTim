@@ -1,7 +1,7 @@
 {
     "name": "plantim-frontend",
     "private": true,
-    "version": "1.2.12",
+    "version": "1.2.13",
     "type": "module",
     "description": "PlanTim Frontend - React Application",
     "scripts": {
@@ -24,6 +24,7 @@
         "framer-motion": "^11.0.0",
         "i18next": "^23.8.0",
         "lucide-react": "^0.562.0",
+        "pdfjs-dist": "^4.10.38",
         "react": "^18.3.1",
         "react-beautiful-dnd": "^13.1.1",
         "react-dom": "^18.3.1",

@@ -16,6 +16,9 @@ export interface FinanceCredit {
   zabrana_verified_by_name: string | null;
   registrar_number: string | null;
   notes: string | null;
+  has_zabrana_scan?: boolean;
+  zabrana_scan_name?: string | null;
+  zabrana_scan_url?: string | null;
   is_paired: boolean;
   created_at: string | null;
   updated_at: string | null;

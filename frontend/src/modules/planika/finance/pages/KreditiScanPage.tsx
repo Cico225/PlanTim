@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { FiCheck, FiSearch, FiCamera, FiCameraOff, FiX, FiRotateCcw } from 'react-icons/fi';
+import {
+  FiCheck,
+  FiSearch,
+  FiCamera,
+  FiCameraOff,
+  FiX,
+  FiRotateCcw,
+  FiFileText,
+  FiUpload,
+} from 'react-icons/fi';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { createWorker, type Worker } from 'tesseract.js';
 import { kreditiService } from '@/services/kreditiService';
@@ -10,8 +19,24 @@ import {
   isValidCreditNumber,
   normalizeCreditNumber,
 } from '../utils/creditNumber';
+import { ocrZabranaPdfs, type PdfOcrProgress } from '../utils/pdfZabranaOcr';
 
 const EXAMPLE_CREDIT_NUMBER = '26-4002-13-01357';
+
+type PdfQueueItem = {
+  id: string;
+  file: File;
+  fileName: string;
+  pageIndex: number;
+  pageCount: number;
+  creditNumbers: string[];
+  selectedNumber: string | null;
+  credit: FinanceCredit | null;
+  status: 'pending' | 'found' | 'not_found' | 'error' | 'paired';
+  message?: string;
+  selected: boolean;
+  ocrPreview?: string;
+};
 
 export default function KreditiScanPage() {
   const [manualNumber, setManualNumber] = useState('');
@@ -22,12 +47,20 @@ export default function KreditiScanPage() {
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [pdfQueue, setPdfQueue] = useState<PdfQueueItem[]>([]);
+  const [pdfProcessing, setPdfProcessing] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<PdfOcrProgress | null>(null);
+  const [bulkRegistrar, setBulkRegistrar] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [activePdfItemId, setActivePdfItemId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const registrarRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const scannerControlsRef = useRef<{ stop: () => void } | null>(null);
   const ocrWorkerRef = useRef<Worker | null>(null);
   const scanLockRef = useRef(false);
+  const pdfFilesRef = useRef<Map<string, File>>(new Map());
 
   const stopCamera = useCallback(() => {
     scannerControlsRef.current?.stop();
@@ -50,6 +83,7 @@ export default function KreditiScanPage() {
     }
     setLoading(true);
     setCredit(null);
+    setActivePdfItemId(null);
     try {
       const res = await kreditiService.lookup(n);
       if (res.found && res.credit) {
@@ -72,6 +106,127 @@ export default function KreditiScanPage() {
       setCredit(null);
     } finally {
       setLoading(false);
+    }
+  }, [stopCamera]);
+
+  const handlePdfFiles = useCallback(async (fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    const files = Array.from(fileList).filter((f) =>
+      f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    );
+    if (!files.length) {
+      toast.error('Odaberite PDF skenove zabrana');
+      return;
+    }
+
+    stopCamera();
+    setCredit(null);
+    setActivePdfItemId(null);
+    setPdfProcessing(true);
+    setPdfProgress(null);
+    setPdfQueue([]);
+    pdfFilesRef.current = new Map();
+
+    try {
+      const pages = await ocrZabranaPdfs(files, setPdfProgress);
+      const items: PdfQueueItem[] = [];
+      const seenCreditIds = new Set<number>();
+
+      for (const page of pages) {
+        const file = files.find((f) => f.name === page.fileName) ?? files[0];
+
+        if (!page.creditNumbers.length) {
+          const id = `${page.fileName}::p${page.pageIndex}::empty::${Math.random().toString(36).slice(2, 8)}`;
+          pdfFilesRef.current.set(id, file);
+          items.push({
+            id,
+            file,
+            fileName: page.fileName,
+            pageIndex: page.pageIndex,
+            pageCount: page.pageCount,
+            creditNumbers: [],
+            selectedNumber: null,
+            credit: null,
+            status: 'not_found',
+            message: 'Nijedan broj kredita (yy-xxxx-xx-xxxxx) nije prepoznat na stranici',
+            selected: false,
+            ocrPreview: page.rawTextPreview || undefined,
+          });
+          continue;
+        }
+
+        // Jedna stranica / tabela može imati više zabrana (više Br. kredita)
+        for (const number of page.creditNumbers) {
+          const id = `${page.fileName}::p${page.pageIndex}::${number}`;
+          pdfFilesRef.current.set(id, file);
+
+          try {
+            const res = await kreditiService.lookup(number);
+            if (res.found && res.credit) {
+              if (seenCreditIds.has(res.credit.id)) {
+                continue;
+              }
+              seenCreditIds.add(res.credit.id);
+              items.push({
+                id,
+                file,
+                fileName: page.fileName,
+                pageIndex: page.pageIndex,
+                pageCount: page.pageCount,
+                creditNumbers: [number],
+                selectedNumber: number,
+                credit: res.credit,
+                status: res.credit.is_paired ? 'paired' : 'found',
+                message: res.credit.is_paired ? 'Već uparen' : undefined,
+                selected: !res.credit.is_paired,
+              });
+            } else {
+              items.push({
+                id,
+                file,
+                fileName: page.fileName,
+                pageIndex: page.pageIndex,
+                pageCount: page.pageCount,
+                creditNumbers: [number],
+                selectedNumber: number,
+                credit: null,
+                status: 'not_found',
+                message: `Broj ${number} nije u bazi kredita`,
+                selected: false,
+              });
+            }
+          } catch {
+            items.push({
+              id,
+              file,
+              fileName: page.fileName,
+              pageIndex: page.pageIndex,
+              pageCount: page.pageCount,
+              creditNumbers: [number],
+              selectedNumber: number,
+              credit: null,
+              status: 'not_found',
+              message: `Broj ${number} nije u bazi kredita`,
+              selected: false,
+            });
+          }
+        }
+      }
+
+      setPdfQueue(items);
+      const found = items.filter((i) => i.status === 'found').length;
+      const notFound = items.filter((i) => i.status === 'not_found').length;
+      const paired = items.filter((i) => i.status === 'paired').length;
+      toast.success(
+        `Prepoznato kredita: ${found + paired + notFound} (za upariti ${found}, već upareni ${paired}, van baze/OCR ${notFound})`
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Greška pri OCR PDF-a';
+      toast.error(message);
+    } finally {
+      setPdfProcessing(false);
+      setPdfProgress(null);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
     }
   }, [stopCamera]);
 
@@ -99,6 +254,7 @@ export default function KreditiScanPage() {
     setRegistrarNumber('');
     setNotes('');
     setShowNotes(false);
+    setActivePdfItemId(null);
     scanLockRef.current = false;
     startCamera();
   }, [startCamera]);
@@ -220,6 +376,20 @@ export default function KreditiScanPage() {
     return () => window.clearTimeout(t);
   }, [credit]);
 
+  const openPdfItem = (item: PdfQueueItem) => {
+    if (!item.credit) {
+      toast.error(item.message || 'Kredit nije pronađen');
+      return;
+    }
+    stopCamera();
+    setActivePdfItemId(item.id);
+    setCredit(item.credit);
+    setManualNumber(item.selectedNumber ?? item.credit.credit_number);
+    setRegistrarNumber(item.credit.registrar_number ?? '');
+    setNotes(item.credit.notes ?? '');
+    setShowNotes(Boolean(item.credit.notes));
+  };
+
   const handleUnpair = async () => {
     if (!credit?.is_paired) return;
     if (!window.confirm('Vratiti ovu zabranu u status neupareno?')) return;
@@ -228,7 +398,19 @@ export default function KreditiScanPage() {
     try {
       await kreditiService.unpairZabrana(credit.id);
       toast.success('Zabrana vraćena u neuparene');
-      prepareNextScan();
+      if (activePdfItemId) {
+        setPdfQueue((prev) =>
+          prev.map((i) =>
+            i.id === activePdfItemId
+              ? { ...i, status: 'found', credit: { ...i.credit!, is_paired: false }, selected: true, message: undefined }
+              : i
+          )
+        );
+        setCredit(null);
+        setActivePdfItemId(null);
+      } else {
+        prepareNextScan();
+      }
     } catch {
       toast.error('Greška pri vraćanju u neuparene');
     } finally {
@@ -244,13 +426,42 @@ export default function KreditiScanPage() {
     }
     setSaving(true);
     try {
+      const pdfItem = activePdfItemId
+        ? pdfQueue.find((i) => i.id === activePdfItemId)
+        : null;
       const res = await kreditiService.verifyZabrana(credit.id, {
         registrar_number: registrarNumber.trim(),
         notes: notes.trim() || undefined,
+        scan: pdfItem?.file,
+        scan_page: pdfItem?.pageIndex,
       });
       setCredit(res.credit);
-      toast.success('Zabrana uparena — skenirajte sljedeći kredit');
-      prepareNextScan();
+      toast.success(pdfItem ? 'Zabrana uparena (sken sačuvan)' : 'Zabrana uparena — skenirajte sljedeći kredit');
+
+      if (pdfItem) {
+        const remaining = pdfQueue.filter(
+          (i) => i.id !== pdfItem.id && i.status === 'found'
+        );
+        const next =
+          remaining.find((i) => i.selected) ?? remaining[0] ?? null;
+
+        setPdfQueue((prev) =>
+          prev.map((i) =>
+            i.id === pdfItem.id
+              ? { ...i, status: 'paired', credit: res.credit, selected: false, message: 'Upareno' }
+              : i
+          )
+        );
+
+        if (next?.credit) {
+          openPdfItem(next);
+        } else {
+          setCredit(null);
+          setActivePdfItemId(null);
+        }
+      } else {
+        prepareNextScan();
+      }
     } catch {
       toast.error('Greška pri evidentiranju zabrane');
     } finally {
@@ -258,12 +469,70 @@ export default function KreditiScanPage() {
     }
   };
 
+  const handleBulkPairFromPdf = async () => {
+    const selected = pdfQueue.filter((i) => i.selected && i.credit && i.status === 'found');
+    if (!selected.length) {
+      toast.error('Odaberite barem jednu pronađenu zabranu');
+      return;
+    }
+    if (!bulkRegistrar.trim()) {
+      toast.error('Broj registratora je obavezan');
+      return;
+    }
+
+    setBulkSaving(true);
+    let ok = 0;
+    let fail = 0;
+    try {
+      for (const item of selected) {
+        if (!item.credit) continue;
+        try {
+          const res = await kreditiService.verifyZabrana(item.credit.id, {
+            registrar_number: bulkRegistrar.trim(),
+            scan: item.file,
+            scan_page: item.pageIndex,
+          });
+          ok += 1;
+          setPdfQueue((prev) =>
+            prev.map((i) =>
+              i.id === item.id
+                ? { ...i, status: 'paired', credit: res.credit, selected: false, message: 'Upareno' }
+                : i
+            )
+          );
+        } catch {
+          fail += 1;
+        }
+      }
+      if (ok) toast.success(`Upareno ${ok} zabrana`);
+      if (fail) toast.error(`Neuspješno: ${fail}`);
+      setBulkRegistrar('');
+      setCredit(null);
+      setActivePdfItemId(null);
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const resetForNext = () => {
+    if (activePdfItemId) {
+      setCredit(null);
+      setActivePdfItemId(null);
+      return;
+    }
     prepareNextScan();
   };
 
   const formatAmount = (amount: number | null, currency: string) =>
     amount != null ? `${Number(amount).toLocaleString('bs-BA')} ${currency}` : '—';
+
+  const progressLabel = pdfProgress
+    ? pdfProgress.phase === 'done'
+      ? 'Završeno'
+      : pdfProgress.phase === 'loading'
+        ? `Učitavanje: ${pdfProgress.fileName}`
+        : `OCR: ${pdfProgress.fileName} — stranica ${pdfProgress.pageIndex}/${pdfProgress.pageCount}`
+    : null;
 
   if (credit) {
     return (
@@ -288,6 +557,12 @@ export default function KreditiScanPage() {
               <FiX size={20} />
             </button>
           </div>
+
+          {activePdfItemId && (
+            <p className="mt-2 text-xs text-gray-500">
+              PDF sken — stranica {pdfQueue.find((i) => i.id === activePdfItemId)?.pageIndex}
+            </p>
+          )}
 
           <p className="mt-3 text-xs font-medium uppercase tracking-wide text-gray-500">Broj kredita</p>
           <p className="break-all font-mono text-2xl font-bold leading-tight text-gray-900 dark:text-white sm:text-3xl">
@@ -386,7 +661,7 @@ export default function KreditiScanPage() {
             className="mt-2 w-full py-1 text-center text-xs text-gray-500 sm:hidden"
             onClick={resetForNext}
           >
-            Sljedeći kredit
+            {activePdfItemId ? 'Nazad na listu PDF' : 'Sljedeći kredit'}
           </button>
           </div>
         </div>
@@ -395,7 +670,7 @@ export default function KreditiScanPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg">
+    <div className="mx-auto max-w-lg space-y-3">
       <div className="card p-3 sm:p-4">
         <h2 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">Skeniranje kredita</h2>
         <p className="mt-1 hidden text-sm text-gray-600 dark:text-gray-400 sm:block">
@@ -458,6 +733,126 @@ export default function KreditiScanPage() {
         </div>
 
         {loading && <p className="mt-2 text-center text-xs text-gray-500">Pretraga…</p>}
+      </div>
+
+      <div className="card p-3 sm:p-4">
+        <div className="flex items-start gap-2">
+          <FiFileText className="mt-0.5 shrink-0 text-primary-600" size={18} />
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Upload skeniranih zabrana (PDF)</h3>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              Jedan ili više PDF fajlova. Na stranici može biti <strong>više kredita</strong> (kolona
+              „Br. kredita”, format <span className="font-mono">yy-xxxx-xx-xxxxx</span>, npr.{' '}
+              <span className="font-mono">26-3004-13-01654</span>). Svi se izvlače i uparuju postojećom logikom.
+            </p>
+          </div>
+        </div>
+
+        <input
+          ref={pdfInputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          multiple
+          className="hidden"
+          onChange={(e) => void handlePdfFiles(e.target.files)}
+        />
+
+        <button
+          type="button"
+          className="btn-primary mt-3 flex w-full items-center justify-center gap-2 py-2.5 touch-manipulation"
+          disabled={pdfProcessing}
+          onClick={() => pdfInputRef.current?.click()}
+        >
+          <FiUpload />
+          {pdfProcessing ? 'Obrada PDF…' : 'Odaberi PDF skenove'}
+        </button>
+
+        {pdfProcessing && progressLabel && (
+          <p className="mt-2 text-center text-xs text-gray-500">{progressLabel}</p>
+        )}
+
+        {pdfQueue.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                className="input flex-1 py-2 text-sm"
+                placeholder="Broj registratora za odabrane *"
+                value={bulkRegistrar}
+                onChange={(e) => setBulkRegistrar(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-primary shrink-0 px-3 py-2 text-sm"
+                disabled={bulkSaving || !bulkRegistrar.trim()}
+                onClick={() => void handleBulkPairFromPdf()}
+              >
+                Upari odabrane
+              </button>
+            </div>
+
+            <ul className="max-h-[40vh] space-y-1.5 overflow-y-auto">
+              {pdfQueue.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-start gap-2 rounded-lg border border-gray-200 p-2 text-sm dark:border-dark-600"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={item.selected}
+                    disabled={item.status !== 'found'}
+                    onChange={(e) =>
+                      setPdfQueue((prev) =>
+                        prev.map((i) =>
+                          i.id === item.id ? { ...i, selected: e.target.checked } : i
+                        )
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => openPdfItem(item)}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {item.fileName} · str. {item.pageIndex}/{item.pageCount}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          item.status === 'found'
+                            ? 'bg-amber-100 text-amber-800'
+                            : item.status === 'paired'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {item.status === 'found'
+                          ? 'Pronađen'
+                          : item.status === 'paired'
+                            ? 'Uparen'
+                            : 'Nije pronađen'}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 font-mono text-xs text-gray-700 dark:text-gray-300">
+                      {item.selectedNumber ?? (item.creditNumbers.join(', ') || '—')}
+                    </p>
+                    {(item.credit?.customer_name || item.message) && (
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {item.credit?.customer_name ?? item.message}
+                      </p>
+                    )}
+                    {item.ocrPreview && item.status === 'not_found' && (
+                      <p className="mt-1 line-clamp-2 text-[10px] text-gray-400" title={item.ocrPreview}>
+                        OCR: {item.ocrPreview}
+                      </p>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
