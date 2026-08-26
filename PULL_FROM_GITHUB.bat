@@ -147,15 +147,21 @@ echo [4/7] Frontend build (vite)...
 cd /d "%PROJECT_DIR%\frontend"
 taskkill /F /IM node.exe >nul 2>&1
 
-if not exist "node_modules\vite" (
+echo Instalacija npm paketa (uvijek, zbog novih dependencyja)...
+if exist "package-lock.json" (
     call npm ci
-    if errorlevel 1 call npm install
     if errorlevel 1 (
-        echo GRESKA: npm install nije uspio.
-        cd /d "%PROJECT_DIR%"
-        pause
-        exit /b 1
+        echo npm ci nije uspio, pokusavam npm install...
+        call npm install
     )
+) else (
+    call npm install
+)
+if errorlevel 1 (
+    echo GRESKA: npm install nije uspio.
+    cd /d "%PROJECT_DIR%"
+    pause
+    exit /b 1
 )
 
 call npx vite build
