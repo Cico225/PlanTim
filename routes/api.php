@@ -731,6 +731,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/krediti/bulk-delete', [PlanikaFinanceController::class, 'bulkDeleteKrediti']);
         Route::post('/krediti/{id}/verify-zabrana', [PlanikaFinanceController::class, 'verifyZabrana']);
         Route::post('/krediti/{id}/unpair-zabrana', [PlanikaFinanceController::class, 'unpairZabrana']);
+        Route::get('/krediti/{id}/zabrana-scan', [PlanikaFinanceController::class, 'getZabranaScan']);
         Route::delete('/krediti/{id}', [PlanikaFinanceController::class, 'deleteKredit']);
 
         // Spiskovi aktivnih ugovora — firme

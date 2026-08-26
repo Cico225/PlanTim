@@ -27,6 +27,10 @@ class FinanceCredit extends Model
         'zabrana_verified_by',
         'registrar_number',
         'notes',
+        'zabrana_scan_path',
+        'zabrana_scan_name',
+        'zabrana_scan_mime',
+        'zabrana_scan_size',
         'created_by',
         'updated_by',
     ];

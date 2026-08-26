@@ -1,0 +1,17 @@
+﻿import { chromium } from 'playwright';
+const BASE = 'https://localhost:5173';
+const browser = await chromium.launch({ headless: true });
+const page = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
+page.on('console', m => console.log('console:', m.type(), m.text()));
+page.on('response', r => { if (r.url().includes('/api') || r.url().includes('login')) console.log('resp', r.status(), r.url()); });
+await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
+await page.fill('input[type="email"]', 'admin@plantim.com');
+await page.fill('input[type="password"]', 'password');
+await page.click('button[type="submit"]');
+await page.waitForTimeout(5000);
+console.log('url', page.url());
+console.log('token', await page.evaluate(() => localStorage.getItem('token')?.slice(0,20)));
+await page.goto(BASE + '/admin', { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(2000);
+console.log('admin url', page.url());
+await browser.close();

@@ -44,7 +44,7 @@ const shots = [
 async function safeGoto(page, urlPath) {
   const url = `${BASE}${urlPath}`;
   try {
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(1200);
     return true;
   } catch (e) {
@@ -63,7 +63,9 @@ async function login(page) {
   await password.fill(PASSWORD);
   const submit = page.locator('button[type="submit"]').first();
   await submit.click();
-  await page.waitForTimeout(2500);
+  await page.waitForFunction(() => !!localStorage.getItem('token'), { timeout: 45000 }).catch(() => null);
+  await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 45000 }).catch(() => null);
+  await page.waitForTimeout(2000);
   // Terms modal ako postoji
   const accept = page.getByRole('button', { name: /prihvat|accept|slažem|continue|nastavi/i }).first();
   if (await accept.isVisible().catch(() => false)) {

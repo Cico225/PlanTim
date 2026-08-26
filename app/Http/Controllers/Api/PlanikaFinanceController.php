@@ -9,11 +9,14 @@ use App\Models\Planika\FinanceCredit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PlanikaFinanceController extends Controller
 {
+    private const ZABRANA_SCAN_FOLDER = 'planika_finance_zabrana_scans';
+
     // ==================== KREDITI ====================
 
     public function getKrediti(Request $request)
@@ -324,6 +327,7 @@ class PlanikaFinanceController extends Controller
         $currency = $credit->currency ?? 'BAM';
         $creditNumber = $credit->credit_number;
 
+        $this->deleteZabranaScanFile($credit);
         $credit->delete();
 
         return response()->json([
@@ -369,6 +373,7 @@ class PlanikaFinanceController extends Controller
 
         DB::transaction(function () use ($credits) {
             foreach ($credits as $credit) {
+                $this->deleteZabranaScanFile($credit);
                 $credit->delete();
             }
         });
@@ -383,6 +388,7 @@ class PlanikaFinanceController extends Controller
 
     /**
      * Evidentiranje ovjerene zabrane — broj registratora je obavezan.
+     * Opcionalno: skenirani PDF/slika zabrane (scan).
      */
     public function verifyZabrana(Request $request, int $id)
     {
@@ -391,24 +397,71 @@ class PlanikaFinanceController extends Controller
         $validator = Validator::make($request->all(), [
             'registrar_number' => 'required|string|max:100',
             'notes' => 'nullable|string|max:2000',
+            'scan' => 'nullable|file|mimes:pdf,jpeg,jpg,png,webp|max:51200',
+            'scan_page' => 'nullable|integer|min:1|max:500',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $credit->update([
+        $payload = [
             'zabrana_verified' => true,
             'zabrana_verified_at' => now(),
             'zabrana_verified_by' => $request->user()->id,
             'registrar_number' => trim((string) $request->input('registrar_number')),
             'notes' => $request->input('notes'),
             'updated_by' => $request->user()->id,
-        ]);
+        ];
+
+        if ($request->hasFile('scan') && Schema::hasColumn('planika_finance_krediti', 'zabrana_scan_path')) {
+            $this->deleteZabranaScanFile($credit);
+            $file = $request->file('scan');
+            $ext = strtolower($file->getClientOriginalExtension() ?: 'pdf');
+            $filename = 'credit_'.$credit->id.'_'.uniqid('scan_', true).'.'.$ext;
+            $path = $file->storeAs(self::ZABRANA_SCAN_FOLDER, $filename, 'public');
+
+            $payload['zabrana_scan_path'] = $path;
+            $payload['zabrana_scan_name'] = $file->getClientOriginalName();
+            $payload['zabrana_scan_mime'] = $file->getMimeType();
+            $payload['zabrana_scan_size'] = $file->getSize();
+
+            $additional = is_array($credit->additional_data) ? $credit->additional_data : [];
+            if ($request->filled('scan_page')) {
+                $additional['zabrana_scan_page'] = (int) $request->input('scan_page');
+            }
+            $payload['additional_data'] = $additional;
+        }
+
+        $credit->update($payload);
 
         return response()->json([
             'message' => 'Zabrana je uspješno uparena sa kreditom.',
             'credit' => $this->formatCredit($credit->fresh()),
+        ]);
+    }
+
+    /**
+     * Preuzimanje skenirane zabrane (PDF/slika) vezane za kredit.
+     */
+    public function getZabranaScan(int $id)
+    {
+        $credit = FinanceCredit::query()->findOrFail($id);
+
+        if (! Schema::hasColumn('planika_finance_krediti', 'zabrana_scan_path')) {
+            return response()->json(['message' => 'Skenovi zabrana nisu dostupni.'], 503);
+        }
+
+        $path = $credit->zabrana_scan_path;
+        if (! $path || ! Storage::disk('public')->exists($path)) {
+            return response()->json(['message' => 'Sken zabrane nije pronađen.'], 404);
+        }
+
+        $downloadName = $credit->zabrana_scan_name ?: basename($path);
+
+        return response()->file(Storage::disk('public')->path($path), [
+            'Content-Type' => $credit->zabrana_scan_mime ?: 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$downloadName.'"',
         ]);
     }
 
@@ -598,6 +651,9 @@ class PlanikaFinanceController extends Controller
             $verifiedBy = $user ? ($user->name ?? $user->email) : null;
         }
 
+        $hasScan = Schema::hasColumn('planika_finance_krediti', 'zabrana_scan_path')
+            && ! empty($credit->zabrana_scan_path);
+
         return [
             'id' => $credit->id,
             'credit_number' => $credit->credit_number,
@@ -616,10 +672,25 @@ class PlanikaFinanceController extends Controller
             'zabrana_verified_by_name' => $verifiedBy,
             'registrar_number' => $credit->registrar_number,
             'notes' => $credit->notes,
+            'has_zabrana_scan' => $hasScan,
+            'zabrana_scan_name' => $hasScan ? ($credit->zabrana_scan_name ?? null) : null,
+            'zabrana_scan_url' => $hasScan ? "/api/planika/finance/krediti/{$credit->id}/zabrana-scan" : null,
             'is_paired' => $credit->isPaired(),
             'created_at' => $credit->created_at?->toIso8601String(),
             'updated_at' => $credit->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function deleteZabranaScanFile(FinanceCredit $credit): void
+    {
+        if (! Schema::hasColumn('planika_finance_krediti', 'zabrana_scan_path')) {
+            return;
+        }
+
+        $path = $credit->zabrana_scan_path;
+        if ($path && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     private function kreditiTableExists(): bool

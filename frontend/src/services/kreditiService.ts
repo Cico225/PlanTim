@@ -50,9 +50,25 @@ export const kreditiService = {
 
   verifyZabrana(
     id: number,
-    data: { registrar_number: string; notes?: string }
+    data: {
+      registrar_number: string;
+      notes?: string;
+      scan?: File;
+      scan_page?: number;
+    }
   ): Promise<{ message: string; credit: FinanceCredit }> {
-    return apiService.post(`/planika/finance/krediti/${id}/verify-zabrana`, data);
+    if (data.scan) {
+      const fd = new FormData();
+      fd.append('registrar_number', data.registrar_number);
+      if (data.notes) fd.append('notes', data.notes);
+      fd.append('scan', data.scan);
+      if (data.scan_page != null) fd.append('scan_page', String(data.scan_page));
+      return apiService.upload(`/planika/finance/krediti/${id}/verify-zabrana`, fd);
+    }
+    return apiService.post(`/planika/finance/krediti/${id}/verify-zabrana`, {
+      registrar_number: data.registrar_number,
+      notes: data.notes,
+    });
   },
 
   unpairZabrana(id: number): Promise<{ message: string; credit: FinanceCredit }> {
