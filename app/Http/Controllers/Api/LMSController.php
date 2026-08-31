@@ -6032,6 +6032,10 @@ class LMSController extends Controller
     public function uploadCourseImage(Request $request)
     {
         try {
+            if (! $this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Access denied'], 403);
+            }
+
             $validator = Validator::make($request->all(), [
                 'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
             ]);
@@ -6067,6 +6071,10 @@ class LMSController extends Controller
     public function uploadLessonImage(Request $request)
     {
         try {
+            if (! $this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Access denied'], 403);
+            }
+
             $validator = Validator::make($request->all(), [
                 'image' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
             ]);
@@ -6102,6 +6110,10 @@ class LMSController extends Controller
     public function uploadLessonFile(Request $request)
     {
         try {
+            if (! $this->userCanManageLms($request->user())) {
+                return response()->json(['message' => 'Access denied'], 403);
+            }
+
             $validator = Validator::make($request->all(), [
                 'file' => 'required|file|mimes:jpeg,jpg,png,gif,webp,pdf|max:10240', // 10MB max, images and PDF
             ]);

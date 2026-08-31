@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AvatarUrlHelper;
+use App\Support\ModulePermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +24,12 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        if (! filter_var(env('ALLOW_PUBLIC_REGISTRATION', false), FILTER_VALIDATE_BOOLEAN)) {
+            return response()->json([
+                'message' => 'Registracija je onemogućena. Kontaktirajte administratora.',
+            ], 403);
+        }
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
@@ -54,6 +62,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->getRoleNames()->first() ?? 'user',
+                'roles' => $user->getRoleNames(),
                 'permissions' => $user->getAllPermissions()->pluck('name'),
             ],
         ], 201);
@@ -322,8 +331,11 @@ class AuthController extends Controller
 
         $role = 'user';
         $permissions = [];
+        $roles = collect(['user']);
         try {
-            $role = $user->getRoleNames()->first() ?? 'user';
+            $roleNames = $user->getRoleNames();
+            $role = $roleNames->first() ?? 'user';
+            $roles = $roleNames;
             $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
         } catch (\Throwable $e) {
             \Log::warning('Auth login: Failed to get roles/permissions', ['error' => $e->getMessage(), 'user_id' => $user->id]);
@@ -335,7 +347,10 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'avatar' => $user->avatar,
+                'avatar_url' => $this->avatarUrlForUser($user),
                 'role' => $role,
+                'roles' => $roles,
                 'permissions' => $permissions,
             ],
         ];
@@ -365,6 +380,7 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'avatar' => $user->avatar,
+            'avatar_url' => $user->avatar ? AvatarUrlHelper::signedUrl($user->id) : null,
             'locale' => $user->locale,
             'theme' => $user->theme,
             'role' => $user->getRoleNames()->first() ?? 'user', // Add role for backward compatibility
@@ -512,84 +528,24 @@ class AuthController extends Controller
     }
 
     /**
-     * Get user avatar
+     * Get user avatar (signed URL required).
      */
-    public function getAvatar(Request $request, $userId = null)
+    public function getAvatar(Request $request, $userId)
     {
-        \Log::info('Avatar: Endpoint called', [
-            'userId' => $userId,
-            'url' => $request->fullUrl(),
-            'method' => $request->method(),
-            'has_token_query' => $request->has('token'),
-            'has_bearer_token' => $request->bearerToken() !== null
-        ]);
-        
-        // Support token query parameter for img tag requests (can't send Bearer token in img src)
-        $token = $request->query('token') ?? $request->bearerToken();
-        
-        $currentUser = null;
-        if ($token) {
-            // Validate token and get user
-            try {
-                $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
-                if ($personalAccessToken && (!$personalAccessToken->expires_at || $personalAccessToken->expires_at > now())) {
-                    $currentUser = $personalAccessToken->tokenable;
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Avatar: Token validation failed', ['error' => $e->getMessage()]);
-            }
+        if (! $request->hasValidSignature()) {
+            abort(403, 'Invalid or expired avatar link.');
         }
-        
-        // Fallback to standard Bearer token authentication if no token in query
-        if (!$currentUser) {
-            try {
-                $currentUser = $request->user();
-            } catch (\Exception $e) {
-                \Log::warning('Avatar: User authentication failed', ['error' => $e->getMessage()]);
-            }
-        }
-        
-        // If no user authenticated, allow viewing own avatar (for public profiles)
-        $targetUserId = $userId ?? ($currentUser ? $currentUser->id : null);
-        
-        if (!$targetUserId) {
-            \Log::warning('Avatar: No target user ID', ['userId' => $userId, 'currentUser' => $currentUser?->id]);
-            abort(404);
-        }
-        
-        $user = User::find($targetUserId);
-        if (!$user) {
-            \Log::warning('Avatar: User not found', ['userId' => $targetUserId]);
-            abort(404);
-        }
-        
-        if (!$user->avatar) {
-            \Log::info('Avatar: User has no avatar', ['userId' => $targetUserId]);
+
+        $user = User::find($userId);
+        if (! $user || ! $user->avatar) {
             abort(404);
         }
 
-        // Build the correct path - avatar is stored relative to public disk
+        if (! Storage::disk('public')->exists($user->avatar)) {
+            abort(404);
+        }
+
         $avatarPath = Storage::disk('public')->path($user->avatar);
-        
-        \Log::info('Avatar: Checking file', [
-            'userId' => $targetUserId,
-            'avatar_db_path' => $user->avatar,
-            'full_path' => $avatarPath,
-            'exists' => file_exists($avatarPath),
-            'storage_exists' => Storage::disk('public')->exists($user->avatar)
-        ]);
-        
-        if (!Storage::disk('public')->exists($user->avatar)) {
-            \Log::error('Avatar: File not found in storage', [
-                'userId' => $targetUserId,
-                'avatar_db_path' => $user->avatar,
-                'full_path' => $avatarPath,
-                'storage_path' => Storage::disk('public')->path($user->avatar)
-            ]);
-            abort(404);
-        }
-
-        // Detect content type from file extension
         $extension = strtolower(pathinfo($avatarPath, PATHINFO_EXTENSION));
         $contentTypes = [
             'jpg' => 'image/jpeg',
@@ -600,19 +556,19 @@ class AuthController extends Controller
         ];
         $contentType = $contentTypes[$extension] ?? 'image/png';
 
-        \Log::info('Avatar: Returning file', [
-            'userId' => $targetUserId,
-            'avatar_path' => $user->avatar,
-            'content_type' => $contentType,
-            'file_size' => filesize($avatarPath)
-        ]);
-
         return response()->file($avatarPath, [
             'Content-Type' => $contentType,
             'Cache-Control' => 'private, max-age=3600',
-            'Access-Control-Allow-Origin' => '*',
-            'Access-Control-Allow-Methods' => 'GET',
         ]);
+    }
+
+    private function avatarUrlForUser(?User $user): ?string
+    {
+        if (! $user || ! $user->avatar) {
+            return null;
+        }
+
+        return AvatarUrlHelper::signedUrl($user->id);
     }
 
     /**
@@ -625,12 +581,7 @@ class AuthController extends Controller
             $targetUserId = $userId ?? $currentUser->id;
             
             // Check if admin is viewing another user's profile
-            $isAdminView = false;
-            try {
-                $isAdminView = $userId !== null && $currentUser->hasRole('admin');
-            } catch (\Exception $e) {
-                // If hasRole fails, assume not admin
-            }
+            $isAdminView = $userId !== null && ModulePermissionHelper::isAdmin($currentUser);
             
             $canView = ($targetUserId == $currentUser->id) || $isAdminView;
             
@@ -709,6 +660,7 @@ class AuthController extends Controller
                 'username' => $user->email, // Username is email
                 'phone' => $user->phone ?? null,
                 'avatar' => $user->avatar ?? null,
+                'avatar_url' => $this->avatarUrlForUser($user),
                 'locale' => $user->locale ?? 'bs',
                 'theme' => $user->theme ?? 'light',
                 'timezone' => $user->timezone ?? 'Europe/Sarajevo',

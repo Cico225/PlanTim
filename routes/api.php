@@ -51,20 +51,25 @@ Route::prefix('app-version')->group(function () {
 });
 
 // Public API routes
-Route::prefix('auth')->group(function () {
+Route::prefix('auth')->middleware('throttle:auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/verify-login', [AuthController::class, 'verifyLogin']);
-    Route::post('/resend-login-code', [AuthController::class, 'resendLoginCode']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });
 
-// Avatar endpoint - public but validates token in query parameter
-Route::get('/profile/avatar/{userId?}', [AuthController::class, 'getAvatar']);
+Route::prefix('auth')->middleware('throttle:auth-verify')->group(function () {
+    Route::post('/verify-login', [AuthController::class, 'verifyLogin']);
+    Route::post('/resend-login-code', [AuthController::class, 'resendLoginCode']);
+});
+
+// Avatar — signed URL (bez tokena u query stringu)
+Route::get('/profile/avatar/{userId}', [AuthController::class, 'getAvatar'])
+    ->middleware('signed')
+    ->name('api.profile.avatar');
 
 // Protected API routes
-Route::middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
     // Auth
     Route::prefix('auth')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -81,8 +86,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/activity/{userId?}', [AuthController::class, 'getActivity']);
         
         // Admin only
-        Route::post('/toggle-status/{userId}', [AuthController::class, 'toggleUserStatus']);
-        Route::post('/assign-role/{userId}', [AuthController::class, 'assignRole']);
+        Route::middleware('admin')->group(function () {
+            Route::post('/toggle-status/{userId}', [AuthController::class, 'toggleUserStatus']);
+            Route::post('/assign-role/{userId}', [AuthController::class, 'assignRole']);
+        });
     });
     
     // Dashboard
@@ -93,7 +100,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // CRM
-    Route::prefix('crm')->group(function () {
+    Route::prefix('crm')->middleware('module:crm')->group(function () {
         Route::get('/', [CRMController::class, 'index']);
         
         // Contacts
@@ -318,7 +325,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // HRM
-    Route::prefix('hrm')->group(function () {
+    Route::prefix('hrm')->middleware('module:planika.hr')->group(function () {
         // Dashboard
         Route::get('/dashboard', [HRMController::class, 'getDashboard']);
         
@@ -719,20 +726,22 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Planika Finansije (Krediti)
     Route::prefix('planika/finance')->group(function () {
-        Route::get('/krediti', [PlanikaFinanceController::class, 'getKrediti']);
-        Route::get('/krediti/report', [PlanikaFinanceController::class, 'getKreditiReport']);
-        Route::get('/krediti/export-zabrane', [PlanikaFinanceController::class, 'exportZabrane']);
-        Route::get('/krediti/selection', [PlanikaFinanceController::class, 'getKreditiSelection']);
-        Route::get('/krediti/lookup', [PlanikaFinanceController::class, 'lookupKredit']);
-        Route::get('/krediti/{id}', [PlanikaFinanceController::class, 'getKredit']);
-        Route::post('/krediti/upload', [PlanikaFinanceController::class, 'uploadKrediti']);
-        Route::post('/krediti/bulk-verify-zabrana', [PlanikaFinanceController::class, 'bulkVerifyZabrana']);
-        Route::post('/krediti/bulk-unpair-zabrana', [PlanikaFinanceController::class, 'bulkUnpairZabrana']);
-        Route::post('/krediti/bulk-delete', [PlanikaFinanceController::class, 'bulkDeleteKrediti']);
-        Route::post('/krediti/{id}/verify-zabrana', [PlanikaFinanceController::class, 'verifyZabrana']);
-        Route::post('/krediti/{id}/unpair-zabrana', [PlanikaFinanceController::class, 'unpairZabrana']);
-        Route::get('/krediti/{id}/zabrana-scan', [PlanikaFinanceController::class, 'getZabranaScan']);
-        Route::delete('/krediti/{id}', [PlanikaFinanceController::class, 'deleteKredit']);
+        Route::middleware('finance.krediti')->group(function () {
+            Route::get('/krediti', [PlanikaFinanceController::class, 'getKrediti']);
+            Route::get('/krediti/report', [PlanikaFinanceController::class, 'getKreditiReport']);
+            Route::get('/krediti/export-zabrane', [PlanikaFinanceController::class, 'exportZabrane']);
+            Route::get('/krediti/selection', [PlanikaFinanceController::class, 'getKreditiSelection']);
+            Route::get('/krediti/lookup', [PlanikaFinanceController::class, 'lookupKredit']);
+            Route::get('/krediti/{id}', [PlanikaFinanceController::class, 'getKredit']);
+            Route::post('/krediti/upload', [PlanikaFinanceController::class, 'uploadKrediti']);
+            Route::post('/krediti/bulk-verify-zabrana', [PlanikaFinanceController::class, 'bulkVerifyZabrana']);
+            Route::post('/krediti/bulk-unpair-zabrana', [PlanikaFinanceController::class, 'bulkUnpairZabrana']);
+            Route::post('/krediti/bulk-delete', [PlanikaFinanceController::class, 'bulkDeleteKrediti']);
+            Route::post('/krediti/{id}/verify-zabrana', [PlanikaFinanceController::class, 'verifyZabrana']);
+            Route::post('/krediti/{id}/unpair-zabrana', [PlanikaFinanceController::class, 'unpairZabrana']);
+            Route::get('/krediti/{id}/zabrana-scan', [PlanikaFinanceController::class, 'getZabranaScan']);
+            Route::delete('/krediti/{id}', [PlanikaFinanceController::class, 'deleteKredit']);
+        });
 
         // Spiskovi aktivnih ugovora — firme
         Route::get('/contract-companies/capabilities', [FinanceContractCompaniesController::class, 'capabilities']);
@@ -757,7 +766,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // Admin - protected routes
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware('admin')->group(function () {
         // System Stats
         Route::get('/stats', [AdminController::class, 'getSystemStats']);
         
@@ -844,8 +853,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 
 // User accessible modules (for menu generation) - outside admin group so all authenticated users can access
-Route::middleware('auth:sanctum')->get('/user/accessible-modules', [AdminModuleController::class, 'getUserAccessibleModules']);
+Route::middleware(['auth:sanctum', 'check.active.api'])->get('/user/accessible-modules', [AdminModuleController::class, 'getUserAccessibleModules']);
 
 // Public security settings (available to all authenticated users for auto-logout functionality)
-Route::middleware('auth:sanctum')->get('/security/public-settings', [SecurityController::class, 'getPublicSecuritySettings']);
+Route::middleware(['auth:sanctum', 'check.active.api'])->get('/security/public-settings', [SecurityController::class, 'getPublicSecuritySettings']);
 

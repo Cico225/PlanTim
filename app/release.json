@@ -1,8 +1,9 @@
 {
-    "version": "1.2.14",
+    "version": "1.2.15",
     "version_name": "Release 2026-08-31",
-    "release_notes": "Novi backup baze podataka",
+    "release_notes": "popravak sigurnosti",
     "changelog": [
+        "popravak sigurnosti",
         "Novi backup baze podataka",
         "Dodana nova funkcionalnost - skeniranje zabrana i automatsko OCR prepoznavanje",
         "DOrada modula HR",
@@ -21,7 +22,6 @@
         "Nedavne aktivnosti s ikonama po tipu akcije",
         "Animirani pregled aktivnosti i kompaktni kalendar sala",
         "Hijerarhijski prikaz dozvola modula i podmodula u administraciji",
-        "Animirane kartice Planika podmodula umjesto statičnih brojeva",
-        "Brisanje kredita u Planika Finansije modulu"
+        "Animirane kartice Planika podmodula umjesto statičnih brojeva"
     ]
 }

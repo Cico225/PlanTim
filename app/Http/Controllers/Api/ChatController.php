@@ -389,7 +389,7 @@ class ChatController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'file' => 'required|file|max:10240', // 10MB max
+                'file' => 'required|file|max:10240|mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip',
                 'conversation_id' => 'required|exists:chat_conversations,id',
             ]);
 
@@ -397,8 +397,20 @@ class ChatController extends Controller
                 return response()->json(['errors' => $validator->errors()], 422);
             }
 
+            $user = $request->user();
+            $conversationId = (int) $request->input('conversation_id');
+
+            $isParticipant = DB::table('chat_participants')
+                ->where('conversation_id', $conversationId)
+                ->where('user_id', $user->id)
+                ->exists();
+
+            if (! $isParticipant) {
+                return response()->json(['error' => 'Access denied'], 403);
+            }
+
             $file = $request->file('file');
-            $originalName = $file->getClientOriginalName();
+            $originalName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
             $mimeType = $file->getMimeType();
             $size = $file->getSize();
             

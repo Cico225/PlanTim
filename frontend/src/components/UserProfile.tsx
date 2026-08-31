@@ -180,10 +180,10 @@ export default function UserProfile({ userId, onClose }: UserProfileProps) {
             <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center text-xl sm:text-2xl font-bold overflow-hidden flex-shrink-0">
               {profileData?.avatarPreview ? (
                 <img src={profileData.avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : profileData?.avatar ? (
+              ) : profileData?.avatar_url || profileData?.avatar ? (
                 <img 
                   key={`header-${avatarTimestamp || Date.now()}`}
-                  src={`/api/profile/avatar/${targetUserId || user?.id}?t=${avatarTimestamp || Date.now()}&token=${localStorage.getItem('token') || ''}`} 
+                  src={profileData.avatar_url || ''} 
                   alt="Avatar" 
                   className="w-full h-full object-cover" 
                 />
@@ -328,33 +328,14 @@ function BasicInfoTab({ profileData, setProfileData, isViewingOtherUser, isAdmin
         <div className="relative">
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center text-2xl sm:text-3xl font-bold overflow-hidden">
             {(() => {
-              // Debug logging
-              if (profileData?.avatarPreview) {
-                console.log('Using avatarPreview:', profileData.avatarPreview);
-              } else if (profileData?.avatar) {
-                console.log('Using avatar from DB:', profileData.avatar);
-              }
-              
               return profileData?.avatarPreview ? (
                 <img src={profileData.avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : profileData?.avatar ? (
+              ) : profileData?.avatar_url || profileData?.avatar ? (
                 <img 
                   key={`avatar-main-${avatarTimestamp || Date.now()}`}
-                  src={`/api/profile/avatar/${targetUserId || user?.id}?t=${avatarTimestamp || Date.now()}&token=${localStorage.getItem('token') || ''}`} 
+                  src={profileData.avatar_url || ''} 
                   alt="Avatar" 
                   className="w-full h-full object-cover"
-                  onLoad={() => {
-                    console.log('Avatar image loaded successfully');
-                    console.log('Avatar URL:', `/api/profile/avatar/${targetUserId || user?.id}?t=${avatarTimestamp || Date.now()}&token=${localStorage.getItem('token') ? 'exists' : 'missing'}`);
-                  }}
-                  onError={(e) => {
-                    console.error('Avatar image failed to load:', e);
-                    console.error('Avatar path:', `/api/profile/avatar/${targetUserId || user?.id}`);
-                    console.error('Avatar from DB:', profileData?.avatar);
-                    console.error('Token exists:', !!localStorage.getItem('token'));
-                    console.error('Full URL:', `/api/profile/avatar/${targetUserId || user?.id}?t=${avatarTimestamp || Date.now()}&token=${localStorage.getItem('token') || ''}`);
-                    // Don't clear avatar on error - keep it so user can see there's an issue
-                  }}
                 />
               ) : (
                 profileData?.name?.charAt(0).toUpperCase() || 'U'

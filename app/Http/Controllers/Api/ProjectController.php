@@ -2498,7 +2498,7 @@ class ProjectController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|max:10240', // Max 10MB
+            'file' => 'required|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,jpg,jpeg,png,gif,webp,zip',
         ]);
 
         if ($validator->fails()) {

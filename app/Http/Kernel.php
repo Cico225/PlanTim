@@ -41,7 +41,6 @@ class Kernel extends HttpKernel
 
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \App\Http\Middleware\RunInternalScheduler::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
@@ -72,6 +71,10 @@ class Kernel extends HttpKernel
         'check.role' => \App\Http\Middleware\CheckRole::class,
         'check.permission' => \App\Http\Middleware\CheckPermission::class,
         'check.active' => \App\Http\Middleware\CheckActiveUser::class,
+        'check.active.api' => \App\Http\Middleware\CheckActiveApiUser::class,
+        'admin' => \App\Http\Middleware\EnsureAdmin::class,
+        'module' => \App\Http\Middleware\EnsureModuleAccess::class,
+        'finance.krediti' => \App\Http\Middleware\EnsureFinanceKreditiAccess::class,
     ];
 }
 

@@ -32,6 +32,7 @@ interface User {
   email: string;
   phone?: string;
   avatar?: string;
+  avatar_url?: string;
   is_active: boolean;
   last_login_at?: string;
   created_at: string;
@@ -464,9 +465,9 @@ export default function UserManagement() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold">
-                          {user.avatar ? (
+                          {user.avatar_url || user.avatar ? (
                             <img
-                              src={user.avatar}
+                              src={user.avatar_url || user.avatar}
                               alt={user.name}
                               className="w-10 h-10 rounded-full object-cover"
                             />
@@ -581,9 +582,9 @@ export default function UserManagement() {
                     className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 mt-1"
                   />
                   <div className="w-12 h-12 rounded-full bg-primary-600 text-white flex items-center justify-center font-semibold flex-shrink-0">
-                    {user.avatar ? (
+                    {user.avatar_url || user.avatar ? (
                       <img
-                        src={user.avatar}
+                        src={user.avatar_url || user.avatar}
                         alt={user.name}
                         className="w-12 h-12 rounded-full object-cover"
                       />

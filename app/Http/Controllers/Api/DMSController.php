@@ -389,7 +389,7 @@ class DMSController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|max:51200', // 50MB max
+            'file' => 'required|file|max:51200|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,jpg,jpeg,png,gif,webp,zip',
             'folder_id' => 'nullable|exists:dms_folders,id',
             'tags' => 'nullable|array',
             'document_id' => 'nullable|exists:documents,id', // For manual versioning
