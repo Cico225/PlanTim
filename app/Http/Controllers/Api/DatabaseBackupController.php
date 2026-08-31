@@ -19,61 +19,6 @@ class DatabaseBackupController extends Controller
 
     public function __construct()
     {
-        // Check if user has admin or super-admin role
-        $this->middleware(function ($request, $next) {
-            try {
-                $user = auth()->user();
-                if (!$user) {
-                    return response()->json([
-                        'message' => 'Unauthorized. Please log in.',
-                    ], 401);
-                }
-                
-                // Check if user has admin role
-                $isAdmin = false;
-                if (method_exists($user, 'hasAnyRole')) {
-                    try {
-                        $isAdmin = $user->hasAnyRole(['admin', 'super-admin']);
-                    } catch (\Exception $e) {
-                        Log::warning('Error checking user role in DatabaseBackup', [
-                            'error' => $e->getMessage(),
-                            'user_id' => $user->id,
-                        ]);
-                        // Fallback: check role directly from database
-                        $isAdmin = DB::table('users')
-                            ->where('id', $user->id)
-                            ->whereIn('role', ['admin', 'super-admin'])
-                            ->exists();
-                    }
-                } else {
-                    // Fallback: check role directly from database
-                    $isAdmin = DB::table('users')
-                        ->where('id', $user->id)
-                        ->where(function($query) {
-                            $query->where('role', 'admin')
-                                  ->orWhere('role', 'super-admin');
-                        })
-                        ->exists();
-                }
-                
-                if (!$isAdmin) {
-                    return response()->json([
-                        'message' => 'Unauthorized. Admin access required.',
-                    ], 403);
-                }
-                
-                return $next($request);
-            } catch (\Exception $e) {
-                Log::error('Error in DatabaseBackup middleware', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-                return response()->json([
-                    'message' => 'Authorization error. Please try again.',
-                ], 500);
-            }
-        });
-
         // SQL backup folder u korijenu projekta (backups/)
         $this->backupDir = base_path('backups');
 

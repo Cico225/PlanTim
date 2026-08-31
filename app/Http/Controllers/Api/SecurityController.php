@@ -12,20 +12,6 @@ use Illuminate\Support\Facades\Log;
 
 class SecurityController extends Controller
 {
-    public function __construct()
-    {
-        // Check if user has admin or super-admin role
-        $this->middleware(function ($request, $next) {
-            $user = auth()->user();
-            if (!$user || !$user->hasAnyRole(['admin', 'super-admin'])) {
-                return response()->json([
-                    'message' => 'Unauthorized. Admin access required.',
-                ], 403);
-            }
-            return $next($request);
-        });
-    }
-
     /**
      * Get security settings (admin only for full settings)
      */

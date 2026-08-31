@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ModulePermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -128,6 +129,10 @@ class NotificationController extends Controller
      */
     public function create(Request $request)
     {
+        if (! ModulePermissionHelper::isAdmin($request->user())) {
+            return response()->json(['message' => 'Access denied'], 403);
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'user_id' => 'required|exists:users,id',
             'type' => 'required|string|max:255',
@@ -164,6 +169,10 @@ class NotificationController extends Controller
      */
     public function bulkCreate(Request $request)
     {
+        if (! ModulePermissionHelper::isAdmin($request->user())) {
+            return response()->json(['message' => 'Access denied'], 403);
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'user_ids' => 'required|array',
             'user_ids.*' => 'exists:users,id',
@@ -311,7 +320,7 @@ class NotificationController extends Controller
     public function sendSystemNotification(Request $request)
     {
         // Check if user has admin permissions
-        if (!$request->user()->hasRole(['super-admin', 'admin'])) {
+        if (! ModulePermissionHelper::isAdmin($request->user())) {
             return response()->json(['message' => 'Access denied'], 403);
         }
 

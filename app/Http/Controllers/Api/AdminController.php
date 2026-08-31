@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\AvatarUrlHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -51,6 +52,8 @@ class AdminController extends Controller
             $roleNames = $user->getRoleNames()->values()->all();
             $userArray['roles'] = array_map('strval', $roleNames);
             $userArray['permissions'] = $user->getAllPermissions()->pluck('name')->values()->all();
+            $userArray['avatar_url'] = ! empty($user->avatar) ? AvatarUrlHelper::signedUrl($user->id) : null;
+
             return $userArray;
         });
 
@@ -526,11 +529,15 @@ class AdminController extends Controller
     public function updateSettings(Request $request)
     {
         $settings = $request->input('settings', $request->all());
+        $allowedKeys = DB::table('system_settings')->pluck('key')->all();
 
         // If settings is an array of objects with full structure
         if (is_array($settings) && isset($settings[0]) && is_array($settings[0]) && isset($settings[0]['key'])) {
             foreach ($settings as $setting) {
                 $key = $setting['key'];
+                if (! in_array($key, $allowedKeys, true)) {
+                    continue;
+                }
                 $value = $setting['value'] ?? '';
                 $type = $setting['type'] ?? 'string';
                 $description = $setting['description'] ?? null;
@@ -549,8 +556,11 @@ class AdminController extends Controller
                 );
             }
         } else {
-            // Legacy: simple key-value pairs
+            // Legacy: simple key-value pairs — samo postojeći ključevi
             foreach ($settings as $key => $value) {
+                if (! in_array($key, $allowedKeys, true)) {
+                    continue;
+                }
                 $existing = DB::table('system_settings')->where('key', $key)->first();
                 
                 if ($existing) {

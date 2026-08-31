@@ -71,6 +71,7 @@ import MeetingRoomsOverview from './modules/meeting-rooms/pages/MeetingRoomsOver
 
 // Administration
 import AdminOverview from './modules/admin/pages/AdminOverview';
+import AdminRouteGuard from './components/AdminRouteGuard';
 
 // Hooks
 import { useAutoLogout } from './hooks/useAutoLogout';
@@ -160,7 +161,7 @@ function App() {
             <Route path="/planika/:submoduleId" element={<PlanikaSubmodule />} />
             <Route path="/ai/*" element={<AIOverview />} />
             <Route path="/meeting-rooms/*" element={<MeetingRoomsOverview />} />
-            <Route path="/admin/*" element={<AdminOverview />} />
+            <Route path="/admin/*" element={<AdminRouteGuard><AdminOverview /></AdminRouteGuard>} />
           </Route>
 
           {/* 404 */}
