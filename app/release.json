@@ -1,8 +1,9 @@
 {
-    "version": "1.2.13",
-    "version_name": "Release 2026-08-26",
-    "release_notes": "Dodana nova funkcionalnost - skeniranje zabrana i automatsko OCR prepoznavanje",
+    "version": "1.2.14",
+    "version_name": "Release 2026-08-31",
+    "release_notes": "Novi backup baze podataka",
     "changelog": [
+        "Novi backup baze podataka",
         "Dodana nova funkcionalnost - skeniranje zabrana i automatsko OCR prepoznavanje",
         "DOrada modula HR",
         "Dorada modula Reklamacije",
@@ -21,7 +22,6 @@
         "Animirani pregled aktivnosti i kompaktni kalendar sala",
         "Hijerarhijski prikaz dozvola modula i podmodula u administraciji",
         "Animirane kartice Planika podmodula umjesto statičnih brojeva",
-        "Brisanje kredita u Planika Finansije modulu",
-        "Automatski backup baze i projekta s internim schedulerom"
+        "Brisanje kredita u Planika Finansije modulu"
     ]
 }

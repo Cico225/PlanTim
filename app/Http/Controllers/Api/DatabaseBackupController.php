@@ -967,6 +967,15 @@ class DatabaseBackupController extends Controller
             $backupDirWritable = File::isWritable($this->backupDir);
             $backupDirExists = File::exists($this->backupDir);
 
+            $zipExtensionAvailable = class_exists(\ZipArchive::class);
+            $systemTarAvailable = false;
+            if (! $zipExtensionAvailable) {
+                $tarOutput = [];
+                $tarCode = 1;
+                @exec('tar --version 2>&1', $tarOutput, $tarCode);
+                $systemTarAvailable = $tarCode === 0;
+            }
+
             return response()->json([
                 'database' => [
                     'connected' => $dbConnected,
@@ -986,6 +995,11 @@ class DatabaseBackupController extends Controller
                     'path' => $this->backupDir,
                     'exists' => $backupDirExists,
                     'writable' => $backupDirWritable,
+                ],
+                'zip' => [
+                    'php_ziparchive' => $zipExtensionAvailable,
+                    'system_tar_fallback' => $systemTarAvailable,
+                    'full_backup_ready' => $zipExtensionAvailable || $systemTarAvailable,
                 ],
             ]);
         } catch (\Exception $e) {

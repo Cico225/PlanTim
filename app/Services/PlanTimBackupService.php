@@ -362,10 +362,26 @@ class PlanTimBackupService
      */
     public function createProjectArchive(string $sqlFilename): array
     {
-        if (! class_exists(ZipArchive::class)) {
-            throw new \RuntimeException('PHP ZipArchive ekstenzija nije uključena.');
+        if (class_exists(ZipArchive::class)) {
+            return $this->createProjectArchiveWithZipArchive($sqlFilename);
         }
 
+        if ($this->canUseSystemTar()) {
+            Log::warning('ZipArchive nije dostupan — koristi se sistemski tar za ZIP arhivu.');
+
+            return $this->createProjectArchiveWithSystemTar($sqlFilename);
+        }
+
+        throw new \RuntimeException(
+            'PHP ZipArchive ekstenzija nije uključena. Omogućite extension=zip u php.ini i restartujte Apache.'
+        );
+    }
+
+    /**
+     * @return array{filename: string, path: string, size: int}
+     */
+    private function createProjectArchiveWithZipArchive(string $sqlFilename): array
+    {
         $timestamp = date('Y-m-d_H-i-s');
         $filename = "plantim_full_{$timestamp}.zip";
         $zipPath = $this->getBackupDir().DIRECTORY_SEPARATOR.$filename;
@@ -431,6 +447,80 @@ class PlanTimBackupService
             'path' => $zipPath,
             'size' => File::size($zipPath),
         ];
+    }
+
+    /**
+     * Rezerva na Windows/Linux serverima gdje Apache PHP nema ZipArchive (npr. nakon PHP updatea).
+     *
+     * @return array{filename: string, path: string, size: int}
+     */
+    private function createProjectArchiveWithSystemTar(string $sqlFilename): array
+    {
+        $timestamp = date('Y-m-d_H-i-s');
+        $filename = "plantim_full_{$timestamp}.zip";
+        $zipPath = $this->getBackupDir().DIRECTORY_SEPARATOR.$filename;
+        $root = base_path();
+
+        $excludePatterns = [
+            'node_modules',
+            '.git',
+            'backups/plantim_full_*.zip',
+            'backups/'.$filename,
+        ];
+
+        $excludeArgs = [];
+        foreach ($excludePatterns as $pattern) {
+            $excludeArgs[] = '--exclude='.escapeshellarg($pattern);
+        }
+
+        $command = 'tar '.implode(' ', $excludeArgs)
+            .' -a -cf '.escapeshellarg($zipPath)
+            .' -C '.escapeshellarg($root)
+            .' .';
+
+        $output = [];
+        $returnCode = 1;
+        exec($command.' 2>&1', $output, $returnCode);
+
+        if ($returnCode !== 0 || ! File::exists($zipPath) || File::size($zipPath) === 0) {
+            if (File::exists($zipPath)) {
+                File::delete($zipPath);
+            }
+
+            $details = trim(implode("\n", $output));
+            Log::error('Sistemski tar backup nije uspio', [
+                'command' => $command,
+                'return_code' => $returnCode,
+                'output' => $details,
+            ]);
+
+            throw new \RuntimeException(
+                'Kreiranje ZIP arhive putem tar nije uspjelo.'
+                .($details !== '' ? ' '.$details : '')
+            );
+        }
+
+        return [
+            'filename' => $filename,
+            'path' => $zipPath,
+            'size' => File::size($zipPath),
+        ];
+    }
+
+    private function canUseSystemTar(): bool
+    {
+        static $available = null;
+
+        if ($available !== null) {
+            return $available;
+        }
+
+        $output = [];
+        $returnCode = 1;
+        @exec('tar --version 2>&1', $output, $returnCode);
+        $available = $returnCode === 0;
+
+        return $available;
     }
 
     public function copyArchiveToDestination(string $zipPath, string $destination, string $filename): string

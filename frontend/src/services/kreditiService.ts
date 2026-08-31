@@ -137,4 +137,39 @@ export const kreditiService = {
       : `zabrane_${year}.xlsx`;
     return apiService.download('/planika/finance/krediti/export-zabrane', filename, params);
   },
+
+  async openZabranaScan(id: number): Promise<void> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`/api/planika/finance/krediti/${id}/zabrana-scan`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/pdf,image/*',
+      },
+    });
+
+    if (!response.ok) {
+      let message = 'Sken zabrane nije dostupan';
+      try {
+        const data = await response.json();
+        message = data.message || message;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      throw new Error('Sken zabrane je prazan');
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const opened = window.open(url, '_blank');
+    if (!opened) {
+      window.URL.revokeObjectURL(url);
+      throw new Error('Nije moguće otvoriti PDF. Dozvolite pop-up prozore.');
+    }
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+  },
 };
