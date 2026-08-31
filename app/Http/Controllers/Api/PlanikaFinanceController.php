@@ -418,11 +418,11 @@ class PlanikaFinanceController extends Controller
             $this->deleteZabranaScanFile($credit);
             $file = $request->file('scan');
             $ext = strtolower($file->getClientOriginalExtension() ?: 'pdf');
-            $filename = 'credit_'.$credit->id.'_'.uniqid('scan_', true).'.'.$ext;
+            $filename = $this->zabranaScanStorageName($credit->credit_number, $ext);
             $path = $file->storeAs(self::ZABRANA_SCAN_FOLDER, $filename, 'public');
 
             $payload['zabrana_scan_path'] = $path;
-            $payload['zabrana_scan_name'] = $file->getClientOriginalName();
+            $payload['zabrana_scan_name'] = $filename;
             $payload['zabrana_scan_mime'] = $file->getMimeType();
             $payload['zabrana_scan_size'] = $file->getSize();
 
@@ -691,6 +691,13 @@ class PlanikaFinanceController extends Controller
         if ($path && Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
         }
+    }
+
+    private function zabranaScanStorageName(string $creditNumber, string $ext = 'pdf'): string
+    {
+        $safe = preg_replace('/[\\\\\/:*?"<>|]/', '_', trim($creditNumber));
+
+        return $safe.'.'.ltrim(strtolower($ext), '.');
     }
 
     private function kreditiTableExists(): bool

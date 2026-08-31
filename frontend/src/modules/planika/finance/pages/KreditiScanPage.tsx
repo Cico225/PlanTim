@@ -9,6 +9,7 @@ import {
   FiRotateCcw,
   FiFileText,
   FiUpload,
+  FiFile,
 } from 'react-icons/fi';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { createWorker, type Worker } from 'tesseract.js';
@@ -20,6 +21,7 @@ import {
   normalizeCreditNumber,
 } from '../utils/creditNumber';
 import { ocrZabranaPdfs, type PdfOcrProgress } from '../utils/pdfZabranaOcr';
+import { extractPdfPage } from '../utils/extractPdfPage';
 
 const EXAMPLE_CREDIT_NUMBER = '26-4002-13-01357';
 
@@ -418,6 +420,16 @@ export default function KreditiScanPage() {
     }
   };
 
+  const handleOpenZabranaScan = async () => {
+    if (!credit?.has_zabrana_scan) return;
+    try {
+      await kreditiService.openZabranaScan(credit.id);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Greška pri otvaranju skena';
+      toast.error(message);
+    }
+  };
+
   const handleVerify = async () => {
     if (!credit) return;
     if (!registrarNumber.trim()) {
@@ -429,10 +441,16 @@ export default function KreditiScanPage() {
       const pdfItem = activePdfItemId
         ? pdfQueue.find((i) => i.id === activePdfItemId)
         : null;
+
+      let scanFile: File | undefined;
+      if (pdfItem?.file && pdfItem.pageIndex) {
+        scanFile = await extractPdfPage(pdfItem.file, pdfItem.pageIndex, credit.credit_number);
+      }
+
       const res = await kreditiService.verifyZabrana(credit.id, {
         registrar_number: registrarNumber.trim(),
         notes: notes.trim() || undefined,
-        scan: pdfItem?.file,
+        scan: scanFile,
         scan_page: pdfItem?.pageIndex,
       });
       setCredit(res.credit);
@@ -487,9 +505,10 @@ export default function KreditiScanPage() {
       for (const item of selected) {
         if (!item.credit) continue;
         try {
+          const scanFile = await extractPdfPage(item.file, item.pageIndex, item.credit.credit_number);
           const res = await kreditiService.verifyZabrana(item.credit.id, {
             registrar_number: bulkRegistrar.trim(),
-            scan: item.file,
+            scan: scanFile,
             scan_page: item.pageIndex,
           });
           ok += 1;
@@ -596,6 +615,18 @@ export default function KreditiScanPage() {
             <p className="mt-3 text-sm text-gray-500">
               Datum izdavanja: <span className="font-medium text-gray-700 dark:text-gray-300">{credit.issue_date}</span>
             </p>
+          )}
+
+          {credit.has_zabrana_scan && (
+            <button
+              type="button"
+              className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60"
+              onClick={() => void handleOpenZabranaScan()}
+              title={credit.zabrana_scan_name ?? 'Pregled skenirane zabrane'}
+            >
+              <FiFile size={18} />
+              Pregled skenirane zabrane (PDF)
+            </button>
           )}
         </div>
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiSearch, FiDownload, FiRotateCcw, FiCheck, FiTrash2 } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch, FiDownload, FiRotateCcw, FiCheck, FiTrash2, FiFile } from 'react-icons/fi';
 import { kreditiService } from '@/services/kreditiService';
 import type { FinanceCredit } from '@/types/planika-finance';
 
@@ -65,6 +65,7 @@ export default function KreditiListPage() {
   const [dateTo, setDateTo] = useState('');
   const [exporting, setExporting] = useState(false);
   const [unpairingId, setUnpairingId] = useState<number | null>(null);
+  const [openingScanId, setOpeningScanId] = useState<number | null>(null);
 
   const [selectedMeta, setSelectedMeta] = useState<Map<number, SelectedMeta>>(new Map());
   const [bulkRegistrar, setBulkRegistrar] = useState('');
@@ -244,6 +245,19 @@ export default function KreditiListPage() {
       toast.error('Greška pri exportu zabrana');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleOpenScan = async (c: FinanceCredit) => {
+    if (!c.has_zabrana_scan) return;
+    setOpeningScanId(c.id);
+    try {
+      await kreditiService.openZabranaScan(c.id);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Greška pri otvaranju skena';
+      toast.error(message);
+    } finally {
+      setOpeningScanId(null);
     }
   };
 
@@ -490,19 +504,33 @@ export default function KreditiListPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {c.is_paired ? (
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-900/20"
-                          disabled={unpairingId === c.id}
-                          onClick={() => handleUnpair(c)}
-                        >
-                          <FiRotateCcw size={14} />
-                          {unpairingId === c.id ? '…' : 'Vrati u neuparene'}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {c.has_zabrana_scan && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                            disabled={openingScanId === c.id}
+                            onClick={() => void handleOpenScan(c)}
+                            title={c.zabrana_scan_name ?? 'Pregled skenirane zabrane'}
+                          >
+                            <FiFile size={14} />
+                            {openingScanId === c.id ? '…' : 'PDF'}
+                          </button>
+                        )}
+                        {c.is_paired ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-900/20"
+                            disabled={unpairingId === c.id}
+                            onClick={() => handleUnpair(c)}
+                          >
+                            <FiRotateCcw size={14} />
+                            {unpairingId === c.id ? '…' : 'Vrati u neuparene'}
+                          </button>
+                        ) : (
+                          !c.has_zabrana_scan && <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
