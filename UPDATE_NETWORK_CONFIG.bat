@@ -17,21 +17,17 @@ cd /d "%~dp0"
 
 echo [1/4] IP adresa servera...
 set "LOCAL_IP="
-if exist "PLANTIM_SERVER_IP.txt" (
-    set /p LOCAL_IP=<"PLANTIM_SERVER_IP.txt"
-)
-if "!LOCAL_IP!"=="" (
-    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-        set "IP_RAW=%%a"
-        goto :found_ip
-    )
-    :found_ip
-    for /f "tokens=* delims= " %%a in ("!IP_RAW!") do set "LOCAL_IP=%%a"
+set "IP_TMP=%TEMP%\plantim-server-ip.txt"
+del /F /Q "%IP_TMP%" 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\resolve-server-ip.ps1" -OutputFile "%IP_TMP%" >nul 2>&1
+if exist "%IP_TMP%" (
+    set /p LOCAL_IP=<"%IP_TMP%"
+    del /F /Q "%IP_TMP%" 2>nul
 )
 
 if "!LOCAL_IP!"=="" (
     echo GRESKA: Ne mogu detektovati IP adresu.
-    echo Kreirajte PLANTIM_SERVER_IP.txt sa IP adresom (npr. 192.168.1.126)
+    echo Kreirajte PLANTIM_SERVER_IP.txt sa IP adresom, npr. 192.168.1.126
     if "!NO_PAUSE!"=="0" pause
     exit /b 1
 )
@@ -50,23 +46,14 @@ if not exist ".env" (
     )
 )
 
-set "FRONTEND_URL=https://!LOCAL_IP!:5173"
-set "BACKEND_URL=http://127.0.0.1:8000"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\update-network-env.ps1" -ServerIp "!LOCAL_IP!"
+if errorlevel 1 (
+    echo GRESKA: Azuriranje .env nije uspjelo.
+    if "!NO_PAUSE!"=="0" pause
+    exit /b 1
+)
 
-powershell -NoProfile -Command ^
-  "$ip='!LOCAL_IP!';" ^
-  "$front='https://'+$ip+':5173';" ^
-  "$sanctum=$ip+','+$ip+':5173,localhost,localhost:5173,127.0.0.1,127.0.0.1:5173';" ^
-  "$c=Get-Content '.env';" ^
-  "$c=$c -replace '^APP_URL=.*','APP_URL='+$front;" ^
-  "$c=$c -replace '^FRONTEND_URL=.*','FRONTEND_URL='+$front;" ^
-  "$c=$c -replace '^SANCTUM_STATEFUL_DOMAINS=.*','SANCTUM_STATEFUL_DOMAINS='+$sanctum;" ^
-  "$c=$c -replace '^CORS_ALLOWED_ORIGINS=.*','CORS_ALLOWED_ORIGINS='+$front;" ^
-  "$c=$c -replace '^SESSION_SECURE_COOKIE=.*','SESSION_SECURE_COOKIE=true';" ^
-  "if ($c -notmatch '^SESSION_DOMAIN=') { $c += 'SESSION_DOMAIN=' } else { $c=$c -replace '^SESSION_DOMAIN=.*','SESSION_DOMAIN=' };" ^
-  "Set-Content '.env' $c -Encoding UTF8"
-
-echo Backend: !FRONTEND_URL!
+echo Backend: https://!LOCAL_IP!:5173
 echo.
 
 echo [3/4] Frontend .env...
@@ -97,6 +84,10 @@ echo Aplikacija: https://!LOCAL_IP!:5173/login
 echo API proxy:  https://!LOCAL_IP!:5173/api
 echo Backend:    http://127.0.0.1:8000
 ) > TRENUTNA_IP_ADRESA.txt
+
+if not exist "PLANTIM_SERVER_IP.txt" (
+    echo !LOCAL_IP!> PLANTIM_SERVER_IP.txt
+)
 
 echo.
 echo ============================================================
