@@ -1,110 +1,109 @@
 @echo off
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
-title PlanTim - Automatsko Ažuriranje Mrežne Konfiguracije
+title PlanTim - Mrezna konfiguracija (HTTPS :5173)
 color 0B
 
+set "NO_PAUSE=0"
+if /I "%~1"=="--no-pause" set "NO_PAUSE=1"
+
 echo.
-echo ═══════════════════════════════════════════════════════════════
-echo   PlanTim - Automatska Mrežna Konfiguracija
-echo ═══════════════════════════════════════════════════════════════
+echo ============================================================
+echo   PlanTim - HTTPS mrezna konfiguracija
+echo ============================================================
 echo.
 
-REM Detekcija lokalne IP adrese
-echo [1/3] Detektujem vašu lokalnu IP adresu...
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-    set IP_RAW=%%a
-    goto :found_ip
+cd /d "%~dp0"
+
+echo [1/4] IP adresa servera...
+set "LOCAL_IP="
+if exist "PLANTIM_SERVER_IP.txt" (
+    set /p LOCAL_IP=<"PLANTIM_SERVER_IP.txt"
 )
-:found_ip
-REM Uklanjanje razmaka
-for /f "tokens=* delims= " %%a in ("%IP_RAW%") do set LOCAL_IP=%%a
+if "!LOCAL_IP!"=="" (
+    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+        set "IP_RAW=%%a"
+        goto :found_ip
+    )
+    :found_ip
+    for /f "tokens=* delims= " %%a in ("!IP_RAW!") do set "LOCAL_IP=%%a"
+)
 
-if "%LOCAL_IP%"=="" (
-    echo ❌ GREŠKA: Ne mogu detektovati IP adresu!
-    echo    Molim pokrenite ručno ili provjerite mrežnu konekciju.
-    pause
+if "!LOCAL_IP!"=="" (
+    echo GRESKA: Ne mogu detektovati IP adresu.
+    echo Kreirajte PLANTIM_SERVER_IP.txt sa IP adresom (npr. 192.168.1.126)
+    if "!NO_PAUSE!"=="0" pause
     exit /b 1
 )
 
-echo ✅ Detektovana IP adresa: %LOCAL_IP%
+echo IP: !LOCAL_IP!
 echo.
 
-REM Kreiranje Backend .env konfiguracije
-echo [2/3] Ažuriram Backend konfiguraciju...
-
+echo [2/4] Backend .env...
 if not exist ".env" (
     if exist ".env.example" (
-        copy .env.example .env >nul
+        copy /Y ".env.example" ".env" >nul
     ) else (
-        echo ❌ GREŠKA: .env.example ne postoji!
-        pause
+        echo GRESKA: .env ne postoji.
+        if "!NO_PAUSE!"=="0" pause
         exit /b 1
     )
 )
 
-REM Ažuriranje APP_URL u backend .env
-powershell -Command "(Get-Content .env) -replace 'APP_URL=.*', 'APP_URL=http://%LOCAL_IP%:8000' | Set-Content .env"
+set "FRONTEND_URL=https://!LOCAL_IP!:5173"
+set "BACKEND_URL=http://127.0.0.1:8000"
 
-echo ✅ Backend konfigurisan za: http://%LOCAL_IP%:8000
+powershell -NoProfile -Command ^
+  "$ip='!LOCAL_IP!';" ^
+  "$front='https://'+$ip+':5173';" ^
+  "$sanctum=$ip+','+$ip+':5173,localhost,localhost:5173,127.0.0.1,127.0.0.1:5173';" ^
+  "$c=Get-Content '.env';" ^
+  "$c=$c -replace '^APP_URL=.*','APP_URL='+$front;" ^
+  "$c=$c -replace '^FRONTEND_URL=.*','FRONTEND_URL='+$front;" ^
+  "$c=$c -replace '^SANCTUM_STATEFUL_DOMAINS=.*','SANCTUM_STATEFUL_DOMAINS='+$sanctum;" ^
+  "$c=$c -replace '^CORS_ALLOWED_ORIGINS=.*','CORS_ALLOWED_ORIGINS='+$front;" ^
+  "$c=$c -replace '^SESSION_SECURE_COOKIE=.*','SESSION_SECURE_COOKIE=true';" ^
+  "if ($c -notmatch '^SESSION_DOMAIN=') { $c += 'SESSION_DOMAIN=' } else { $c=$c -replace '^SESSION_DOMAIN=.*','SESSION_DOMAIN=' };" ^
+  "Set-Content '.env' $c -Encoding UTF8"
+
+echo Backend: !FRONTEND_URL!
 echo.
 
-REM Kreiranje Frontend .env konfiguracije
-echo [3/3] Ažuriram Frontend konfiguraciju...
-
+echo [3/4] Frontend .env...
 if not exist "frontend\.env" (
     if exist "frontend\env-template.txt" (
-        copy frontend\env-template.txt frontend\.env >nul
+        copy /Y "frontend\env-template.txt" "frontend\.env" >nul
     )
 )
 
-REM Kreiranje frontend .env sa ispravnom IP adresom
 (
-echo VITE_API_URL=http://%LOCAL_IP%:8000/api
+echo VITE_API_URL=/api
 echo VITE_APP_NAME=PlanTim
-echo VITE_APP_URL=http://%LOCAL_IP%:5173
+echo VITE_APP_URL=https://!LOCAL_IP!:5173
 echo VITE_DEFAULT_LANGUAGE=bs
 echo VITE_DEFAULT_THEME=light
-echo VITE_WS_URL=ws://%LOCAL_IP%:6001
+echo VITE_WS_URL=wss://!LOCAL_IP!:6001
+echo VITE_OFFICE365_REDIRECT_URI=https://!LOCAL_IP!:5173/auth/office365/callback
 ) > frontend\.env
 
-echo ✅ Frontend konfigurisan za: http://%LOCAL_IP%:5173
+echo Frontend: https://!LOCAL_IP!:5173
 echo.
 
-echo ═══════════════════════════════════════════════════════════════
-echo   ✅ KONFIGURACIJA USPEŠNO AŽURIRANA!
-echo ═══════════════════════════════════════════════════════════════
-echo.
-echo 📱 Vaša lokalna IP adresa: %LOCAL_IP%
-echo.
-echo 🌐 Pristupite aplikaciji sa:
-echo    • Ovaj računar:    http://localhost:5173
-echo    • Drugi uređaji:   http://%LOCAL_IP%:5173
-echo.
-echo 💡 Kada promenite WiFi mrežu, ponovo pokrenite ovaj fajl!
-echo.
-echo ═══════════════════════════════════════════════════════════════
-echo.
-
-REM Kreiranje quick access fajla sa trenutnom IP adresom
+echo [4/4] TRENUTNA_IP_ADRESA.txt...
 (
-echo Trenutna IP adresa: %LOCAL_IP%
+echo !LOCAL_IP!
 echo.
-echo Frontend: http://%LOCAL_IP%:5173
-echo Backend:  http://%LOCAL_IP%:8000
-echo API:      http://%LOCAL_IP%:8000/api
-echo.
-echo Lokalni pristup:
-echo Frontend: http://localhost:5173
-echo Backend:  http://localhost:8000
+echo Aplikacija: https://!LOCAL_IP!:5173/login
+echo API proxy:  https://!LOCAL_IP!:5173/api
+echo Backend:    http://127.0.0.1:8000
 ) > TRENUTNA_IP_ADRESA.txt
 
-echo ℹ️  Informacije sačuvane u: TRENUTNA_IP_ADRESA.txt
 echo.
-
-pause
-
-
-
-
-
-
+echo ============================================================
+echo   Konfiguracija azurirana
+echo ============================================================
+echo.
+echo   https://!LOCAL_IP!:5173/login
+echo.
+if "!NO_PAUSE!"=="0" pause
+exit /b 0

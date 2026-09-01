@@ -3,22 +3,29 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 
-// HTTPS configuration - check if certificates exist
+// HTTPS — server cert (mreza) ili localhost fallback
 function getHttpsConfig() {
-  const keyPath = path.resolve(__dirname, 'certs/localhost-key.pem')
-  const certPath = path.resolve(__dirname, 'certs/localhost-cert.pem')
-  
-  try {
-    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-      return {
-        key: fs.readFileSync(keyPath),
-        cert: fs.readFileSync(certPath),
+  const candidates = [
+    ['certs/server-key.pem', 'certs/server-cert.pem'],
+    ['certs/localhost-key.pem', 'certs/localhost-cert.pem'],
+  ]
+
+  for (const [keyFile, certFile] of candidates) {
+    const keyPath = path.resolve(__dirname, keyFile)
+    const certPath = path.resolve(__dirname, certFile)
+    try {
+      if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        return {
+          key: fs.readFileSync(keyPath),
+          cert: fs.readFileSync(certPath),
+        }
       }
+    } catch {
+      // try next pair
     }
-  } catch (error) {
-    console.warn('HTTPS certificates not found or invalid, using HTTP')
   }
-  
+
+  console.warn('HTTPS certificates not found in frontend/certs/ — run GENERATE_VITE_SSL_CERT.bat')
   return false
 }
 
@@ -42,27 +49,17 @@ export default defineConfig({
     port: 5173,
     host: true,
     https: getHttpsConfig(),
-    allowedHosts: [
-      'localhost',
-      '127.0.0.1',
-      'plantim',
-      '.local',
-      '.test',
-    ],
+    // Interna mreza — dozvoli pristup preko LAN IP (npr. 192.168.1.126)
+    allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost/PlanTim/public',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
         ws: true,
-        configure: (proxy, _options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log(`[PROXY] ${req.method} ${req.url} -> ${proxyReq.path}`);
-          });
-        },
       },
       '/storage': {
-        target: 'http://localhost/PlanTim/public',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },

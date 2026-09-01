@@ -1,8 +1,9 @@
 {
-    "version": "1.2.18",
+    "version": "1.2.19",
     "version_name": "Release 2026-09-01",
-    "release_notes": "ukidanje porta",
+    "release_notes": "podesavanje porta",
     "changelog": [
+        "podesavanje porta",
         "ukidanje porta",
         "SSL dorada C",
         "ssl certifikat",
@@ -21,7 +22,6 @@
         "Dorada modula Upravljanje projektima!",
         "Promjena nova verzija.",
         "Poboljšanje dizajna Pregleda aktivnosti i dodano verzioniranje aplikacije sa opisom promjena.",
-        "Modernizovan dashboard s animiranim karticama u Planika stilu",
-        "Nedavne aktivnosti s ikonama po tipu akcije"
+        "Modernizovan dashboard s animiranim karticama u Planika stilu"
     ]
 }
