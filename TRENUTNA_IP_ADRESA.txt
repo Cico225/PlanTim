@@ -1,9 +1,1 @@
-Trenutna IP adresa: 192.168.1.177
-
-Frontend: http://192.168.1.177:5173
-Backend:  http://192.168.1.177:8000
-API:      http://192.168.1.177:8000/api
-
-Lokalni pristup:
-Frontend: http://localhost:5173
-Backend:  http://localhost:8000
+77.77.210.70
