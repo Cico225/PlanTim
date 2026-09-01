@@ -71,7 +71,16 @@ echo Kopirano: %VHOST_DST%
 echo.
 echo [Korak 4/6] httpd.conf (SSL modul)...
 copy /Y "%HTTPD_CONF%" "%HTTPD_CONF%.plantim-backup" >nul
-powershell -NoProfile -Command "$c = Get-Content '%HTTPD_CONF%'; $c = $c -replace '^#LoadModule ssl_module modules/mod_ssl.so', 'LoadModule ssl_module modules/mod_ssl.so'; $c = $c -replace '^#LoadModule socache_shmcb_module modules/mod_socache_shmcb.so', 'LoadModule socache_shmcb_module modules/mod_socache_shmcb.so'; if ($c -notmatch 'Include conf/extra/plantim-https-ip.conf') { $c += ''; $c += 'Include conf/extra/plantim-https-ip.conf' }; Set-Content '%HTTPD_CONF%' $c -Encoding UTF8"
+
+powershell -NoProfile -Command ^
+  "$c = Get-Content '%HTTPD_CONF%';" ^
+  "$c = $c -replace '^#LoadModule ssl_module modules/mod_ssl.so', 'LoadModule ssl_module modules/mod_ssl.so';" ^
+  "$c = $c -replace '^#LoadModule socache_shmcb_module modules/mod_socache_shmcb.so', 'LoadModule socache_shmcb_module modules/mod_socache_shmcb.so';" ^
+  "$c = $c -replace '^Include conf/extra/httpd-ssl.conf', '# Include conf/extra/httpd-ssl.conf  # PlanTim uses plantim-https-ip.conf';" ^
+  "if ($c -notmatch 'Include conf/extra/plantim-https-ip.conf') { $c += ''; $c += 'Include conf/extra/plantim-https-ip.conf' }" ^
+  "Set-Content '%HTTPD_CONF%' $c -Encoding UTF8"
+
+echo httpd.conf azuriran. Test: FIX_APACHE_SSL.bat ako Apache ne startuje.
 
 echo.
 echo [Korak 5/6] Firewall...
