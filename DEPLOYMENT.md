@@ -336,6 +336,20 @@ Sve je definisano u `.gitignore`.
 
 Isto okruženje kao na laptopu: `C:\xampp\`, projekat u `C:\xampp\htdocs\PlanTim`.
 
+### HTTPS samo sa IP adresom (bez domene)
+
+Pogledajte detaljan vodič: **`docs/WINDOWS_SERVER_HTTPS.md`**
+
+Na serveru (kao Administrator):
+
+```bat
+SETUP_WINDOWS_HTTPS.bat
+```
+
+Zatim ručno: `.env`, restart Apache, prihvatite certifikat u browseru.
+
+Pristup: `https://VAŠA_IP/login` (bez porta 5173).
+
 ### Jednokratno podešavanje servera
 
 #### 1. Instaliraj alate

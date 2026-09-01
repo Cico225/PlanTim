@@ -1,8 +1,9 @@
 {
-    "version": "1.2.15",
-    "version_name": "Release 2026-08-31",
-    "release_notes": "popravak sigurnosti",
+    "version": "1.2.16",
+    "version_name": "Release 2026-09-01",
+    "release_notes": "ssl certifikat",
     "changelog": [
+        "ssl certifikat",
         "popravak sigurnosti",
         "Novi backup baze podataka",
         "Dodana nova funkcionalnost - skeniranje zabrana i automatsko OCR prepoznavanje",
@@ -21,7 +22,6 @@
         "Modernizovan dashboard s animiranim karticama u Planika stilu",
         "Nedavne aktivnosti s ikonama po tipu akcije",
         "Animirani pregled aktivnosti i kompaktni kalendar sala",
-        "Hijerarhijski prikaz dozvola modula i podmodula u administraciji",
-        "Animirane kartice Planika podmodula umjesto statičnih brojeva"
+        "Hijerarhijski prikaz dozvola modula i podmodula u administraciji"
     ]
 }
