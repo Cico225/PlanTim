@@ -2,6 +2,8 @@
     RewriteEngine On
     RewriteBase /
     RewriteRule ^index\.html$ - [L]
+    # API ide na Laravel (Apache vhost), ne na React SPA
+    RewriteCond %{REQUEST_URI} !^/api
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule . /index.html [L]
