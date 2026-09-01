@@ -1,8 +1,9 @@
 {
-    "version": "1.2.16",
+    "version": "1.2.17",
     "version_name": "Release 2026-09-01",
-    "release_notes": "ssl certifikat",
+    "release_notes": "SSL dorada C",
     "changelog": [
+        "SSL dorada C",
         "ssl certifikat",
         "popravak sigurnosti",
         "Novi backup baze podataka",
@@ -21,7 +22,6 @@
         "Poboljšanje dizajna Pregleda aktivnosti i dodano verzioniranje aplikacije sa opisom promjena.",
         "Modernizovan dashboard s animiranim karticama u Planika stilu",
         "Nedavne aktivnosti s ikonama po tipu akcije",
-        "Animirani pregled aktivnosti i kompaktni kalendar sala",
-        "Hijerarhijski prikaz dozvola modula i podmodula u administraciji"
+        "Animirani pregled aktivnosti i kompaktni kalendar sala"
     ]
 }
