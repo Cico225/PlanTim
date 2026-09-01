@@ -32,6 +32,8 @@ composer-setup.php
 /uploads/
 /backups/
 TRENUTNA_IP_ADRESA.txt
+PLANTIM_SERVER_IP.txt
+/frontend/certs/
 
 # --- Logovi i cache ---
 /storage/logs/*

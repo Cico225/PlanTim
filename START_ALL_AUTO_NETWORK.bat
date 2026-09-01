@@ -1,128 +1,103 @@
 @echo off
-SETLOCAL
+SETLOCAL EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul 2>&1
-title PlanTim - Automatsko Pokretanje (Auto Network)
+title PlanTim - HTTPS pokretanje (mreza)
 color 0A
 
 echo.
 echo ============================================================
-echo   PlanTim - Automatsko Pokretanje sa Auto Network
+echo   PlanTim - HTTPS pokretanje (https://IP:5173)
 echo ============================================================
 echo.
 
-REM Provera da li postoji PHP
+cd /d "%~dp0"
+
 SET PHP_PATH=C:\xampp\php\php.exe
 if not exist "%PHP_PATH%" (
-    echo [GRESKA] PHP nije pronadjen na: %PHP_PATH%
-    echo.
-    echo Molimo proverite da li je XAMPP instaliran na C:\xampp\
-    echo.
+    echo GRESKA: PHP nije pronadjen na %PHP_PATH%
     pause
     exit /b 1
 )
 
-REM Provera da li postoji frontend folder
-cd /d "%~dp0"
-if not exist "frontend" (
-    echo [GRESKA] Frontend folder nije pronadjen!
-    echo.
-    pause
-    exit /b 1
-)
-
-REM Provera da li postoji package.json u frontend folderu
 if not exist "frontend\package.json" (
-    echo [GRESKA] package.json nije pronadjen u frontend folderu!
-    echo.
+    echo GRESKA: frontend\package.json ne postoji.
     pause
     exit /b 1
 )
 
-REM Provera da li postoji UPDATE_NETWORK_CONFIG.bat
-if not exist "UPDATE_NETWORK_CONFIG.bat" (
-    echo [GRESKA] UPDATE_NETWORK_CONFIG.bat nije pronadjen!
-    echo.
-    pause
-    exit /b 1
-)
-
-REM Prvo azuriraj mreznu konfiguraciju
-echo [KORAK 1] Azuriranje mrezne konfiguracije...
-call UPDATE_NETWORK_CONFIG.bat
-
-if errorlevel 1 (
-    echo [GRESKA] Greska pri azuriranju mrezne konfiguracije!
-    pause
-    exit /b 1
-)
-
-echo.
-echo [KORAK 2] Pokretanje servera...
-echo.
-
-REM Detekcija IP adrese ponovo za servere
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-    set IP_RAW=%%a
-    goto :found_ip
-)
-:found_ip
-for /f "tokens=* delims= " %%a in ("%IP_RAW%") do set LOCAL_IP=%%a
-
-REM Provera da li je MySQL pokrenut
-tasklist /FI "IMAGENAME eq mysqld.exe" 2>NUL | find /I /N "mysqld.exe">NUL
-if "%ERRORLEVEL%"=="1" (
-    echo [UPOZORENJE] MySQL nije pokrenut! Pokretanje XAMPP MySQL servisa...
-    if exist "C:\xampp\mysql_start.bat" (
-        start "" "C:\xampp\mysql_start.bat"
-        timeout /t 5 /nobreak >nul
+if not exist "frontend\certs\server-cert.pem" (
+    echo [KORAK 0] SSL certifikat ne postoji — generisanje...
+    call "%~dp0GENERATE_VITE_SSL_CERT.bat"
+    if errorlevel 1 (
+        pause
+        exit /b 1
     )
 )
 
-REM Pokretanje Backend servera na svim interfejsima (0.0.0.0 = localhost + mrezni)
-echo [INFO] Pokretanje Backend servera...
-echo        Dostupan na: http://localhost:8000 i http://%LOCAL_IP%:8000
-start "PlanTim Backend" cmd /k "cd /d %~dp0 && C:\xampp\php\php.exe artisan serve --host=0.0.0.0 --port=8000"
+echo [KORAK 1] Azuriranje mrezne konfiguracije...
+call "%~dp0UPDATE_NETWORK_CONFIG.bat" --no-pause
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
+"%PHP_PATH%" artisan config:clear >nul 2>&1
+
+set "LOCAL_IP="
+if exist "PLANTIM_SERVER_IP.txt" set /p LOCAL_IP=<"PLANTIM_SERVER_IP.txt"
+if "!LOCAL_IP!"=="" (
+    for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "$t=Get-Content 'TRENUTNA_IP_ADRESA.txt' -Raw; if ($t -match '(\d{1,3}(?:\.\d{1,3}){3})') { $Matches[1] }"`) do set "LOCAL_IP=%%I"
+)
+
+echo.
+echo [KORAK 2] MySQL...
+tasklist /FI "IMAGENAME eq mysqld.exe" 2>NUL | find /I /N "mysqld.exe">NUL
+if errorlevel 1 (
+    echo Pokretanje MySQL...
+    if exist "C:\xampp\mysql_start.bat" (
+        start "" /MIN "C:\xampp\mysql_start.bat"
+        timeout /t 5 /nobreak >nul
+    ) else (
+        echo UPOZORENJE: Pokrenite MySQL iz XAMPP Control Panel-a.
+    )
+)
+
+echo.
+echo [KORAK 3] Backend (Laravel artisan serve)...
+echo        http://127.0.0.1:8000
+start "PlanTim Backend" cmd /k "cd /d %~dp0 && %PHP_PATH% artisan serve --host=127.0.0.1 --port=8000"
 
 timeout /t 5 /nobreak >nul
 
-REM Pokretanje Frontend servera na svim interfejsima
-echo [INFO] Pokretanje Frontend servera...
-echo        Dostupan na: http://localhost:5173 i http://%LOCAL_IP%:5173
+echo.
+echo [KORAK 4] Frontend (Vite HTTPS)...
+echo        https://!LOCAL_IP!:5173
 start "PlanTim Frontend" cmd /k "cd /d %~dp0\frontend && npm run dev -- --host 0.0.0.0"
 
 timeout /t 3 /nobreak >nul
 
 echo.
 echo ============================================================
-echo   [USPEH] SVI SERVERI SU POKRENUTI!
+echo   SERVERI POKRENUTI
 echo ============================================================
 echo.
-echo Vasa IP adresa: %LOCAL_IP%
-echo.
-echo Pristupite aplikaciji:
-echo    - Sa ovog racunara:     http://localhost:5173
-echo    - Sa drugih uredaja:    http://%LOCAL_IP%:5173
+echo IP:         !LOCAL_IP!
+echo Aplikacija: https://!LOCAL_IP!:5173/login
 echo.
 echo Kredencijali:
-echo    Email:    admin@plantim.com
-echo    Lozinka:  password
+echo   Email:    admin@plantim.com
+echo   Lozinka:  password
 echo.
-echo TIP: Kada promenite WiFi, samo zatvorite servere
-echo      i ponovo pokrenite ovaj fajl!
+echo NAPOMENA: Browser moze prikazati upozorenje o certifikatu.
+echo          Advanced -^> Accept the Risk and Continue
 echo.
 echo ============================================================
 echo.
 
-REM Cekanje 5 sekundi pa otvaranje browsera
 timeout /t 5 /nobreak >nul
+start https://!LOCAL_IP!:5173/login
 
-echo [INFO] Otvaranje aplikacije u browseru...
-start http://localhost:5173
-
-echo.
-echo Pritisnite bilo koji taster za zatvaranje ovog prozora...
-echo (Serveri ce nastaviti da rade u pozadini)
-echo.
-pause
-
+echo Pritisnite bilo koji taster za zatvaranje...
+echo (Serveri nastavljaju u pozadini)
+pause >nul
 ENDLOCAL

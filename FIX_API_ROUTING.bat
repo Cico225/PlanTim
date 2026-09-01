@@ -2,6 +2,10 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM Brza popravka: login greska "route auth/login could not be found"
+REM Opcija: FIX_API_ROUTING.bat --no-pause
+
+set "NO_PAUSE=0"
+if /I "%~1"=="--no-pause" set "NO_PAUSE=1"
 
 set "PROJECT_DIR=%~dp0"
 set "APACHE_DIR=C:\xampp\apache"
@@ -30,4 +34,5 @@ if errorlevel 1 (
 echo.
 echo OK. XAMPP: Stop -^> Start Apache
 echo Test: https://!SERVER_IP!/login
-pause
+if "!NO_PAUSE!"=="0" pause
+exit /b 0
