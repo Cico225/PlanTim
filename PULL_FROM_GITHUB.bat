@@ -75,6 +75,7 @@ if errorlevel 1 (
 if exist "TRENUTNA_IP_ADRESA.txt.bak" (
     copy /Y "TRENUTNA_IP_ADRESA.txt.bak" "TRENUTNA_IP_ADRESA.txt" >nul
     del /F /Q "TRENUTNA_IP_ADRESA.txt.bak" 2>nul
+    powershell -NoProfile -Command "$p='TRENUTNA_IP_ADRESA.txt'; $t=Get-Content $p -Raw; if ($t -match '(\d{1,3}(?:\.\d{1,3}){3})') { $Matches[1] | Set-Content $p -Encoding ASCII -NoNewline; Add-Content $p '' }"
 )
 
 echo Git pull zavrsen.
