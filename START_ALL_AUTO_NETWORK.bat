@@ -41,17 +41,32 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "frontend\node_modules" (
-    echo [KORAK 0] npm install (prvi put)...
+if not exist "frontend\node_modules\.bin\vite.cmd" (
+    echo [KORAK 0] Vite nije instaliran - npm install...
+    echo Nakon restore backupa ovo je normalno. Pricekajte...
     pushd "%~dp0frontend"
-    call npm install
+    if exist "package-lock.json" (
+        call npm ci
+        if errorlevel 1 call npm install
+    ) else (
+        call npm install
+    )
     if errorlevel 1 (
         echo GRESKA: npm install nije uspio.
+        echo Pokrenite rucno: INSTALL_FRONTEND_DEPS.bat
+        popd
+        pause
+        exit /b 1
+    )
+    if not exist "node_modules\.bin\vite.cmd" (
+        echo GRESKA: vite nije pronadjen nakon npm install.
+        echo Pokrenite: INSTALL_FRONTEND_DEPS.bat
         popd
         pause
         exit /b 1
     )
     popd
+    echo.
 )
 
 if not exist "frontend\certs\server-cert.pem" (
@@ -121,7 +136,7 @@ if not errorlevel 1 (
     echo Port 5173 je vec zauzet — preskacem pokretanje frontenda.
 ) else (
     echo        https://!LOCAL_IP!:5173
-    start "PlanTim Frontend" cmd /k "set PATH=%NODE_DIR%;%APPDATA%\npm;%PATH% && cd /d "%~dp0frontend" && npm run dev -- --host 0.0.0.0"
+    start "PlanTim Frontend" cmd /k "set PATH=%NODE_DIR%;%APPDATA%\npm;%PATH% && cd /d "%~dp0frontend" && if not exist node_modules\.bin\vite.cmd (echo GRESKA: Pokrenite INSTALL_FRONTEND_DEPS.bat && pause) else (call node_modules\.bin\vite.cmd --host 0.0.0.0)"
     timeout /t 8 /nobreak >nul
 )
 

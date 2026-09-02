@@ -1,8 +1,9 @@
 {
-    "version": "1.2.20",
-    "version_name": "Release 2026-09-01",
-    "release_notes": "korekcija porta",
+    "version": "1.2.21",
+    "version_name": "Release 2026-09-02",
+    "release_notes": "postavljanje recaptca",
     "changelog": [
+        "postavljanje recaptca",
         "korekcija porta",
         "podesavanje porta",
         "ukidanje porta",
@@ -21,7 +22,6 @@
         "Dorada funkcionalnosti Reklamacije.",
         "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije.",
         "Dorada modula Upravljanje projektima!",
-        "Promjena nova verzija.",
-        "Poboljšanje dizajna Pregleda aktivnosti i dodano verzioniranje aplikacije sa opisom promjena."
+        "Promjena nova verzija."
     ]
 }
