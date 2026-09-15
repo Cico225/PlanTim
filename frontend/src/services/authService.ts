@@ -70,14 +70,44 @@ class AuthService {
     return await apiService.get(url);
   }
 
-  async updateProfile(data: any, userId?: number): Promise<void> {
+  async updateProfile(data: any, userId?: number): Promise<any> {
     const url = userId ? `/profile/${userId}` : '/profile';
-    // Use POST with _method=PUT for FormData to work properly with Laravel
+    // POST route accepts FormData directly — avoid _method=PUT spoofing (can drop files)
     if (data instanceof FormData) {
-      data.append('_method', 'PUT');
       return await apiService.post(url, data);
     }
     return await apiService.put(url, data);
+  }
+
+  /**
+   * Upload avatar via native fetch (avoids Axios multipart Content-Type bugs).
+   */
+  async uploadAvatar(file: File, userId?: number): Promise<any> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const token = localStorage.getItem('token');
+    const url = userId ? `/api/profile/avatar/${userId}` : '/api/profile/avatar';
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // Do NOT set Content-Type — browser sets multipart boundary
+      },
+      body: formData,
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const error: any = new Error(data?.message || data?.error || 'Avatar upload failed');
+      error.response = { status: response.status, data };
+      throw error;
+    }
+
+    return data;
   }
 
   async changePassword(data: { current_password?: string; password: string; password_confirmation: string }, userId?: number): Promise<void> {

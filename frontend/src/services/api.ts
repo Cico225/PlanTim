@@ -12,8 +12,7 @@ class ApiService {
     this.api = axios.create({
       baseURL: API_URL,
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       withCredentials: false,
     });
@@ -28,10 +27,31 @@ class ApiService {
         if (!config.method) {
           config.method = 'get';
         }
-        // Ako je FormData, ne postavljaj Content-Type - axios će automatski postaviti sa boundary
-        if (config.data instanceof FormData) {
-          delete config.headers['Content-Type'];
+
+        const isFormData =
+          typeof FormData !== 'undefined' && config.data instanceof FormData;
+
+        if (isFormData) {
+          // Axios 1.x: default/manual Content-Type breaks multipart boundary and
+          // Laravel then never sees uploaded files (hasFile === false).
+          const headers = config.headers as any;
+          if (headers && typeof headers.setContentType === 'function') {
+            headers.setContentType(false);
+          } else if (headers && typeof headers.set === 'function') {
+            headers.set('Content-Type', false);
+          } else if (headers) {
+            delete headers['Content-Type'];
+            delete headers['content-type'];
+          }
+        } else if (
+          config.data &&
+          typeof config.data === 'object' &&
+          !config.headers?.['Content-Type'] &&
+          !config.headers?.['content-type']
+        ) {
+          config.headers['Content-Type'] = 'application/json';
         }
+
         return config;
       },
       (error) => {

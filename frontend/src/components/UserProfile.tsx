@@ -33,7 +33,7 @@ interface UserProfileProps {
 }
 
 export default function UserProfile({ userId, onClose }: UserProfileProps) {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   
   // Check if user is admin
   const isAdmin = user?.role?.toLowerCase() === 'admin' || 
@@ -42,6 +42,7 @@ export default function UserProfile({ userId, onClose }: UserProfileProps) {
   const [activeTab, setActiveTab] = useState<'basic' | 'security' | 'settings' | 'digitalCard' | 'activity'>('basic');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [activityData, setActivityData] = useState<any>(null);
   const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now());
@@ -59,16 +60,50 @@ export default function UserProfile({ userId, onClose }: UserProfileProps) {
     }
   }, [activeTab, targetUserId]);
 
+  const applyAvatarFromResponse = (responseUser: any) => {
+    if (!responseUser) return;
+    setAvatarTimestamp(Date.now());
+    setProfileData((prev: any) => ({
+      ...prev,
+      avatar: responseUser.avatar ?? prev?.avatar,
+      avatar_url: responseUser.avatar_url ?? prev?.avatar_url,
+      avatarFile: undefined,
+      avatarPreview: undefined,
+    }));
+    // Keep auth store in sync so header / other views show the new image
+    if (!isViewingOtherUser) {
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser) {
+        updateUser({
+          ...currentUser,
+          avatar: responseUser.avatar ?? currentUser.avatar,
+          avatar_url: responseUser.avatar_url ?? currentUser.avatar_url,
+          name: responseUser.name ?? currentUser.name,
+          email: responseUser.email ?? currentUser.email,
+        });
+      }
+    }
+  };
+
   const loadProfile = async () => {
     try {
       setLoading(true);
       const data = await authService.getProfile(targetUserId);
-      console.log('Loaded profile data:', data);
       setProfileData(data);
-      // Update avatar timestamp when profile is loaded to force refresh
-      if (data?.avatar) {
-        console.log('Avatar path:', data.avatar);
+      if (data?.avatar || data?.avatar_url) {
         setAvatarTimestamp(Date.now());
+      }
+      if (!isViewingOtherUser && data) {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+          updateUser({
+            ...currentUser,
+            avatar: data.avatar ?? currentUser.avatar,
+            avatar_url: data.avatar_url ?? currentUser.avatar_url,
+            name: data.name ?? currentUser.name,
+            email: data.email ?? currentUser.email,
+          });
+        }
       }
     } catch (error: any) {
       console.error('Failed to load profile:', error);
@@ -88,70 +123,145 @@ export default function UserProfile({ userId, onClose }: UserProfileProps) {
     }
   };
 
+  const handleAvatarUpload = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Slika je veća od 5MB');
+      return;
+    }
+
+    const previousAvatar = profileData?.avatar;
+    const uploadId = Date.now();
+
+    // Show local preview immediately
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileData((prev: any) => {
+        // Only apply preview while this upload is still in-flight
+        if (prev?._avatarUploadId !== uploadId) {
+          return prev;
+        }
+        return {
+          ...prev,
+          avatarPreview: reader.result,
+          avatarFile: undefined,
+        };
+      });
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      setUploadingAvatar(true);
+      setProfileData((prev: any) => ({ ...prev, _avatarUploadId: uploadId }));
+
+      const response = await authService.uploadAvatar(file, targetUserId);
+      const responseUser = response?.user;
+
+      if (!responseUser?.avatar || responseUser.avatar === previousAvatar) {
+        setProfileData((prev: any) => ({
+          ...prev,
+          avatarFile: undefined,
+          avatarPreview: undefined,
+          _avatarUploadId: undefined,
+        }));
+        toast.error('Slika nije sačuvana na serveru. Pokušajte ponovo.');
+        return;
+      }
+
+      setAvatarTimestamp(Date.now());
+      setProfileData((prev: any) => ({
+        ...prev,
+        avatar: responseUser.avatar,
+        avatar_url: responseUser.avatar_url,
+        avatarFile: undefined,
+        avatarPreview: undefined,
+        _avatarUploadId: undefined,
+      }));
+
+      if (!isViewingOtherUser) {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+          updateUser({
+            ...currentUser,
+            avatar: responseUser.avatar,
+            avatar_url: responseUser.avatar_url,
+          });
+        }
+      }
+
+      toast.success('Profilna slika je sačuvana');
+    } catch (error: any) {
+      console.error('Failed to upload avatar:', error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Greška pri uploadu profilne slike';
+      toast.error(errorMessage);
+      setProfileData((prev: any) => ({
+        ...prev,
+        avatarFile: undefined,
+        avatarPreview: undefined,
+        _avatarUploadId: undefined,
+      }));
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
-      const formData = new FormData();
 
-      // Basic info - always send these fields
-      formData.append('name', profileData?.name || '');
-      formData.append('email', profileData?.email || '');
-      if (profileData?.phone !== undefined) formData.append('phone', profileData.phone || '');
-      if (profileData?.locale) formData.append('locale', profileData.locale);
-      if (profileData?.theme) formData.append('theme', profileData.theme);
-      if (profileData?.timezone) formData.append('timezone', profileData.timezone);
+      // JSON save — do not touch avatar (already saved via /profile/avatar)
+      const payload: Record<string, any> = {
+        name: profileData?.name || '',
+        email: profileData?.email || '',
+        phone: profileData?.phone ?? '',
+        locale: profileData?.locale,
+        theme: profileData?.theme,
+        timezone: profileData?.timezone,
+        settings: {
+          default_module: profileData?.settings?.default_module || '',
+          table_rows_per_page: profileData?.settings?.table_rows_per_page || 25,
+          auto_logout_timeout: profileData?.settings?.auto_logout_timeout || 0,
+        },
+        notification_settings: {
+          email_enabled: !!profileData?.notification_settings?.email_enabled,
+          desktop_enabled: !!profileData?.notification_settings?.desktop_enabled,
+          sound_enabled: !!profileData?.notification_settings?.sound_enabled,
+        },
+      };
 
-      // Avatar
-      if (profileData?.avatarFile) {
-        formData.append('avatar', profileData.avatarFile);
-      }
+      const previousAvatar = profileData?.avatar;
+      const previousAvatarUrl = profileData?.avatar_url;
 
-      // Settings
-      formData.append('settings[default_module]', profileData?.settings?.default_module || '');
-      formData.append('settings[table_rows_per_page]', String(profileData?.settings?.table_rows_per_page || 25));
-      formData.append('settings[auto_logout_timeout]', String(profileData?.settings?.auto_logout_timeout || 0));
+      const response = await authService.updateProfile(payload, targetUserId);
 
-      // Notification settings
-      formData.append('notification_settings[email_enabled]', profileData?.notification_settings?.email_enabled ? '1' : '0');
-      formData.append('notification_settings[desktop_enabled]', profileData?.notification_settings?.desktop_enabled ? '1' : '0');
-      formData.append('notification_settings[sound_enabled]', profileData?.notification_settings?.sound_enabled ? '1' : '0');
+      setProfileData((prev: any) => ({
+        ...prev,
+        name: response?.user?.name ?? prev?.name,
+        email: response?.user?.email ?? prev?.email,
+        avatar: response?.user?.avatar ?? previousAvatar ?? prev?.avatar,
+        avatar_url: response?.user?.avatar_url ?? previousAvatarUrl ?? prev?.avatar_url,
+        avatarFile: undefined,
+        avatarPreview: undefined,
+      }));
+      setAvatarTimestamp(Date.now());
 
-      console.log('Saving profile:', {
-        name: profileData?.name,
-        email: profileData?.email,
-        phone: profileData?.phone,
-        hasAvatar: !!profileData?.avatarFile,
-      });
-
-      const hadAvatarFile = !!profileData?.avatarFile;
-      
-      const response = await authService.updateProfile(formData, targetUserId);
-      
-      console.log('Profile update response:', response);
-      
-      toast.success('Profil uspješno ažuriran');
-      
-      // Reload profile to get updated data (will set avatar from server)
-      await loadProfile();
-      
-      // Clear avatar preview and file after profile is reloaded
-      // This ensures the server avatar is displayed instead of the preview
-      if (hadAvatarFile) {
-        // Use setTimeout to ensure loadProfile state update is complete
-        setTimeout(() => {
-          setProfileData((prev: any) => {
-            // Only clear preview if avatar is available from server
-            if (prev?.avatar) {
-              return {
-                ...prev,
-                avatarFile: undefined,
-                avatarPreview: undefined
-              };
-            }
-            return prev;
+      if (!isViewingOtherUser) {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+          updateUser({
+            ...currentUser,
+            name: response?.user?.name ?? currentUser.name,
+            email: response?.user?.email ?? currentUser.email,
+            avatar: response?.user?.avatar ?? previousAvatar ?? currentUser.avatar,
+            avatar_url: response?.user?.avatar_url ?? previousAvatarUrl ?? currentUser.avatar_url,
           });
-        }, 200);
+        }
       }
+
+      toast.success('Profil uspješno ažuriran');
     } catch (error: any) {
       console.error('Failed to update profile:', error);
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Greška pri ažuriranju profila';
@@ -180,10 +290,10 @@ export default function UserProfile({ userId, onClose }: UserProfileProps) {
             <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center text-xl sm:text-2xl font-bold overflow-hidden flex-shrink-0">
               {profileData?.avatarPreview ? (
                 <img src={profileData.avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : profileData?.avatar_url || profileData?.avatar ? (
+              ) : profileData?.avatar_url ? (
                 <img 
                   key={`header-${avatarTimestamp || Date.now()}`}
-                  src={profileData.avatar_url || ''} 
+                  src={profileData.avatar_url} 
                   alt="Avatar" 
                   className="w-full h-full object-cover" 
                 />
@@ -247,6 +357,8 @@ export default function UserProfile({ userId, onClose }: UserProfileProps) {
               avatarTimestamp={avatarTimestamp}
               targetUserId={targetUserId}
               user={user}
+              uploadingAvatar={uploadingAvatar}
+              onAvatarSelect={handleAvatarUpload}
             />
           )}
           {activeTab === 'security' && (
@@ -308,16 +420,21 @@ export default function UserProfile({ userId, onClose }: UserProfileProps) {
 }
 
 // Basic Info Tab Component
-function BasicInfoTab({ profileData, setProfileData, isViewingOtherUser, isAdmin, avatarTimestamp, targetUserId, user }: any) {
+function BasicInfoTab({
+  profileData,
+  setProfileData,
+  isViewingOtherUser,
+  isAdmin,
+  avatarTimestamp,
+  uploadingAvatar,
+  onAvatarSelect,
+}: any) {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setProfileData({ ...profileData, avatarFile: file });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileData({ ...profileData, avatarFile: file, avatarPreview: reader.result });
-      };
-      reader.readAsDataURL(file);
+    // Allow selecting the same file again later
+    e.target.value = '';
+    if (file && onAvatarSelect) {
+      onAvatarSelect(file);
     }
   };
 
@@ -327,28 +444,35 @@ function BasicInfoTab({ profileData, setProfileData, isViewingOtherUser, isAdmin
       <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-6">
         <div className="relative">
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-white flex items-center justify-center text-2xl sm:text-3xl font-bold overflow-hidden">
-            {(() => {
-              return profileData?.avatarPreview ? (
-                <img src={profileData.avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : profileData?.avatar_url || profileData?.avatar ? (
-                <img 
-                  key={`avatar-main-${avatarTimestamp || Date.now()}`}
-                  src={profileData.avatar_url || ''} 
-                  alt="Avatar" 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                profileData?.name?.charAt(0).toUpperCase() || 'U'
-              );
-            })()}
+            {profileData?.avatarPreview ? (
+              <img src={profileData.avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+            ) : profileData?.avatar_url ? (
+              <img
+                key={`avatar-main-${avatarTimestamp || Date.now()}`}
+                src={profileData.avatar_url}
+                alt="Avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              profileData?.name?.charAt(0).toUpperCase() || 'U'
+            )}
           </div>
           {!isViewingOtherUser && (
-            <label className="absolute bottom-0 right-0 w-8 h-8 bg-primary-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-600 transition-colors">
-              <FiCamera className="w-4 h-4" />
+            <label
+              className={`absolute bottom-0 right-0 w-8 h-8 bg-primary-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-600 transition-colors ${
+                uploadingAvatar ? 'opacity-60 pointer-events-none' : ''
+              }`}
+            >
+              {uploadingAvatar ? (
+                <FiRefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <FiCamera className="w-4 h-4" />
+              )}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
                 className="hidden"
+                disabled={uploadingAvatar}
                 onChange={handleAvatarChange}
               />
             </label>
@@ -356,7 +480,9 @@ function BasicInfoTab({ profileData, setProfileData, isViewingOtherUser, isAdmin
         </div>
         <div className="text-center sm:text-left">
           <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Profilna slika</h3>
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Maksimalna veličina: 5MB</p>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            {uploadingAvatar ? 'Čuvanje slike...' : 'Kliknite kameru — slika se automatski čuva (max 5MB)'}
+          </p>
         </div>
       </div>
 
