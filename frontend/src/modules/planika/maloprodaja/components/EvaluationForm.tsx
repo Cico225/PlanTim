@@ -11,6 +11,7 @@ import {
   EvaluationCriteria,
   Store,
 } from '@/types/planika-maloprodaja';
+import { formatDateTime } from '@/utils/dateFormat';
 
 interface EvaluationFormProps {
   evaluationId?: number;
@@ -669,7 +670,7 @@ export default function EvaluationForm({ evaluationId, onSuccess, onCancel }: Ev
                         <p className="text-sm font-medium text-gray-900 dark:text-white">{signature.user_name || 'Nepoznato'}</p>
                         {signature.signed_at && (
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(signature.signed_at).toLocaleString('hr-HR')}
+                            {formatDateTime(signature.signed_at)}
                           </p>
                         )}
                       </div>
@@ -740,7 +741,7 @@ export default function EvaluationForm({ evaluationId, onSuccess, onCancel }: Ev
                           <p className="text-sm font-medium text-gray-900 dark:text-white">{signature.user_name || 'Nepoznato'}</p>
                           {signature.signed_at && (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {new Date(signature.signed_at).toLocaleString('hr-HR')}
+                              {formatDateTime(signature.signed_at)}
                             </p>
                           )}
                         </div>

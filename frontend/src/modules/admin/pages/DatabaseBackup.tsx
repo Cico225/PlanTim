@@ -17,7 +17,7 @@ import {
   FiPlay,
   FiCalendar,
 } from 'react-icons/fi';
-import { format, parseISO } from 'date-fns';
+import { formatDateTime } from '@/utils/dateFormat';
 import { apiService } from '@/services/api';
 import toast from 'react-hot-toast';
 
@@ -334,14 +334,6 @@ export default function DatabaseBackup() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return format(parseISO(dateString), 'dd.MM.yyyy HH:mm');
-    } catch {
-      return dateString;
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -541,7 +533,7 @@ export default function DatabaseBackup() {
                 {' · '}
                 {backupSettings.last_run.trigger_type === 'scheduled' ? 'Automatski' : 'Ručni'}
                 {' · '}
-                {formatDate(backupSettings.last_run.started_at)}
+                {formatDateTime(backupSettings.last_run.started_at)}
               </p>
               {backupSettings.last_run.zip_filename && (
                 <p className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-1">
@@ -578,7 +570,7 @@ export default function DatabaseBackup() {
               <tbody>
                 {backupRuns.map((run) => (
                   <tr key={run.id} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-3 px-4 text-sm">{formatDate(run.started_at)}</td>
+                    <td className="py-3 px-4 text-sm">{formatDateTime(run.started_at)}</td>
                     <td className="py-3 px-4 text-sm">{run.trigger_type === 'scheduled' ? 'Automatski' : 'Ručni'}</td>
                     <td className="py-3 px-4 text-sm">
                       <span className={run.status === 'success' ? 'text-green-600' : run.status === 'failed' ? 'text-red-600' : 'text-amber-600'}>
@@ -814,7 +806,7 @@ export default function DatabaseBackup() {
                     <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
                       <div className="flex items-center gap-2">
                         <FiClock size={14} />
-                        {formatDate(backup.created_at)}
+                        {formatDateTime(backup.created_at)}
                       </div>
                     </td>
                     <td className="py-3 px-4">

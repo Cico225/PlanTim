@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { getHRDashboard, getEmployees, getAlerts, createEmployee, importEmployees, getDepartments, getEmployee, updateEmployee, deleteEmployee, getStores, getWorkPositions } from '../../../services/hrmService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 import type { EmployeeStatus } from '../../../types/hrm';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import ATSPositions from '../components/ATSPositions';
@@ -147,17 +148,6 @@ function HRDashboard() {
   const alerts = alertsData || dashboardData?.alerts || [];
   const recentActivities = dashboardData?.recent_activities || [];
 
-  const formatShortDate = (value?: string) => {
-    if (!value) return 'Bez datuma';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString('bs-BA', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
-
   const statCards = [
     { label: 'Ukupno zaposlenika', value: stats.total_employees, icon: Users, color: 'bg-blue-500' },
     { label: 'Aktivni', value: stats.active_employees, icon: CheckCircle, color: 'bg-green-500' },
@@ -234,7 +224,7 @@ function HRDashboard() {
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{activity.description}</p>
                   </div>
                   <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                    {formatShortDate(activity.date || activity.created_at)}
+                    {formatDate(activity.date || activity.created_at, 'Bez datuma')}
                   </span>
                 </div>
               ))}
@@ -296,7 +286,7 @@ function HRDashboard() {
                   </div>
                 </div>
                 {alert.due_date && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{formatShortDate(alert.due_date)}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(alert.due_date, 'Bez datuma')}</span>
                 )}
               </div>
             ))}
@@ -1604,7 +1594,7 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Datum rođenja</p>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-400" />
-                      <p className="text-base text-gray-900 dark:text-white">{new Date(emp.date_of_birth).toLocaleDateString('sr-RS')}</p>
+                      <p className="text-base text-gray-900 dark:text-white">{formatDate(emp.date_of_birth)}</p>
                     </div>
                   </div>
                 )}
@@ -1714,7 +1704,7 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Datum početka</p>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
-                    <p className="text-base text-gray-900 dark:text-white">{new Date(emp.hire_date).toLocaleDateString('sr-RS')}</p>
+                    <p className="text-base text-gray-900 dark:text-white">{formatDate(emp.hire_date)}</p>
                   </div>
                 </div>
                 {emp.probation_end_date && (
@@ -1722,7 +1712,7 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Kraj probnog roka</p>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-400" />
-                      <p className="text-base text-gray-900 dark:text-white">{new Date(emp.probation_end_date).toLocaleDateString('sr-RS')}</p>
+                      <p className="text-base text-gray-900 dark:text-white">{formatDate(emp.probation_end_date)}</p>
                     </div>
                   </div>
                 )}
@@ -1731,7 +1721,7 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Datum prestanka</p>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-400" />
-                      <p className="text-base text-gray-900 dark:text-white">{new Date(emp.termination_date).toLocaleDateString('sr-RS')}</p>
+                      <p className="text-base text-gray-900 dark:text-white">{formatDate(emp.termination_date)}</p>
                     </div>
                   </div>
                 )}

@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fi';
 import { apiService } from '@/services/api';
 import type { AppVersion } from '@/hooks/useAppVersion';
+import { formatDate } from '@/utils/dateFormat';
 
 interface VersionHistoryItem extends AppVersion {
   id?: number;
@@ -26,15 +27,6 @@ interface VersionInfoModalProps {
 }
 
 const changeIcons = [FiZap, FiPackage, FiShield, FiDatabase, FiLayers, FiStar];
-
-function formatDate(value?: string | null) {
-  if (!value) return '';
-  return new Date(value).toLocaleDateString('bs-BA', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function normalizeChangelog(changelog?: string[] | null): string[] {
   if (!changelog?.length) return [];
@@ -164,7 +156,7 @@ export default function VersionInfoModal({
                     )}
                   </motion.div>
                   {primary?.released_at && (
-                    <p className="mt-2 text-xs text-white/70 sm:text-sm">{formatDate(primary.released_at)}</p>
+                    <p className="mt-2 text-xs text-white/70 sm:text-sm">{formatDate(primary.released_at, '')}</p>
                   )}
                 </div>
 
@@ -257,7 +249,7 @@ export default function VersionInfoModal({
                               <span className="min-w-0 break-words">{entry.version_name || 'Verzija'}</span>
                               {entry.released_at && (
                                 <span className="break-words text-[11px] font-normal text-gray-500 dark:text-gray-400">
-                                  · {formatDate(entry.released_at)}
+                                  · {formatDate(entry.released_at, '')}
                                 </span>
                               )}
                             </span>

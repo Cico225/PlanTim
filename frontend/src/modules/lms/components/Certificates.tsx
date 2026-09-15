@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fi';
 import { lmsService, Certificate } from '@/services/lmsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 interface CertificateWithStatus extends Certificate {
   is_earned: boolean;
@@ -293,13 +294,7 @@ export default function Certificates() {
                         <FiCalendar className="h-3.5 w-3.5" />
                         <span>
                           Izdato:{' '}
-                          {certificate.issued_at
-                            ? new Date(certificate.issued_at).toLocaleDateString('bs-BA', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })
-                            : 'N/A'}
+                          {formatDate(certificate.issued_at, 'N/A')}
                         </span>
                       </div>
 
@@ -469,13 +464,7 @@ function CertificateModal({
               </p>
               <p className="mb-4 text-sm text-white/90">uspješno završen dana</p>
               <p className="mb-6 font-semibold text-white">
-                {certificate.issued_at
-                  ? new Date(certificate.issued_at).toLocaleDateString('bs-BA', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })
-                  : 'N/A'}
+                {formatDate(certificate.issued_at, 'N/A')}
               </p>
 
               {certificate.final_score !== undefined && certificate.final_score !== null && (
@@ -520,11 +509,7 @@ function CertificateModal({
                 <div>
                   <p className="font-semibold text-gray-900 dark:text-white">Datum izdavanja</p>
                   <p>
-                    {new Date(certificate.issued_at).toLocaleDateString('bs-BA', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
+                    {formatDate(certificate.issued_at)}
                   </p>
                 </div>
               </div>

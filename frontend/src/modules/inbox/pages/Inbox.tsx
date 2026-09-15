@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { formatDateTime } from '@/utils/dateFormat';
 import { apiService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { 
@@ -579,7 +580,7 @@ export default function Inbox() {
                         {selectedMessage.sender_email}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                        {format(new Date(selectedMessage.created_at), 'PPpp')}
+                        {formatDateTime(selectedMessage.created_at)}
                       </p>
                     </div>
                   </div>

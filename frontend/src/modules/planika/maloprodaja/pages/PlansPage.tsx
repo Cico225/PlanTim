@@ -13,6 +13,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import { ActivityPlan } from '@/types/planika-maloprodaja';
+import { formatDate } from '@/utils/dateFormat';
 import PlanForm from '../components/PlanForm';
 
 export default function PlansPage() {
@@ -271,13 +272,13 @@ export default function PlansPage() {
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Početak</p>
                 <p className="mt-1 text-sm font-medium">
-                  {new Date(selectedPlan.start_date).toLocaleDateString('bs-BA')}
+                  {formatDate(selectedPlan.start_date)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Završetak</p>
                 <p className="mt-1 text-sm font-medium">
-                  {new Date(selectedPlan.end_date).toLocaleDateString('bs-BA')}
+                  {formatDate(selectedPlan.end_date)}
                 </p>
               </div>
               <div>
@@ -373,8 +374,8 @@ export default function PlansPage() {
               <div className="flex items-center gap-2">
                 <FiCalendar className="w-4 h-4" />
                 <span>
-                  {new Date(plan.start_date).toLocaleDateString('bs-BA')} -{' '}
-                  {new Date(plan.end_date).toLocaleDateString('bs-BA')}
+                  {formatDate(plan.start_date)} -{' '}
+                  {formatDate(plan.end_date)}
                 </span>
               </div>
               <div className="flex items-center gap-2">

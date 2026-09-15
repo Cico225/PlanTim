@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import Timeline from './Timeline';
 import DocumentList from './DocumentList';
 import TagManager from './TagManager';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function DealDetail() {
   const { id } = useParams<{ id: string }>();
@@ -201,7 +202,7 @@ export default function DealDetail() {
                     <div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">Očekivani Datum Zatvaranja</p>
                       <p className="text-gray-900 dark:text-white">
-                        {new Date(deal.expected_close_date).toLocaleDateString('bs-BA')}
+                        {formatDate(deal.expected_close_date)}
                       </p>
                     </div>
                   )}

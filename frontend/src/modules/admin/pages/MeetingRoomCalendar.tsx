@@ -14,6 +14,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInte
 import { apiService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
+import { formatDate, formatMonthYear } from '@/utils/dateFormat';
 
 interface MeetingRoom {
   id: number;
@@ -387,7 +388,7 @@ export default function MeetingRoomCalendar() {
       >
         <div className="mb-4 pb-3 border-b border-gray-200 dark:border-gray-600">
           <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            {format(currentDate, 'EEEE, d. MMMM yyyy')}
+            {formatDate(currentDate)}
           </div>
         </div>
         <div className="space-y-3">
@@ -746,10 +747,10 @@ export default function MeetingRoomCalendar() {
               <div className="text-center flex-1 sm:flex-none sm:min-w-[200px] px-2">
                 <div className="font-medium text-sm sm:text-base text-gray-900 dark:text-white whitespace-nowrap">
                   {viewMode === 'day'
-                    ? format(currentDate, 'dd.MM.yyyy')
+                    ? formatDate(currentDate)
                     : viewMode === 'week'
-                    ? `${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'dd.MM')} - ${format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'dd.MM.yyyy')}`
-                    : format(currentDate, 'MMMM yyyy')}
+                    ? `${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'dd.MM')} - ${formatDate(endOfWeek(currentDate, { weekStartsOn: 1 }))}`
+                    : formatMonthYear(currentDate)}
                 </div>
               </div>
               <button

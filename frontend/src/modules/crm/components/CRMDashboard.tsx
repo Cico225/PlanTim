@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiUsers, FiBriefcase, FiDollarSign, FiActivity, FiTrendingUp, FiPlus } from 'react-icons/fi';
 import { apiService } from '@/services/api';
+import { formatDate } from '@/utils/dateFormat';
 
 interface CRMStats {
   contacts_count: number;
@@ -246,7 +247,7 @@ export default function CRMDashboard() {
                 </div>
                 {activity.scheduled_at && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {new Date(activity.scheduled_at).toLocaleDateString('bs-BA')}
+                    {formatDate(activity.scheduled_at)}
                   </p>
                 )}
               </div>

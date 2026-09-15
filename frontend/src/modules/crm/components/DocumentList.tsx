@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiUpload, FiFile, FiDownload, FiTrash2, FiFileText } from 'react-icons/fi';
 import { apiService } from '@/services/api';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 interface Document {
   id: number;
@@ -132,7 +133,7 @@ export default function DocumentList({ entityType, entityId }: DocumentListProps
                 <div>
                   <div className="font-medium text-gray-900 dark:text-white">{doc.name}</div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {formatFileSize(doc.file_size)} • {doc.file_type || 'Dokument'} • {new Date(doc.uploaded_at).toLocaleDateString('bs-BA')}
+                    {formatFileSize(doc.file_size)} • {doc.file_type || 'Dokument'} • {formatDate(doc.uploaded_at)}
                   </div>
                 </div>
               </div>

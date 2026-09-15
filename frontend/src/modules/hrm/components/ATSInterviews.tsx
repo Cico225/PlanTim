@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ClipboardCheck, Plus, Edit2, Trash2, Calendar, Clock, User, Video, Phone, MapPin, Search, Filter } from 'lucide-react';
 import { atsService, type Interview } from '../../../services/atsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function ATSInterviews() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,7 +162,7 @@ export default function ATSInterviews() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <Calendar className="w-4 h-4" />
-                  {new Date(interview.scheduled_date).toLocaleDateString('sr-RS')}
+                  {formatDate(interview.scheduled_date)}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <Clock className="w-4 h-4" />

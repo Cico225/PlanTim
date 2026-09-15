@@ -41,6 +41,7 @@ import type {
   LegalEntity,
   JobRole,
 } from '../../../types/hrm';
+import { formatDate } from '@/utils/dateFormat';
 
 const LEGAL_ENTITY_LABELS: Record<LegalEntity, string> = {
   fbih: 'FBiH',
@@ -71,11 +72,6 @@ const TERM_PRESETS = [
   { value: '12', label: '12 mjeseci' },
   { value: 'custom', label: 'Prilagođeno (ručni datum)' },
 ] as const;
-
-function formatDate(value?: string | null) {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('bs-BA');
-}
 
 function formatFileSize(bytes?: number | null) {
   if (!bytes && bytes !== 0) return '—';

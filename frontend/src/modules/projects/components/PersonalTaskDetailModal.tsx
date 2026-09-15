@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiX, FiCalendar, FiFlag, FiTag, FiSave, FiTrash2, FiEdit2, FiUser } from 'react-icons/fi';
 import { projectsService, Task } from '@/services/projectsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 interface PersonalTaskDetailModalProps {
   isOpen: boolean;
@@ -333,7 +334,7 @@ export default function PersonalTaskDetailModal({
                   />
                 ) : (
                   <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">
-                    {(task as any).start_date ? new Date((task as any).start_date).toLocaleDateString('bs-BA') : '-'}
+                    {formatDate((task as any).start_date, '-')}
                   </p>
                 )}
               </div>
@@ -353,7 +354,7 @@ export default function PersonalTaskDetailModal({
                   />
                 ) : (
                   <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">
-                    {task.due_date ? new Date(task.due_date).toLocaleDateString('bs-BA') : '-'}
+                    {formatDate(task.due_date, '-')}
                   </p>
                 )}
               </div>

@@ -4,6 +4,7 @@ import { FiPlus, FiActivity, FiSearch, FiEdit, FiTrash2, FiEye, FiCheckCircle } 
 import { useAuthStore } from '@/store/authStore';
 import { apiService } from '@/services/api';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 import ActivityForm from './ActivityForm';
 
 interface Activity {
@@ -186,7 +187,7 @@ export default function ActivitiesList() {
                           )}
                           {activity.deal_title && <p>💰 {activity.deal_title}</p>}
                           {activity.scheduled_at && (
-                            <p>{new Date(activity.scheduled_at).toLocaleDateString('bs-BA')}</p>
+                            <p>{formatDate(activity.scheduled_at)}</p>
                           )}
                         </div>
                       </div>
@@ -265,7 +266,7 @@ export default function ActivitiesList() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             {activity.scheduled_at && (
                               <div className="text-sm text-gray-900 dark:text-white">
-                                {new Date(activity.scheduled_at).toLocaleDateString('bs-BA')}
+                                {formatDate(activity.scheduled_at)}
                               </div>
                             )}
                           </td>

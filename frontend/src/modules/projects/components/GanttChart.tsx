@@ -18,6 +18,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { srLatn } from 'date-fns/locale';
+import { formatDate, formatMonthYear } from '@/utils/dateFormat';
 
 interface GanttChartProps {
   projectId: number | string;
@@ -488,8 +489,8 @@ export default function GanttChart({ projectId, userId, dateFrom, dateTo, priori
           </button>
           <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white min-w-[140px] sm:min-w-[180px] text-center">
             {viewMode === 'week' 
-              ? `${format(getDaysInMonth()[0], 'dd.MM', { locale: srLatn })} - ${format(getDaysInMonth()[getDaysInMonth().length - 1], 'dd.MM.yyyy', { locale: srLatn })}`
-              : format(currentDate, 'MMMM yyyy', { locale: srLatn })
+              ? `${format(getDaysInMonth()[0], 'dd.MM', { locale: srLatn })} - ${formatDate(getDaysInMonth()[getDaysInMonth().length - 1])}`
+              : formatMonthYear(currentDate)
             }
           </h2>
           <button
@@ -561,8 +562,8 @@ export default function GanttChart({ projectId, userId, dateFrom, dateTo, priori
                       </div>
                       {project.start_date && project.end_date && (
                         <div className="text-[10px] text-gray-500 dark:text-gray-400 ml-4 mt-0.5">
-                          {format(parseISO(project.start_date), 'dd.MM.yyyy', { locale: srLatn })} -{' '}
-                          {format(parseISO(project.end_date), 'dd.MM.yyyy', { locale: srLatn })}
+                          {formatDate(project.start_date)} -{' '}
+                          {formatDate(project.end_date)}
                         </div>
                       )}
                     </div>
@@ -592,8 +593,8 @@ export default function GanttChart({ projectId, userId, dateFrom, dateTo, priori
                         </div>
                         {task.start_date && task.end_date && (
                           <div className="text-[10px] text-gray-500 dark:text-gray-400 ml-4 mb-1">
-                            {format(parseISO(task.start_date), 'dd.MM.yyyy', { locale: srLatn })} -{' '}
-                            {format(parseISO(task.end_date), 'dd.MM.yyyy', { locale: srLatn })}
+                            {formatDate(task.start_date)} -{' '}
+                            {formatDate(task.end_date)}
                           </div>
                         )}
                         {mainAssignee && (
@@ -742,10 +743,10 @@ export default function GanttChart({ projectId, userId, dateFrom, dateTo, priori
                                 minWidth: '50px',
                               }}
                               onClick={() => setSelectedItem(selectedItem === task.id ? null : task.id)}
-                              title={`${task.title} - ${format(parseISO(task.start_date), 'dd.MM.yyyy', { locale: srLatn })} - ${format(parseISO(task.end_date), 'dd.MM.yyyy', { locale: srLatn })}`}
+                              title={`${task.title} - ${formatDate(task.start_date)} - ${formatDate(task.end_date)}`}
                             >
                               <span className="text-white text-[10px] font-semibold truncate">
-                                {format(parseISO(task.start_date), 'dd.MM.yyyy', { locale: srLatn })} {task.title}
+                                {formatDate(task.start_date)} {task.title}
                               </span>
                             </div>
                           </div>

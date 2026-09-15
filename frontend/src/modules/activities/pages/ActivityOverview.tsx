@@ -15,8 +15,8 @@ import {
   FiEdit2,
   FiTrash2,
 } from 'react-icons/fi';
-import { format, parseISO } from 'date-fns';
 import { apiService } from '@/services/api';
+import { formatDateTimeSeconds } from '@/utils/dateFormat';
 import toast from 'react-hot-toast';
 import MeetingRoomCalendarCompact from '../components/MeetingRoomCalendarCompact';
 import ActivityOverviewAnimation, { ActivityStatCard } from '../components/ActivityOverviewAnimation';
@@ -179,14 +179,6 @@ export default function ActivityOverview() {
       date_to: '',
     });
     setCurrentPage(1);
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return format(parseISO(dateString), 'dd.MM.yyyy HH:mm:ss');
-    } catch {
-      return dateString;
-    }
   };
 
   const exportLogs = () => {
@@ -428,7 +420,7 @@ export default function ActivityOverview() {
                           )}
                           <span className="inline-flex items-center gap-1">
                             <FiClock size={14} />
-                            {formatDate(log.created_at)}
+                            {formatDateTimeSeconds(log.created_at)}
                           </span>
                           {log.log_name && (
                             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs dark:bg-dark-700">
@@ -536,7 +528,7 @@ export default function ActivityOverview() {
                   </div>
                   <div className="rounded-xl bg-gray-50 p-4 dark:bg-dark-900/40">
                     <label className="label mb-1">Datum i vrijeme</label>
-                    <p className="text-gray-700 dark:text-gray-200">{formatDate(selectedLog.created_at)}</p>
+                    <p className="text-gray-700 dark:text-gray-200">{formatDateTimeSeconds(selectedLog.created_at)}</p>
                   </div>
                   {selectedLog.log_name && (
                     <div className="rounded-xl bg-gray-50 p-4 dark:bg-dark-900/40">

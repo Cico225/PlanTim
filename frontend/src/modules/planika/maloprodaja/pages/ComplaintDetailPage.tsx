@@ -9,6 +9,7 @@ import ComplaintRejectionLetter, {
   buildDefaultRejectionResponse,
 } from '../components/ComplaintRejectionLetter';
 import { retailComplaintsService } from '@/services/retailComplaintsService';
+import { formatDate } from '@/utils/dateFormat';
 import {
   ComplaintCapabilities,
   ComplaintReviewAction,
@@ -246,7 +247,7 @@ export default function ComplaintDetailPage() {
               <InfoRow label="Račun" value={complaint.receipt_number} />
               <InfoRow
                 label="Datum kupovine"
-                value={complaint.purchase_date ? new Date(complaint.purchase_date).toLocaleDateString('bs-BA') : null}
+                value={complaint.purchase_date ? formatDate(complaint.purchase_date) : null}
               />
             </InfoSection>
           </div>

@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fi';
 import { StoreControl } from '@/types/planika-maloprodaja';
 import ControlFormComponent from '../components/ControlForm';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function ControlsPage() {
   const navigate = useNavigate();
@@ -170,7 +171,7 @@ export default function ControlsPage() {
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Datum</p>
                 <p className="mt-1 text-sm font-medium">
-                  {new Date(selectedControl.control_date).toLocaleDateString('bs-BA')}
+                  {formatDate(selectedControl.control_date)}
                 </p>
               </div>
               <div>
@@ -362,7 +363,7 @@ export default function ControlsPage() {
                 </div>
                 <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                   <span>
-                    {new Date(control.control_date).toLocaleDateString('bs-BA')}
+                    {formatDate(control.control_date)}
                   </span>
                   <span>•</span>
                   <span>{control.controller?.name}</span>

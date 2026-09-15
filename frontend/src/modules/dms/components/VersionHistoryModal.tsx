@@ -8,8 +8,7 @@ import {
 } from 'react-icons/fi';
 import { apiService } from '@/services/api';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
-import { sr } from 'date-fns/locale';
+import { formatDateTime } from '@/utils/dateFormat';
 
 interface Version {
   id?: number;
@@ -72,14 +71,6 @@ export default function VersionHistoryModal({
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const formatDateTime = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'dd.MM.yyyy. HH:mm', { locale: sr });
-    } catch (error) {
-      return dateString;
-    }
   };
 
   return (

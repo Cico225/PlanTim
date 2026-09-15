@@ -23,6 +23,7 @@ import {
   FiEye,
 } from 'react-icons/fi';
 import { apiService } from '@/services/api';
+import { formatDateTime } from '@/utils/dateFormat';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { sr } from 'date-fns/locale';
@@ -384,13 +385,7 @@ export default function DMSOverview() {
 
   const formatItemDate = (item: UnifiedItem) => {
     const dateStr = item.isFolder ? item.created_at : (item.updated_at || item.created_at);
-    return new Date(dateStr || '').toLocaleDateString('sr-RS', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatDateTime(dateStr);
   };
 
   const handleItemOpen = (item: UnifiedItem) => {
@@ -701,22 +696,7 @@ export default function DMSOverview() {
                       </div>
                     </td>
                     <td className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {item.isFolder 
-                        ? new Date(item.created_at || '').toLocaleDateString('sr-RS', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : new Date(item.updated_at || item.created_at).toLocaleDateString('sr-RS', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                      }
+                      {formatDateTime(item.isFolder ? item.created_at : (item.updated_at || item.created_at))}
                     </td>
                     <td className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap truncate max-w-xs" title={item.type}>
                       {item.type}

@@ -15,6 +15,7 @@ import {
 import { format } from 'date-fns';
 import { sr } from 'date-fns/locale';
 import { apiService } from '@/services/api';
+import { formatDate, formatMonthYear } from '@/utils/dateFormat';
 import { projectsService } from '@/services/projectsService';
 import toast from 'react-hot-toast';
 
@@ -240,14 +241,11 @@ export default function ProjectsCalendar() {
 
   const formatDateHeader = (): string => {
     if (viewMode === 'month') {
-      return currentDate.toLocaleDateString('bs-BA', { month: 'long', year: 'numeric' });
-    } else {
-      const start = getStartOfView(currentDate);
-      const end = getEndOfView(currentDate);
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-      return `${startDate.toLocaleDateString('bs-BA')} - ${endDate.toLocaleDateString('bs-BA')}`;
+      return formatMonthYear(currentDate);
     }
+    const start = getStartOfView(currentDate);
+    const end = getEndOfView(currentDate);
+    return `${formatDate(start)} - ${formatDate(end)}`;
   };
 
   const getEventIcon = (type: string) => {
@@ -536,7 +534,7 @@ export default function ProjectsCalendar() {
                                 {event.start && (
                                   <span className="flex items-center gap-0.5 shrink-0">
                                     <FiClock className="w-2.5 h-2.5" />
-                                    {format(new Date(event.start), 'dd.MM.', { locale: sr })}
+                                    {formatDate(event.start).slice(0, 6)}
                                   </span>
                                 )}
                               </div>
@@ -652,9 +650,9 @@ export default function ProjectsCalendar() {
                               {event.start && (
                                 <div className="text-xs opacity-75 flex items-center gap-1">
                                   <FiClock className="w-3 h-3 shrink-0" />
-                                  {format(new Date(event.start), 'dd.MM.yyyy', { locale: sr })}
+                                  {formatDate(event.start)}
                                   {event.end && event.end !== event.start && (
-                                    <> – {format(new Date(event.end), 'dd.MM.yyyy', { locale: sr })}</>
+                                    <> – {formatDate(event.end)}</>
                                   )}
                                 </div>
                               )}

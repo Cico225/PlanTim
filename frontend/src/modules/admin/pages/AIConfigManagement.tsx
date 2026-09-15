@@ -19,8 +19,8 @@ import {
   FiEye,
   FiEyeOff,
 } from 'react-icons/fi';
-import { format, parseISO } from 'date-fns';
 import { apiService } from '@/services/api';
+import { formatDateTime } from '@/utils/dateFormat';
 
 interface AISetting {
   value: any;
@@ -212,15 +212,6 @@ export default function AIConfigManagement() {
       );
     } finally {
       setTesting(false);
-    }
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    try {
-      return format(parseISO(dateString), 'dd.MM.yyyy HH:mm');
-    } catch {
-      return dateString;
     }
   };
 
@@ -744,7 +735,7 @@ export default function AIConfigManagement() {
                           {chat.message_count || 0}
                         </td>
                         <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                          {formatDate(chat.created_at)}
+                          {formatDateTime(chat.created_at, 'N/A')}
                         </td>
                       </tr>
                     ))}

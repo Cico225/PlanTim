@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FiX, FiShield, FiUsers, FiLock, FiCalendar } from 'react-icons/fi';
 import { apiService } from '@/services/api';
+import { formatDate } from '@/utils/dateFormat';
 import toast from 'react-hot-toast';
 import ModulePermissionsTree, { type ModulePermission } from './ModulePermissionsTree';
 
@@ -103,11 +104,7 @@ export default function RoleDetailsModal({ role, onClose }: RoleDetailsModalProp
                         <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Kreirana</div>
                         <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                           <FiCalendar className="text-green-600" size={16} />
-                          {new Date(roleDetails.created_at).toLocaleDateString('sr-RS', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
+                          {formatDate(roleDetails.created_at)}
                         </div>
                       </div>
                     )}

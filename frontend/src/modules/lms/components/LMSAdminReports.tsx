@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import { lmsService } from '@/services/lmsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 interface AdminStats {
   total_users: number;
@@ -231,7 +232,7 @@ export default function LMSAdminReports() {
                       {enrollment.progress}%
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {new Date(enrollment.enrolled_at).toLocaleDateString('hr-HR')}
+                      {formatDate(enrollment.enrolled_at)}
                     </div>
                   </div>
                 </div>

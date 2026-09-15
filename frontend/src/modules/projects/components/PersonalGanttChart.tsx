@@ -13,6 +13,7 @@ import {
   parseISO,
 } from 'date-fns';
 import { srLatn } from 'date-fns/locale';
+import { formatDate, formatMonthYear } from '@/utils/dateFormat';
 
 type PersonalGanttTask = Task & {
   start_date?: string;
@@ -84,9 +85,9 @@ export default function PersonalGanttChart({ onTaskClick, refreshTrigger }: Pers
 
   const formatTimelineLabel = (date: Date) => {
     if (zoomLevel === 3) {
-      return format(date, 'MMM yyyy', { locale: srLatn });
+      return formatMonthYear(date);
     }
-    return format(date, 'dd MMM', { locale: srLatn });
+    return format(date, 'dd.MM', { locale: srLatn });
   };
 
   const getTaskColor = (status: string) => {
@@ -370,8 +371,8 @@ export default function PersonalGanttChart({ onTaskClick, refreshTrigger }: Pers
                               {task.title}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {format(startDate, 'dd.MM.yyyy', { locale: srLatn })} -{' '}
-                              {format(endDate, 'dd.MM.yyyy', { locale: srLatn })}
+                              {formatDate(startDate)} -{' '}
+                              {formatDate(endDate)}
                             </div>
                           </div>
                         </div>

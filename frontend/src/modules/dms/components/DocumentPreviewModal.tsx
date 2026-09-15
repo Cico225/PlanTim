@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FiX, FiDownload, FiMove, FiClock, FiTrash2, FiMail, FiEye } from 'react-icons/fi';
-import { format } from 'date-fns';
-import { sr } from 'date-fns/locale';
 import { apiService } from '@/services/api';
+import { formatDateTime } from '@/utils/dateFormat';
 import toast from 'react-hot-toast';
 
 interface Document {
@@ -299,7 +298,7 @@ export default function DocumentPreviewModal({
                 Kreiran
               </label>
               <p className="text-sm text-gray-900 dark:text-white">
-                {format(new Date(document.created_at), 'dd.MM.yyyy HH:mm', { locale: sr })}
+                {formatDateTime(document.created_at)}
               </p>
             </div>
             {document.updated_at && (
@@ -308,7 +307,7 @@ export default function DocumentPreviewModal({
                   Ažuriran
                 </label>
                 <p className="text-sm text-gray-900 dark:text-white">
-                  {format(new Date(document.updated_at), 'dd.MM.yyyy HH:mm', { locale: sr })}
+                  {formatDateTime(document.updated_at)}
                 </p>
               </div>
             )}

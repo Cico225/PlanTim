@@ -4,7 +4,7 @@ import { projectsService, Task } from '@/services/projectsService';
 import toast from 'react-hot-toast';
 import CreateTaskModal from './CreateTaskModal';
 import { format, parseISO } from 'date-fns';
-import { srLatn } from 'date-fns/locale';
+import { formatDate } from '@/utils/dateFormat';
 
 interface TableTask extends Task {
   project_name?: string;
@@ -511,9 +511,9 @@ export default function ProjectsTableView() {
                     (task.assignees?.length ? task.assignees.map((a: any) => a.user_name).join(', ') : '-')}
                 </p>
                 <p>
-                  {task.start_date ? format(parseISO(task.start_date), 'dd.MM.yyyy', { locale: srLatn }) : '-'}
+                  {task.start_date ? formatDate(task.start_date) : '-'}
                   {' – '}
-                  {task.end_date ? format(parseISO(task.end_date), 'dd.MM.yyyy', { locale: srLatn }) : '-'}
+                  {task.end_date ? formatDate(task.end_date) : '-'}
                 </p>
               </div>
               <div className="mt-3 flex justify-end border-t border-gray-200 pt-3 dark:border-dark-700">
@@ -665,7 +665,7 @@ export default function ProjectsTableView() {
                         />
                       ) : (
                         <span className="text-sm text-gray-900 dark:text-white">
-                          {task.start_date ? format(parseISO(task.start_date), 'dd.MM.yyyy', { locale: srLatn }) : '-'}
+                          {task.start_date ? formatDate(task.start_date) : '-'}
                         </span>
                       )}
                     </td>
@@ -679,7 +679,7 @@ export default function ProjectsTableView() {
                         />
                       ) : (
                         <span className="text-sm text-gray-900 dark:text-white">
-                          {task.end_date ? format(parseISO(task.end_date), 'dd.MM.yyyy', { locale: srLatn }) : '-'}
+                          {task.end_date ? formatDate(task.end_date) : '-'}
                         </span>
                       )}
                     </td>

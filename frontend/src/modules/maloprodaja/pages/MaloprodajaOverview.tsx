@@ -198,6 +198,7 @@ import {
   ControlRecordAttachmentsTab,
 
 } from '../components/ControlRecordTabs';
+import { formatDate, formatDateTime, formatDateTimeSeconds, formatMonthYear } from '@/utils/dateFormat';
 
 
 // Tab components - inline implementations
@@ -710,7 +711,7 @@ function ReportsTab() {
                   reports.map((report) => (
                     <tr key={`${report.type}-${report.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-0.5 sm:px-1 lg:px-6 py-1 sm:py-1.5 lg:py-4 whitespace-nowrap text-[7px] sm:text-[8px] lg:text-sm text-gray-900 dark:text-white">
-                        {report.date ? new Date(report.date).toLocaleDateString('hr-HR') : '-'}
+                        {formatDate(report.date, '-')}
                       </td>
                       <td className="px-0.5 sm:px-1 lg:px-6 py-1 sm:py-1.5 lg:py-4 whitespace-nowrap">
                         <span className={`px-0.5 rounded-full text-[6px] sm:text-[7px] lg:text-xs font-medium ${
@@ -771,7 +772,7 @@ function ReportsTab() {
               <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <h3 className="text-sm sm:text-lg font-semibold text-gray-900 dark:text-white text-center flex-1 px-2">
-              {currentDate.toLocaleDateString('hr-HR', { month: 'long', year: 'numeric' })}
+              {formatMonthYear(currentDate)}
             </h3>
             <button
               onClick={() => navigateMonth('next')}
@@ -1104,7 +1105,7 @@ function ControlPlansTab() {
               {selectedPlan.deadline && (
                 <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                   <CalendarIcon className="w-4 h-4" />
-                  <span>Rok: {new Date(selectedPlan.deadline).toLocaleDateString('hr-HR')}</span>
+                  <span>Rok: {formatDate(selectedPlan.deadline)}</span>
                 </div>
               )}
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
@@ -1143,7 +1144,7 @@ function ControlPlansTab() {
                         </div>
                       </td>
                       <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap text-[8px] sm:text-[9px] lg:text-sm text-gray-900 dark:text-white">
-                        {new Date(item.planned_date).toLocaleDateString('hr-HR')}
+                        {formatDate(item.planned_date)}
                       </td>
                       <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap">
                         <span className={`px-0.5 sm:px-1 lg:px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] lg:text-xs font-medium ${getItemStatusBadge(item.status)}`}>
@@ -1799,7 +1800,7 @@ function CalendarView({
                         <div
                           key={item.id}
                           className="text-xs p-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded truncate"
-                          title={`${item.store_name} - ${new Date(item.planned_date).toLocaleDateString('hr-HR')}`}
+                          title={`${item.store_name} - ${formatDate(item.planned_date)}`}
                         >
                           {item.store_name}
                         </div>
@@ -2138,7 +2139,7 @@ function EducationPlansTab() {
                 </div>
                 <div className="flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4" />
-                  <span>{new Date(plan.education_date).toLocaleDateString('hr-HR')}</span>
+                  <span>{formatDate(plan.education_date)}</span>
                   {plan.start_time && (
                     <span className="text-xs">({plan.start_time} - {plan.end_time || 'TBA'})</span>
                   )}
@@ -2207,7 +2208,7 @@ function EducationPlansTab() {
                       {plan.employee_name || '-'}
                     </td>
                     <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap text-[8px] sm:text-[9px] lg:text-sm text-gray-900 dark:text-white">
-                      {new Date(plan.education_date).toLocaleDateString('hr-HR')}
+                      {formatDate(plan.education_date)}
                       {plan.start_time && (
                         <div className="text-[7px] sm:text-[8px] lg:text-xs text-gray-500 dark:text-gray-400">
                           {plan.start_time} - {plan.end_time || 'TBA'}
@@ -2703,9 +2704,9 @@ function ControlRecordsTab() {
                         </span>
                       </td>
                       <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap text-[8px] sm:text-[9px] lg:text-sm text-gray-900 dark:text-white">
-                        {new Date(record.control_date_from).toLocaleDateString('hr-HR')}
+                        {formatDate(record.control_date_from)}
                         {record.control_date_to && record.control_date_to !== record.control_date_from && (
-                          <span> - {new Date(record.control_date_to).toLocaleDateString('hr-HR')}</span>
+                          <span> - {formatDate(record.control_date_to)}</span>
                         )}
                       </td>
                       <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap">
@@ -2768,9 +2769,9 @@ function ControlRecordsTab() {
                   <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                     <span className="break-words">
-                      {new Date(record.control_date_from).toLocaleDateString('hr-HR')}
+                      {formatDate(record.control_date_from)}
                       {record.control_date_to && record.control_date_to !== record.control_date_from && (
-                        <span> - {new Date(record.control_date_to).toLocaleDateString('hr-HR')}</span>
+                        <span> - {formatDate(record.control_date_to)}</span>
                       )}
                     </span>
                   </div>
@@ -3043,7 +3044,7 @@ function ManagerEvaluationsTab() {
                       <span className="break-words">{evaluation.store_name}</span>
                       <span>•</span>
                       <span className="whitespace-nowrap">
-                        {new Date(evaluation.period_start).toLocaleDateString('bs-BA')} - {new Date(evaluation.period_end).toLocaleDateString('bs-BA')}
+                        {formatDate(evaluation.period_start)} - {formatDate(evaluation.period_end)}
                       </span>
                       <span>•</span>
                       <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">
@@ -3806,39 +3807,11 @@ function ManagerEvaluationForm({ evaluation, criteria, onSuccess, onCancel }: an
                               </p>
                               {signature.signed_at ? (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  Potpisano: {(() => {
-                                    try {
-                                      const date = new Date(signature.signed_at);
-                                      return date.toLocaleString('bs-BA', { 
-                                        year: 'numeric', 
-                                        month: '2-digit', 
-                                        day: '2-digit', 
-                                        hour: '2-digit', 
-                                        minute: '2-digit',
-                                        second: '2-digit'
-                                      });
-                                    } catch (e) {
-                                      return signature.signed_at;
-                                    }
-                                  })()}
+                                  Potpisano: {formatDateTimeSeconds(signature.signed_at, signature.signed_at)}
                                 </p>
                               ) : signature.created_at ? (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  Potpisano: {(() => {
-                                    try {
-                                      const date = new Date(signature.created_at);
-                                      return date.toLocaleString('bs-BA', { 
-                                        year: 'numeric', 
-                                        month: '2-digit', 
-                                        day: '2-digit', 
-                                        hour: '2-digit', 
-                                        minute: '2-digit',
-                                        second: '2-digit'
-                                      });
-                                    } catch (e) {
-                                      return signature.created_at;
-                                    }
-                                  })()}
+                                  Potpisano: {formatDateTimeSeconds(signature.created_at, signature.created_at)}
                                 </p>
                               ) : (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -4088,7 +4061,7 @@ function SalesStaffEvaluationsTab() {
                       <span>{evaluation.store_name}</span>
                       <span>•</span>
                       <span>
-                        {new Date(evaluation.period_start).toLocaleDateString('bs-BA')} - {new Date(evaluation.period_end).toLocaleDateString('bs-BA')}
+                        {formatDate(evaluation.period_start)} - {formatDate(evaluation.period_end)}
                       </span>
                       <span>•</span>
                       <span className="font-semibold text-gray-900 dark:text-white">
@@ -4709,39 +4682,11 @@ function SalesStaffEvaluationForm({ evaluation, criteria, onSuccess, onCancel }:
                               </p>
                               {signature.signed_at ? (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  Potpisano: {(() => {
-                                    try {
-                                      const date = new Date(signature.signed_at);
-                                      return date.toLocaleString('bs-BA', { 
-                                        year: 'numeric', 
-                                        month: '2-digit', 
-                                        day: '2-digit', 
-                                        hour: '2-digit', 
-                                        minute: '2-digit',
-                                        second: '2-digit'
-                                      });
-                                    } catch (e) {
-                                      return signature.signed_at;
-                                    }
-                                  })()}
+                                  Potpisano: {formatDateTimeSeconds(signature.signed_at, signature.signed_at)}
                                 </p>
                               ) : signature.created_at ? (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  Potpisano: {(() => {
-                                    try {
-                                      const date = new Date(signature.created_at);
-                                      return date.toLocaleString('bs-BA', { 
-                                        year: 'numeric', 
-                                        month: '2-digit', 
-                                        day: '2-digit', 
-                                        hour: '2-digit', 
-                                        minute: '2-digit',
-                                        second: '2-digit'
-                                      });
-                                    } catch (e) {
-                                      return signature.created_at;
-                                    }
-                                  })()}
+                                  Potpisano: {formatDateTimeSeconds(signature.created_at, signature.created_at)}
                                 </p>
                               ) : (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -5353,7 +5298,7 @@ function RewardsAndBonusesTab() {
                     {reward.date && (
                       <>
                         <span>•</span>
-                        <span>{new Date(reward.date).toLocaleDateString('bs-BA')}</span>
+                        <span>{formatDate(reward.date)}</span>
                       </>
                     )}
                   </div>
@@ -6807,7 +6752,7 @@ function ControlRecordSigningTab({
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{signature.user_name || 'Nepoznato'}</p>
                       {signature.signed_at && (
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(signature.signed_at).toLocaleString('hr-HR')}
+                          {formatDateTime(signature.signed_at)}
                         </p>
                       )}
                     </div>
@@ -6865,7 +6810,7 @@ function ControlRecordSigningTab({
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{signature.user_name || 'Nepoznato'}</p>
                       {signature.signed_at && (
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(signature.signed_at).toLocaleString('hr-HR')}
+                          {formatDateTime(signature.signed_at)}
                         </p>
                       )}
                     </div>

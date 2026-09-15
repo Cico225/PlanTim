@@ -17,6 +17,7 @@ import {
 import { apiService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
+import { formatDate, formatDateTime } from '@/utils/dateFormat';
 
 interface Office365Status {
   connected: boolean;
@@ -495,7 +496,7 @@ export default function Office365Overview() {
                       {conn.email || 'N/A'}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                      {conn.created_at ? new Date(conn.created_at).toLocaleDateString() : 'N/A'}
+                      {formatDate(conn.created_at, 'N/A')}
                     </td>
                     <td className="py-3 px-4">
                       <button
@@ -567,9 +568,9 @@ export default function Office365Overview() {
               {status?.connected && status.connection && (
                 <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                   <p>Email: {status.connection.email}</p>
-                  <p>Povezan: {new Date(status.connection.connected_at).toLocaleDateString()}</p>
+                  <p>Povezan: {formatDate(status.connection.connected_at)}</p>
                   {status.connection.last_sync_at && (
-                    <p>Poslednja sinhronizacija: {new Date(status.connection.last_sync_at).toLocaleDateString()}</p>
+                    <p>Poslednja sinhronizacija: {formatDate(status.connection.last_sync_at)}</p>
                   )}
                 </div>
               )}
@@ -834,7 +835,7 @@ export default function Office365Overview() {
                                 {event.subject}
                               </h4>
                               <p className="text-sm text-gray-600 dark:text-gray-400">
-                                {event.start?.dateTime && new Date(event.start.dateTime).toLocaleString()}
+                                {event.start?.dateTime && formatDateTime(event.start.dateTime)}
                               </p>
                             </div>
                           ))}

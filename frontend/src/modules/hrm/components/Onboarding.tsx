@@ -27,8 +27,8 @@ import {
 import { getEmployees } from '../../../services/hrmService';
 import type { HROnboardingProcess, HROnboardingTask, HROnboardingTemplate } from '../../../types/hrm';
 import toast from 'react-hot-toast';
-import { format, parseISO } from 'date-fns';
-import { hr } from 'date-fns/locale';
+import { formatDate } from '@/utils/dateFormat';
+import { format } from 'date-fns';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   not_started: {
@@ -259,7 +259,7 @@ export default function Onboarding() {
                       </div>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         {process.template_name ?? 'Predložak'} · Početak:{' '}
-                        {process.start_date ? format(parseISO(process.start_date), 'd. M. y.', { locale: hr }) : '–'}
+                        {formatDate(process.start_date, '–')}
                       </p>
                       <div className="mt-2 flex items-center gap-2">
                         <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden max-w-[200px]">
@@ -469,12 +469,12 @@ function OnboardingDetail({
           <div className="flex flex-wrap gap-4 mb-6">
             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
               <Calendar className="w-4 h-4" />
-              Početak: {process.start_date ? format(parseISO(process.start_date), 'd. MMM y.', { locale: hr }) : '–'}
+              Početak: {formatDate(process.start_date, '–')}
             </div>
             {process.target_completion_date && (
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <Clock className="w-4 h-4" />
-                Planirano: {format(parseISO(process.target_completion_date), 'd. MMM y.', { locale: hr })}
+                Planirano: {formatDate(process.target_completion_date)}
               </div>
             )}
           </div>
@@ -537,7 +537,7 @@ function OnboardingDetail({
                         )}
                         {task.due_date && (
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Rok: {format(parseISO(task.due_date), 'd. M. y.', { locale: hr })}
+                            Rok: {formatDate(task.due_date)}
                           </span>
                         )}
                         <span className={`text-xs font-medium ${taskCfg.color}`}>{taskCfg.label}</span>
