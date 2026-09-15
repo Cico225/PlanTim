@@ -137,34 +137,34 @@ if errorlevel 1 (
 
 echo.
 echo [KORAK 3] Backend (Laravel artisan serve)...
-netstat -an | findstr /R /C:":8000 .*LISTENING" >nul 2>&1
+netstat -an | findstr ":8000" | findstr "LISTENING" >nul 2>&1
 if not errorlevel 1 (
     echo Port 8000 je vec zauzet - preskacem pokretanje backend-a.
 ) else (
     echo        http://127.0.0.1:8000
-    start "PlanTim Backend" cmd /k "cd /d "%~dp0" && "%PHP_PATH%" artisan serve --host=127.0.0.1 --port=8000"
+    start "PlanTim Backend" cmd /k "cd /d %~dp0 && "%PHP_PATH%" artisan serve --host=127.0.0.1 --port=8000"
     timeout /t 5 /nobreak >nul
 )
 
 echo.
 echo [KORAK 4] Frontend (Vite HTTPS)...
-REM Uvijek restartuj Vite da se ucitaju nove izmjene (ne zadrzavaj stari proces)
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":5173 .*LISTENING"') do (
-    echo        Zaustavljam stari Vite PID %%P...
+REM Zaustavi stari Vite na 5173
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":5173" ^| findstr "LISTENING"') do (
+    echo        Zaustavljam stari proces PID %%P...
     taskkill /F /PID %%P >nul 2>&1
 )
 timeout /t 2 /nobreak >nul
 echo        https://!LOCAL_IP!:5173
-start "PlanTim Frontend" cmd /k "set PATH=%NODE_DIR%;%APPDATA%\npm;%PATH% && cd /d "%~dp0frontend" && if not exist node_modules\.bin\vite.cmd (echo GRESKA: Pokrenite INSTALL_FRONTEND_DEPS.bat && pause) else (if exist node_modules\.vite rmdir /s /q node_modules\.vite & call node_modules\.bin\vite.cmd --host 0.0.0.0 --force)"
-timeout /t 12 /nobreak >nul
+start "PlanTim Frontend" cmd /k "%~dp0START_FRONTEND_DEV.bat"
+timeout /t 10 /nobreak >nul
 
 echo.
 echo [KORAK 5] Provjera portova...
 set "BACKEND_OK=0"
 set "FRONTEND_OK=0"
-netstat -an | findstr /R /C:":8000 .*LISTENING" >nul 2>&1
+netstat -an | findstr ":8000" | findstr "LISTENING" >nul 2>&1
 if not errorlevel 1 set "BACKEND_OK=1"
-netstat -an | findstr /R /C:":5173 .*LISTENING" >nul 2>&1
+netstat -an | findstr ":5173" | findstr "LISTENING" >nul 2>&1
 if not errorlevel 1 set "FRONTEND_OK=1"
 
 (
