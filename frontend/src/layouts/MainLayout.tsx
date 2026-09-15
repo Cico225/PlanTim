@@ -253,12 +253,31 @@ export default function MainLayout() {
     }
     
     if (userModules.length === 0) {
-      // User has no permissions - show only dashboard as fallback
+      // Still show inbox + notifications — all authenticated users can use them
       return [
         {
           title: t('navigation.main'),
           items: [
             { name: t('dashboard.title'), href: '/dashboard', icon: FiHome, color: 'blue' },
+          ],
+        },
+        {
+          title: t('navigation.communication') || 'Komunikacija',
+          items: [
+            {
+              name: t('inbox.title'),
+              href: '/inbox',
+              icon: FiMail,
+              color: 'pink',
+              badge: getModuleBadge('inbox'),
+            },
+            {
+              name: t('notifications.title'),
+              href: '/notifications',
+              icon: FiBell,
+              color: 'yellow',
+              badge: getModuleBadge('notifications'),
+            },
           ],
         },
       ];

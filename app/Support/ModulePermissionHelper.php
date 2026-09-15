@@ -11,6 +11,7 @@ class ModulePermissionHelper
     /** Spatie permission module prefixes that map to a different system_modules.name */
     private const MODULE_ALIASES = [
         'administration' => 'admin',
+        'chat' => 'inbox',
     ];
 
     /** @var array<int, list<string>> */

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ModulePermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -27,39 +28,39 @@ class InboxController extends Controller
     }
 
     /**
-     * Check if user can send messages
+     * Check if user can send messages.
+     * Allows: inbox_senders list, module/role create permission, or admin/manager.
      */
     private function canUserSend(int $userId): bool
     {
-        // Check if inbox_senders table exists
-        if (!Schema::hasTable('inbox_senders')) {
-            // If table doesn't exist, check by role (admin, manager can send)
-            $user = User::find($userId);
-            if ($user && method_exists($user, 'hasAnyRole')) {
-                try {
-                    return $user->hasAnyRole(['admin', 'manager', 'Super Admin']);
-                } catch (\Exception $e) {
-                    Log::warning('Inbox: Failed to check user role', ['error' => $e->getMessage()]);
-                }
-            }
+        $user = User::find($userId);
+        if (!$user) {
             return false;
         }
 
-        // Check in inbox_senders table
-        $sender = DB::table('inbox_senders')
-            ->where('user_id', $userId)
-            ->where('can_send', true)
-            ->first();
+        // Explicit allow-list
+        if (Schema::hasTable('inbox_senders')) {
+            $sender = DB::table('inbox_senders')
+                ->where('user_id', $userId)
+                ->where('can_send', true)
+                ->first();
 
-        if ($sender) {
+            if ($sender) {
+                return true;
+            }
+        }
+
+        // Role / module permissions (Uloge i dozvole + role_module_permissions)
+        if (ModulePermissionHelper::allows($user, 'inbox', 'create', 'inbox.create')) {
             return true;
         }
 
-        // Fallback: check by role
-        $user = User::find($userId);
-        if ($user && method_exists($user, 'hasAnyRole')) {
+        // Legacy role fallback
+        if (method_exists($user, 'hasAnyRole')) {
             try {
-                return $user->hasAnyRole(['admin', 'manager', 'Super Admin']);
+                if ($user->hasAnyRole(['admin', 'manager', 'super-admin', 'super_admin', 'Super Admin', 'Admin'])) {
+                    return true;
+                }
             } catch (\Exception $e) {
                 Log::warning('Inbox: Failed to check user role', ['error' => $e->getMessage()]);
             }
