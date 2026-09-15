@@ -63,6 +63,19 @@ if not exist "frontend\.env" (
     )
 )
 
+REM Sacuvaj postojeći VITE_RECAPTCHA_SITE_KEY ili uzmi iz backend .env
+set "RECAPTCHA_SITE="
+for /f "usebackq tokens=1* delims==" %%A in (`findstr /B /C:"RECAPTCHA_SITE_KEY=" ".env" 2^>nul`) do set "RECAPTCHA_SITE=%%B"
+if "!RECAPTCHA_SITE!"=="" (
+    for /f "usebackq tokens=1* delims==" %%A in (`findstr /B /C:"VITE_RECAPTCHA_SITE_KEY=" "frontend\.env" 2^>nul`) do set "RECAPTCHA_SITE=%%B"
+)
+
+REM Na privatnom LAN IP-u Google produkcijski kljuc cesto ne radi — koristi Google test site key
+echo !LOCAL_IP! | findstr /R "^192\.168\. ^10\. ^172\." >nul
+if not errorlevel 1 (
+    set "RECAPTCHA_SITE=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+)
+
 (
 echo VITE_API_URL=/api
 echo VITE_APP_NAME=PlanTim
@@ -71,9 +84,11 @@ echo VITE_DEFAULT_LANGUAGE=bs
 echo VITE_DEFAULT_THEME=light
 echo VITE_WS_URL=wss://!LOCAL_IP!:6001
 echo VITE_OFFICE365_REDIRECT_URI=https://!LOCAL_IP!:5173/auth/office365/callback
+if defined RECAPTCHA_SITE if not "!RECAPTCHA_SITE!"=="" echo VITE_RECAPTCHA_SITE_KEY=!RECAPTCHA_SITE!
 ) > frontend\.env
 
 echo Frontend: https://!LOCAL_IP!:5173
+if defined RECAPTCHA_SITE if not "!RECAPTCHA_SITE!"=="" echo reCAPTCHA site key: postavljen
 echo.
 
 echo [4/4] TRENUTNA_IP_ADRESA.txt...
