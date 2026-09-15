@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ModulePermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -21,10 +22,14 @@ class ProjectController extends Controller
      */
     protected function checkPermission($user, $permission)
     {
-        // Admin and manager always have access
-        if ($user && method_exists($user, 'hasAnyRole')) {
+        if (!$user) {
+            return false;
+        }
+
+        // Managers keep legacy full Projects access
+        if (method_exists($user, 'hasAnyRole')) {
             try {
-                if ($user->hasAnyRole(['admin', 'manager', 'super-admin'])) {
+                if ($user->hasAnyRole(['manager'])) {
                     return true;
                 }
             } catch (\Exception $e) {
@@ -32,43 +37,15 @@ class ProjectController extends Controller
             }
         }
 
-        // Check user_module_permissions
-        if (!Schema::hasTable('user_module_permissions')) {
-            return false;
-        }
+        $action = match ($permission) {
+            'view', 'read' => 'read',
+            'create' => 'create',
+            'update' => 'update',
+            'delete' => 'delete',
+            default => $permission,
+        };
 
-        try {
-            $userPermission = DB::table('user_module_permissions')
-                ->where('user_id', $user->id)
-                ->where('module_name', 'projects')
-                ->first();
-
-            if (!$userPermission) {
-                return false;
-            }
-
-            // Map permission types
-            switch ($permission) {
-                case 'view':
-                case 'read':
-                    return $userPermission->can_view || $userPermission->can_read;
-                case 'create':
-                    return $userPermission->can_create;
-                case 'update':
-                    return $userPermission->can_update;
-                case 'delete':
-                    return $userPermission->can_delete;
-                default:
-                    return false;
-            }
-        } catch (\Exception $e) {
-            Log::error('Projects: Failed to check user permissions', [
-                'error' => $e->getMessage(),
-                'user_id' => $user->id,
-                'permission' => $permission
-            ]);
-            return false;
-        }
+        return ModulePermissionHelper::allows($user, 'projects', $action, "projects.{$action}");
     }
     /**
      * Get all projects

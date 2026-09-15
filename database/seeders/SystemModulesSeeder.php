@@ -6,6 +6,7 @@ use App\Support\LmsModuleRegistry;
 use App\Support\PlanikaModuleRegistry;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class SystemModulesSeeder extends Seeder
 {
@@ -15,6 +16,12 @@ class SystemModulesSeeder extends Seeder
         DB::table('user_module_permissions')
             ->where('module_name', 'chat')
             ->update(['module_name' => 'inbox']);
+
+        if (Schema::hasTable('role_module_permissions')) {
+            DB::table('role_module_permissions')
+                ->where('module_name', 'chat')
+                ->update(['module_name' => 'inbox']);
+        }
         
         // Remove chat module if it exists (replaced by inbox module)
         DB::table('system_modules')->where('name', 'chat')->delete();

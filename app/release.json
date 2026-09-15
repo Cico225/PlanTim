@@ -1,8 +1,9 @@
 {
-    "version": "1.2.21",
-    "version_name": "Release 2026-09-02",
-    "release_notes": "postavljanje recaptca",
+    "version": "1.2.22",
+    "version_name": "Release 2026-09-15",
+    "release_notes": "DOrada modula ovlaštenja",
     "changelog": [
+        "DOrada modula ovlaštenja",
         "postavljanje recaptca",
         "korekcija porta",
         "podesavanje porta",
@@ -21,7 +22,6 @@
         "Popravak dizajna na Ljudskim resursima",
         "Dorada funkcionalnosti Reklamacije.",
         "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije.",
-        "Dorada modula Upravljanje projektima!",
-        "Promjena nova verzija."
+        "Dorada modula Upravljanje projektima!"
     ]
 }

@@ -51,12 +51,28 @@ export default defineConfig({
     https: getHttpsConfig(),
     // Interna mreza — dozvoli pristup preko LAN IP (npr. 192.168.1.126)
     allowedHosts: true,
+    headers: {
+      'Cache-Control': 'no-store',
+    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
         ws: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const host = req.headers.host
+            if (host) {
+              proxyReq.setHeader('X-Forwarded-Host', host)
+              proxyReq.setHeader(
+                'X-Forwarded-Proto',
+                (req.headers['x-forwarded-proto'] as string) ||
+                  ((req.socket as any)?.encrypted ? 'https' : 'http')
+              )
+            }
+          })
+        },
       },
       '/storage': {
         target: 'http://127.0.0.1:8000',

@@ -75,7 +75,7 @@ export default function AdminOverview() {
       id: 'roles',
       name: 'Uloge i Dozvole',
       icon: FiShield,
-      description: 'Upravljanje ulogama i RBAC sistemom',
+      description: 'Uloge i ovlaštenja po modulima (isto kao Moduli)',
       color: 'purple',
     },
     {

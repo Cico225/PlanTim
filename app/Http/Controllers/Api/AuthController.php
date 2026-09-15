@@ -380,7 +380,7 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'avatar' => $user->avatar,
-            'avatar_url' => $user->avatar ? AvatarUrlHelper::signedUrl($user->id) : null,
+            'avatar_url' => $this->avatarUrlForUser($user),
             'locale' => $user->locale,
             'theme' => $user->theme,
             'role' => $user->getRoleNames()->first() ?? 'user', // Add role for backward compatibility
@@ -528,11 +528,18 @@ class AuthController extends Controller
     }
 
     /**
-     * Get user avatar (signed URL required).
+     * Get user avatar (HMAC-signed relative URL required).
      */
     public function getAvatar(Request $request, $userId)
     {
-        if (! $request->hasValidSignature()) {
+        $valid = AvatarUrlHelper::isValid(
+            (int) $userId,
+            $request->query('v'),
+            $request->query('expires'),
+            $request->query('sig')
+        );
+
+        if (! $valid) {
             abort(403, 'Invalid or expired avatar link.');
         }
 
@@ -558,8 +565,107 @@ class AuthController extends Controller
 
         return response()->file($avatarPath, [
             'Content-Type' => $contentType,
-            'Cache-Control' => 'private, max-age=3600',
+            'Cache-Control' => 'private, max-age=86400, immutable',
         ]);
+    }
+
+    /**
+     * Upload only the profile avatar (multipart). Dedicated route avoids FormData issues
+     * with the general profile update endpoint.
+     */
+    public function uploadAvatar(Request $request, $userId = null)
+    {
+        try {
+            $currentUser = $request->user();
+            $targetUserId = $userId ?? $currentUser->id;
+
+            $isAdminView = false;
+            try {
+                $isAdminView = $userId !== null && $currentUser->hasRole('admin');
+            } catch (\Exception $e) {
+                $isAdminView = false;
+            }
+
+            $canUpdate = ((int) $targetUserId === (int) $currentUser->id) || $isAdminView;
+            if (! $canUpdate) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $user = User::find($targetUserId);
+            if (! $user) {
+                return response()->json(['error' => 'User not found'], 404);
+            }
+
+            if (! $request->hasFile('avatar')) {
+                \Log::warning('Avatar upload missing file', [
+                    'user_id' => $targetUserId,
+                    'content_type' => $request->header('Content-Type'),
+                    'keys' => array_keys($request->all()),
+                ]);
+
+                return response()->json([
+                    'message' => 'Avatar file is missing from request.',
+                ], 422);
+            }
+
+            $request->validate([
+                'avatar' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            ]);
+
+            $avatar = $request->file('avatar');
+            $extension = strtolower($avatar->getClientOriginalExtension() ?: $avatar->extension() ?: 'jpg');
+
+            if (! Storage::disk('public')->exists('avatars')) {
+                Storage::disk('public')->makeDirectory('avatars', 0755, true);
+            }
+
+            $basename = $targetUserId.'_'.time().'.'.$extension;
+
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+
+            $stored = Storage::disk('public')->putFileAs('avatars', $avatar, $basename);
+            if (! $stored || ! Storage::disk('public')->exists($stored)) {
+                return response()->json([
+                    'message' => 'Upload profilne slike nije uspio (storage).',
+                ], 500);
+            }
+
+            $user->avatar = $stored;
+            $user->save();
+            $user->refresh();
+
+            \Log::info('Avatar uploaded via uploadAvatar', [
+                'user_id' => $targetUserId,
+                'avatar' => $stored,
+            ]);
+
+            return response()->json([
+                'message' => 'Avatar updated successfully',
+                'user' => [
+                    'id' => $user->id,
+                    'avatar' => $user->avatar,
+                    'avatar_url' => $this->avatarUrlForUser($user),
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'message' => collect($e->errors())->flatten()->first() ?? 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('uploadAvatar failed: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Upload profilne slike nije uspio: '.$e->getMessage(),
+            ], 500);
+        }
     }
 
     private function avatarUrlForUser(?User $user): ?string
@@ -568,7 +674,10 @@ class AuthController extends Controller
             return null;
         }
 
-        return AvatarUrlHelper::signedUrl($user->id);
+        return AvatarUrlHelper::signedUrl(
+            $user->id,
+            AvatarUrlHelper::versionFromPath($user->avatar)
+        );
     }
 
     /**
@@ -820,18 +929,18 @@ class AuthController extends Controller
         if ($request->hasFile('avatar')) {
             try {
                 $request->validate([
-                    'avatar' => 'image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+                    'avatar' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max
                 ]);
 
                 $avatar = $request->file('avatar');
-                $extension = $avatar->getClientOriginalExtension();
+                $extension = strtolower($avatar->getClientOriginalExtension() ?: $avatar->extension() ?: 'jpg');
                 
                 // Ensure avatars directory exists
                 if (!Storage::disk('public')->exists('avatars')) {
                     Storage::disk('public')->makeDirectory('avatars', 0755, true);
                 }
-                
-                $filename = 'avatars/' . $targetUserId . '_' . time() . '.' . $extension;
+
+                $basename = $targetUserId . '_' . time() . '.' . $extension;
                 
                 // Delete old avatar if exists
                 if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
@@ -839,7 +948,7 @@ class AuthController extends Controller
                 }
                 
                 // Store the file using Storage facade for better control
-                $stored = Storage::disk('public')->putFileAs('avatars', $avatar, $targetUserId . '_' . time() . '.' . $extension);
+                $stored = Storage::disk('public')->putFileAs('avatars', $avatar, $basename);
                 
                 \Log::info('Avatar storage attempt', [
                     'user_id' => $targetUserId,
@@ -868,15 +977,16 @@ class AuthController extends Controller
                     'full_path' => Storage::disk('public')->path($stored),
                     'url_path' => Storage::disk('public')->url($stored),
                 ]);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                throw $e;
             } catch (\Exception $e) {
                 \Log::error('Error uploading avatar: ' . $e->getMessage(), [
                     'user_id' => $targetUserId,
                     'error' => $e->getTraceAsString(),
                 ]);
-                // Return error to user
                 return response()->json([
-                    'message' => 'Profile updated, but avatar upload failed: ' . $e->getMessage()
-                ], 200); // Still return 200 but with warning message
+                    'message' => 'Upload profilne slike nije uspio: ' . $e->getMessage(),
+                ], 422);
             }
         }
 
@@ -964,7 +1074,9 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Profile updated successfully',
                 'user' => [
+                    'id' => $user->id,
                     'avatar' => $user->avatar,
+                    'avatar_url' => $this->avatarUrlForUser($user),
                     'name' => $user->name,
                     'email' => $user->email,
                 ]
@@ -1234,6 +1346,7 @@ class AuthController extends Controller
 
         // Sync roles (replace all)
         $user->syncRoles([$request->role]);
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         activity()
             ->causedBy($currentUser)

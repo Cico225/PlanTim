@@ -90,6 +90,7 @@ class AdminController extends Controller
         if ($request->has('role')) {
             $user = \App\Models\User::find($userId);
             $user->assignRole($request->input('role'));
+            app()[PermissionRegistrar::class]->forgetCachedPermissions();
         }
 
         $user = DB::table('users')->find($userId);
@@ -245,6 +246,15 @@ class AdminController extends Controller
                 }
                 
                 $role->users_count = $usersCount;
+
+                $modulePermsCount = 0;
+                if (Schema::hasTable('role_module_permissions')) {
+                    $modulePermsCount = DB::table('role_module_permissions')
+                        ->where('role_id', $role->id)
+                        ->where('can_view', true)
+                        ->count();
+                }
+                $role->module_permissions_count = $modulePermsCount;
                 
                 // Set is_system to false if column doesn't exist
                 if (!isset($role->is_system)) {
@@ -274,6 +284,16 @@ class AdminController extends Controller
             'name' => 'required|string|max:255|unique:roles,name',
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,name',
+            'module_permissions' => 'nullable|array',
+            'module_permissions.*.module_name' => 'required_with:module_permissions|string|exists:system_modules,name',
+            'module_permissions.*.can_view' => 'boolean',
+            'module_permissions.*.can_read' => 'boolean',
+            'module_permissions.*.can_create' => 'boolean',
+            'module_permissions.*.can_update' => 'boolean',
+            'module_permissions.*.can_delete' => 'boolean',
+            'module_permissions.*.can_export' => 'boolean',
+            'module_permissions.*.can_import' => 'boolean',
+            'module_permissions.*.custom_permissions' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -293,9 +313,14 @@ class AdminController extends Controller
         
         $role = Role::create($roleData);
 
-        if ($request->has('permissions') && is_array($request->input('permissions'))) {
+        if ($request->has('module_permissions') && is_array($request->input('module_permissions'))) {
+            $this->saveRoleModulePermissions((int) $role->id, $request->input('module_permissions'));
+            $this->syncSpatiePermissionsFromModulePermissions($role, $request->input('module_permissions'));
+        } elseif ($request->has('permissions') && is_array($request->input('permissions'))) {
             $role->givePermissionTo($request->input('permissions'));
         }
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Log activity
         if (auth()->check()) {
@@ -305,6 +330,7 @@ class AdminController extends Controller
                 ->withProperties([
                     'name' => $request->input('name'),
                     'permissions_count' => count($request->input('permissions', [])),
+                    'module_permissions_count' => count($request->input('module_permissions', [])),
                     'permissions' => $request->input('permissions', []),
                 ])
                 ->log('created role');
@@ -322,6 +348,16 @@ class AdminController extends Controller
             'name' => 'required|string|max:255|unique:roles,name,' . $id,
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,name',
+            'module_permissions' => 'nullable|array',
+            'module_permissions.*.module_name' => 'required_with:module_permissions|string|exists:system_modules,name',
+            'module_permissions.*.can_view' => 'boolean',
+            'module_permissions.*.can_read' => 'boolean',
+            'module_permissions.*.can_create' => 'boolean',
+            'module_permissions.*.can_update' => 'boolean',
+            'module_permissions.*.can_delete' => 'boolean',
+            'module_permissions.*.can_export' => 'boolean',
+            'module_permissions.*.can_import' => 'boolean',
+            'module_permissions.*.custom_permissions' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -348,7 +384,10 @@ class AdminController extends Controller
         
         $role->update(['name' => $request->input('name')]);
 
-        if ($request->has('permissions')) {
+        if ($request->has('module_permissions') && is_array($request->input('module_permissions'))) {
+            $this->saveRoleModulePermissions((int) $role->id, $request->input('module_permissions'));
+            $this->syncSpatiePermissionsFromModulePermissions($role, $request->input('module_permissions'));
+        } elseif ($request->has('permissions')) {
             $role->syncPermissions($request->input('permissions'));
         }
 
@@ -356,7 +395,7 @@ class AdminController extends Controller
 
         // Log activity
         if (auth()->check()) {
-            $newPermissions = $request->has('permissions') ? $request->input('permissions') : $oldPermissions;
+            $newPermissions = $role->permissions()->pluck('name')->toArray();
             activity('role')
                 ->causedBy(auth()->user())
                 ->performedOn($role)
@@ -365,12 +404,111 @@ class AdminController extends Controller
                     'new_name' => $request->input('name'),
                     'old_permissions' => $oldPermissions,
                     'new_permissions' => $newPermissions,
-                    'permissions_changed' => $request->has('permissions'),
+                    'permissions_changed' => $request->has('permissions') || $request->has('module_permissions'),
                 ])
                 ->log('updated role');
         }
 
         return response()->json($role->load('permissions'));
+    }
+
+    /**
+     * Persist role_module_permissions rows for a role.
+     */
+    private function saveRoleModulePermissions(int $roleId, array $permissions): void
+    {
+        if (!Schema::hasTable('role_module_permissions')) {
+            return;
+        }
+
+        foreach ($permissions as $permissionData) {
+            if (empty($permissionData['module_name'])) {
+                continue;
+            }
+
+            DB::table('role_module_permissions')->updateOrInsert(
+                [
+                    'role_id' => $roleId,
+                    'module_name' => $permissionData['module_name'],
+                ],
+                [
+                    'can_view' => $permissionData['can_view'] ?? false,
+                    'can_read' => $permissionData['can_read'] ?? false,
+                    'can_create' => $permissionData['can_create'] ?? false,
+                    'can_update' => $permissionData['can_update'] ?? false,
+                    'can_delete' => $permissionData['can_delete'] ?? false,
+                    'can_export' => $permissionData['can_export'] ?? false,
+                    'can_import' => $permissionData['can_import'] ?? false,
+                    'custom_permissions' => isset($permissionData['custom_permissions'])
+                        ? json_encode($permissionData['custom_permissions'])
+                        : null,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+    }
+
+    /**
+     * Keep Spatie permissions in sync with module permission flags (for legacy can() checks).
+     */
+    private function syncSpatiePermissionsFromModulePermissions(Role $role, array $modulePermissions): void
+    {
+        $desired = [];
+
+        foreach ($modulePermissions as $mp) {
+            $module = (string) ($mp['module_name'] ?? '');
+            if ($module === '') {
+                continue;
+            }
+
+            // Spatie seeder uses "administration.*" for the admin module
+            $spatieModule = $module === 'admin' ? 'administration' : $module;
+
+            $actions = [
+                'view' => !empty($mp['can_view']),
+                'read' => !empty($mp['can_read']) || !empty($mp['can_view']),
+                'create' => !empty($mp['can_create']),
+                'update' => !empty($mp['can_update']),
+                'delete' => !empty($mp['can_delete']),
+                'export' => !empty($mp['can_export']),
+                'import' => !empty($mp['can_import']),
+                'manage' => !empty($mp['can_create']) && !empty($mp['can_update']) && !empty($mp['can_delete']),
+            ];
+
+            foreach ($actions as $action => $enabled) {
+                if ($enabled) {
+                    $desired[] = "{$spatieModule}.{$action}";
+                    if ($spatieModule !== $module) {
+                        $desired[] = "{$module}.{$action}";
+                    }
+                }
+            }
+
+            $custom = $mp['custom_permissions'] ?? null;
+            if (is_string($custom)) {
+                $custom = json_decode($custom, true) ?: [];
+            }
+            if (is_array($custom)) {
+                foreach ($custom as $key => $value) {
+                    if ($value) {
+                        $desired[] = "{$spatieModule}.{$key}";
+                        if ($spatieModule !== $module) {
+                            $desired[] = "{$module}.{$key}";
+                        }
+                    }
+                }
+            }
+        }
+
+        $desired = array_values(array_unique($desired));
+        if ($desired === []) {
+            $role->syncPermissions([]);
+            return;
+        }
+
+        $existing = Permission::whereIn('name', $desired)->pluck('name')->all();
+        $role->syncPermissions($existing);
     }
 
     /**
@@ -477,6 +615,7 @@ class AdminController extends Controller
         $user = \App\Models\User::findOrFail($userId);
         $oldRoles = $user->roles->pluck('name')->toArray();
         $user->syncRoles([$request->input('role')]);
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Log activity
         if (auth()->check()) {
@@ -494,6 +633,7 @@ class AdminController extends Controller
 
         // Reload user with roles and permissions for response
         $user->refresh();
+        $user->load('roles', 'permissions');
         
         return response()->json([
             'message' => 'Role assigned successfully',

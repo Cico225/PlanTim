@@ -34,22 +34,48 @@ echo ========================================
 echo Folder: %PROJECT_DIR%
 echo.
 
-echo [1/7] Git fetch i pull...
-
-if exist "TRENUTNA_IP_ADRESA.txt" (
-    copy /Y "TRENUTNA_IP_ADRESA.txt" "TRENUTNA_IP_ADRESA.txt.bak" >nul
-)
-
-"%GIT_PATH%" fetch origin
-if errorlevel 1 (
-    echo GRESKA: git fetch nije uspio.
+if not exist "%PROJECT_DIR%\.git" (
+    echo GRESKA: Ovo nije git repo (.git nedostaje).
+    echo To se cesto desi nakon restore PlanTim backupa.
+    echo.
+    echo Pokrenite prvo: REPAIR_GIT_ON_SERVER.bat
+    echo zatim ponovo:   PULL_FROM_GITHUB.bat
+    echo.
     pause
     exit /b 1
 )
 
-"%GIT_PATH%" checkout main
+echo [1/7] Git fetch i pull...
+
+REM Sacuvaj lokalne fajlove koje ne smiju nestati nakon force checkout
+SET "LOCAL_BAK=%TEMP%\plantim-pull-local-%RANDOM%"
+mkdir "%LOCAL_BAK%" 2>nul
+if exist "TRENUTNA_IP_ADRESA.txt" copy /Y "TRENUTNA_IP_ADRESA.txt" "%LOCAL_BAK%\TRENUTNA_IP_ADRESA.txt" >nul
+if exist "PLANTIM_SERVER_IP.txt" copy /Y "PLANTIM_SERVER_IP.txt" "%LOCAL_BAK%\PLANTIM_SERVER_IP.txt" >nul
+if exist ".env" copy /Y ".env" "%LOCAL_BAK%\.env" >nul
+if exist "frontend\.env" copy /Y "frontend\.env" "%LOCAL_BAK%\frontend.env" >nul
+if exist "frontend\certs" xcopy /E /I /Y /Q "frontend\certs" "%LOCAL_BAK%\certs\" >nul
+
+"%GIT_PATH%" fetch origin
+if errorlevel 1 (
+    echo GRESKA: git fetch nije uspio.
+    echo Ako pise "not a git repository", pokrenite: REPAIR_GIT_ON_SERVER.bat
+    pause
+    exit /b 1
+)
+
+REM Force uskladjenje sa GitHub main (potrebno nakon restore backupa)
+"%GIT_PATH%" checkout -f -B main origin/main
 if errorlevel 1 (
     echo GRESKA: git checkout main nije uspio.
+    pause
+    exit /b 1
+)
+
+"%GIT_PATH%" branch --set-upstream-to=origin/main main 2>nul
+"%GIT_PATH%" reset --hard origin/main
+if errorlevel 1 (
+    echo GRESKA: git reset --hard origin/main nije uspio.
     pause
     exit /b 1
 )
@@ -64,17 +90,21 @@ for %%F in (
     "PUSH_TO_GITHUB.bat"
 ) do if exist %%F del /F /Q %%F 2>nul
 
-"%GIT_PATH%" reset --hard HEAD
-"%GIT_PATH%" pull origin main
-if errorlevel 1 (
-    echo GRESKA: git pull nije uspio.
-    pause
-    exit /b 1
+REM Vrati lokalne fajlove
+if exist "%LOCAL_BAK%\TRENUTNA_IP_ADRESA.txt" copy /Y "%LOCAL_BAK%\TRENUTNA_IP_ADRESA.txt" "TRENUTNA_IP_ADRESA.txt" >nul
+if exist "%LOCAL_BAK%\PLANTIM_SERVER_IP.txt" copy /Y "%LOCAL_BAK%\PLANTIM_SERVER_IP.txt" "PLANTIM_SERVER_IP.txt" >nul
+if exist "%LOCAL_BAK%\.env" copy /Y "%LOCAL_BAK%\.env" ".env" >nul
+if exist "%LOCAL_BAK%\frontend.env" (
+    if not exist "frontend" mkdir "frontend"
+    copy /Y "%LOCAL_BAK%\frontend.env" "frontend\.env" >nul
 )
+if exist "%LOCAL_BAK%\certs" (
+    if not exist "frontend\certs" mkdir "frontend\certs"
+    xcopy /E /I /Y /Q "%LOCAL_BAK%\certs\*" "frontend\certs\" >nul
+)
+rmdir /S /Q "%LOCAL_BAK%" 2>nul
 
-if exist "TRENUTNA_IP_ADRESA.txt.bak" (
-    copy /Y "TRENUTNA_IP_ADRESA.txt.bak" "TRENUTNA_IP_ADRESA.txt" >nul
-    del /F /Q "TRENUTNA_IP_ADRESA.txt.bak" 2>nul
+if exist "TRENUTNA_IP_ADRESA.txt" (
     powershell -NoProfile -Command "$p='TRENUTNA_IP_ADRESA.txt'; $t=Get-Content $p -Raw; if ($t -match '(\d{1,3}(?:\.\d{1,3}){3})') { $Matches[1] | Set-Content $p -Encoding ASCII -NoNewline; Add-Content $p '' }"
 )
 

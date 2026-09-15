@@ -63,9 +63,8 @@ Route::prefix('auth')->middleware('throttle:auth-verify')->group(function () {
     Route::post('/resend-login-code', [AuthController::class, 'resendLoginCode']);
 });
 
-// Avatar — signed URL (bez tokena u query stringu)
+// Avatar — HMAC relative URL (works behind Vite HTTPS proxy)
 Route::get('/profile/avatar/{userId}', [AuthController::class, 'getAvatar'])
-    ->middleware('signed')
     ->name('api.profile.avatar');
 
 // Protected API routes
@@ -78,12 +77,15 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
 
     // User Profile
     Route::prefix('profile')->group(function () {
-        Route::get('/{userId?}', [AuthController::class, 'getProfile']);
-        Route::put('/{userId?}', [AuthController::class, 'updateProfile']);
-        Route::post('/{userId?}', [AuthController::class, 'updateProfile']); // POST for FormData
+        // Specific routes MUST be registered before /{userId?} catch-all
+        Route::post('/avatar/{userId?}', [AuthController::class, 'uploadAvatar']);
         Route::post('/change-password/{userId?}', [AuthController::class, 'changePassword']);
         Route::post('/logout-all/{userId?}', [AuthController::class, 'logoutAllDevices']);
         Route::get('/activity/{userId?}', [AuthController::class, 'getActivity']);
+
+        Route::get('/{userId?}', [AuthController::class, 'getProfile']);
+        Route::put('/{userId?}', [AuthController::class, 'updateProfile']);
+        Route::post('/{userId?}', [AuthController::class, 'updateProfile']); // POST for FormData
         
         // Admin only
         Route::middleware('admin')->group(function () {
