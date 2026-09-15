@@ -1,20 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Award, Plus, Edit2, Trash2, Mail, Calendar, DollarSign, CheckCircle, XCircle, Search, Filter, Send } from 'lucide-react';
-import { atsService, type Offer } from '../../../services/atsService';
+import { atsService, type Candidate, type JobPosition, type Offer } from '../../../services/atsService';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/utils/dateFormat';
+import type { AtsLinkTarget } from './ATSCandidates';
 
-export default function ATSOffers() {
+type Props = {
+  initialPrefill?: AtsLinkTarget | null;
+  onPrefillConsumed?: () => void;
+};
+
+export default function ATSOffers({ initialPrefill, onPrefillConsumed }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  const [prefill, setPrefill] = useState<AtsLinkTarget | null>(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (initialPrefill?.candidate_id) {
+      setPrefill(initialPrefill);
+      setEditingOffer(null);
+      setShowForm(true);
+      onPrefillConsumed?.();
+    }
+  }, [initialPrefill, onPrefillConsumed]);
 
   const { data: offers, isLoading } = useQuery({
     queryKey: ['ats-offers', statusFilter, searchTerm],
-    queryFn: () => atsService.getOffers({ 
+    queryFn: () => atsService.getOffers({
       status: statusFilter !== 'all' ? statusFilter : undefined,
     }),
   });
@@ -23,6 +39,7 @@ export default function ATSOffers() {
     mutationFn: (id: number) => atsService.deleteOffer(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-offers'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Ponuda je uspješno obrisana');
     },
     onError: () => {
@@ -34,10 +51,35 @@ export default function ATSOffers() {
     mutationFn: (id: number) => atsService.sendOffer(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-offers'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Ponuda je uspješno poslata');
     },
     onError: () => {
       toast.error('Greška pri slanju ponude');
+    },
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: (id: number) => atsService.acceptOffer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ats-offers'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
+      toast.success('Ponuda je prihvaćena — kandidat označen kao zaposlen');
+    },
+    onError: () => {
+      toast.error('Greška pri prihvatanju ponude');
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: number) => atsService.rejectOffer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ats-offers'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
+      toast.success('Ponuda je odbijena');
+    },
+    onError: () => {
+      toast.error('Greška pri odbijanju ponude');
     },
   });
 
@@ -75,9 +117,17 @@ export default function ATSOffers() {
     }
   };
 
+  const filtered = (offers?.data || []).filter((offer: Offer) => {
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (offer.candidate_name || '').toLowerCase().includes(q) ||
+      (offer.position_title || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -89,6 +139,7 @@ export default function ATSOffers() {
         <button
           onClick={() => {
             setEditingOffer(null);
+            setPrefill(null);
             setShowForm(true);
           }}
           className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
@@ -98,7 +149,6 @@ export default function ATSOffers() {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -127,14 +177,13 @@ export default function ATSOffers() {
         </div>
       </div>
 
-      {/* Offers List */}
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
         </div>
-      ) : offers?.data && offers.data.length > 0 ? (
+      ) : filtered.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {offers.data.map((offer: Offer) => (
+          {filtered.map((offer: Offer) => (
             <div
               key={offer.id}
               className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow"
@@ -154,10 +203,10 @@ export default function ATSOffers() {
               </div>
 
               <div className="space-y-2 mb-4">
-                {offer.salary && (
+                {offer.salary != null && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <DollarSign className="w-4 h-4" />
-                    {offer.salary.toLocaleString('sr-RS')} KM
+                    {Number(offer.salary).toLocaleString('sr-RS')} KM
                   </div>
                 )}
                 {offer.start_date && (
@@ -184,7 +233,7 @@ export default function ATSOffers() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
                 {offer.status === 'pending' && (
                   <button
                     onClick={() => handleSend(offer.id)}
@@ -194,8 +243,29 @@ export default function ATSOffers() {
                     Pošalji
                   </button>
                 )}
+                {offer.status === 'sent' && (
+                  <>
+                    <button
+                      onClick={() => acceptMutation.mutate(offer.id)}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Prihvati
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('Odbijti ponudu?')) rejectMutation.mutate(offer.id);
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Odbij
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => {
+                    setPrefill(null);
                     setEditingOffer(offer);
                     setShowForm(true);
                   }}
@@ -222,13 +292,14 @@ export default function ATSOffers() {
         </div>
       )}
 
-      {/* Offer Form Modal */}
       {showForm && (
         <OfferFormModal
           offer={editingOffer}
+          prefill={prefill}
           onClose={() => {
             setShowForm(false);
             setEditingOffer(null);
+            setPrefill(null);
           }}
         />
       )}
@@ -236,11 +307,27 @@ export default function ATSOffers() {
   );
 }
 
-function OfferFormModal({ offer, onClose }: { offer: Offer | null; onClose: () => void }) {
+function OfferFormModal({
+  offer,
+  prefill,
+  onClose,
+}: {
+  offer: Offer | null;
+  prefill?: AtsLinkTarget | null;
+  onClose: () => void;
+}) {
   const [formData, setFormData] = useState({
-    candidate_id: offer?.candidate_id || '',
-    position_id: offer?.position_id || '',
-    salary: offer?.salary || '',
+    candidate_id: offer?.candidate_id
+      ? String(offer.candidate_id)
+      : prefill?.candidate_id
+        ? String(prefill.candidate_id)
+        : '',
+    position_id: offer?.position_id
+      ? String(offer.position_id)
+      : prefill?.position_id
+        ? String(prefill.position_id)
+        : '',
+    salary: offer?.salary != null ? String(offer.salary) : '',
     start_date: offer?.start_date ? offer.start_date.split('T')[0] : '',
     status: offer?.status || 'pending',
     notes: offer?.notes || '',
@@ -248,10 +335,24 @@ function OfferFormModal({ offer, onClose }: { offer: Offer | null; onClose: () =
 
   const queryClient = useQueryClient();
 
+  const { data: candidatesData } = useQuery({
+    queryKey: ['ats-candidates-options'],
+    queryFn: () => atsService.getCandidates(),
+  });
+
+  const { data: positionsData } = useQuery({
+    queryKey: ['ats-positions-options'],
+    queryFn: () => atsService.getPositions(),
+  });
+
+  const candidates: Candidate[] = candidatesData?.data || [];
+  const positions: JobPosition[] = positionsData?.data || [];
+
   const createMutation = useMutation({
-    mutationFn: (data: any) => atsService.createOffer(data),
+    mutationFn: (data: Partial<Offer>) => atsService.createOffer(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-offers'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Ponuda je uspješno kreirana');
       onClose();
     },
@@ -261,9 +362,10 @@ function OfferFormModal({ offer, onClose }: { offer: Offer | null; onClose: () =
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => atsService.updateOffer(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Offer> }) => atsService.updateOffer(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-offers'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Ponuda je uspješno ažurirana');
       onClose();
     },
@@ -272,16 +374,33 @@ function OfferFormModal({ offer, onClose }: { offer: Offer | null; onClose: () =
     },
   });
 
+  const handleCandidateChange = (candidateId: string) => {
+    const selected = candidates.find((c) => String(c.id) === candidateId);
+    setFormData((prev) => ({
+      ...prev,
+      candidate_id: candidateId,
+      position_id: selected?.position_id ? String(selected.position_id) : prev.position_id,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const submitData = {
-      ...formData,
+    if (!formData.candidate_id || !formData.position_id) {
+      toast.error('Odaberite kandidata i poziciju');
+      return;
+    }
+    const payload: Partial<Offer> = {
+      candidate_id: Number(formData.candidate_id),
+      position_id: Number(formData.position_id),
       salary: formData.salary ? Number(formData.salary) : undefined,
+      start_date: formData.start_date || undefined,
+      status: formData.status as Offer['status'],
+      notes: formData.notes || undefined,
     };
     if (offer) {
-      updateMutation.mutate({ id: offer.id, data: submitData });
+      updateMutation.mutate({ id: offer.id, data: payload });
     } else {
-      createMutation.mutate(submitData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -294,6 +413,44 @@ function OfferFormModal({ offer, onClose }: { offer: Offer | null; onClose: () =
           </h3>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Kandidat *
+              </label>
+              <select
+                required
+                value={formData.candidate_id}
+                onChange={(e) => handleCandidateChange(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">— Odaberite kandidata —</option>
+                {candidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.first_name} {c.last_name}
+                    {c.position_title ? ` · ${c.position_title}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Pozicija *
+              </label>
+              <select
+                required
+                value={formData.position_id}
+                onChange={(e) => setFormData({ ...formData, position_id: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">— Odaberite poziciju —</option>
+                {positions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.title}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -325,7 +482,7 @@ function OfferFormModal({ offer, onClose }: { offer: Offer | null; onClose: () =
             </label>
             <select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as Offer['status'] })}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="pending">Na čekanju</option>
@@ -368,12 +525,3 @@ function OfferFormModal({ offer, onClose }: { offer: Offer | null; onClose: () =
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

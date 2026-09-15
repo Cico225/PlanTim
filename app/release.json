@@ -1,8 +1,9 @@
 {
-    "version": "1.2.23",
+    "version": "1.2.24",
     "version_name": "Release 2026-09-15",
-    "release_notes": "DOrada formata datuma",
+    "release_notes": "dorada modula HR",
     "changelog": [
+        "dorada modula HR",
         "DOrada formata datuma",
         "DOrada modula ovlaštenja",
         "postavljanje recaptca",
@@ -21,7 +22,6 @@
         "Implementacija korisničkog uputstva",
         "Nove funkcionalnosti u modulu HR",
         "Popravak dizajna na Ljudskim resursima",
-        "Dorada funkcionalnosti Reklamacije.",
-        "DOdavanje funkcionalnosti Reklamacijeu modulu Maloprodaja i dodavanje funkcionalnosti pregleda spiskova kredita u modulu FInansije."
+        "Dorada funkcionalnosti Reklamacije."
     ]
 }

@@ -1234,6 +1234,20 @@ class HRMController extends Controller
             return response()->json(['message' => 'Candidate not found'], 404);
         }
 
+        $candidate->interviews = DB::table('ats_interviews')
+            ->select('ats_interviews.*', 'ats_positions.title as position_title')
+            ->leftJoin('ats_positions', 'ats_interviews.position_id', '=', 'ats_positions.id')
+            ->where('ats_interviews.candidate_id', $id)
+            ->orderByDesc('ats_interviews.scheduled_date')
+            ->get();
+
+        $candidate->offers = DB::table('ats_offers')
+            ->select('ats_offers.*', 'ats_positions.title as position_title')
+            ->leftJoin('ats_positions', 'ats_offers.position_id', '=', 'ats_positions.id')
+            ->where('ats_offers.candidate_id', $id)
+            ->orderByDesc('ats_offers.created_at')
+            ->get();
+
         return response()->json($candidate);
     }
 
@@ -1386,6 +1400,13 @@ class HRMController extends Controller
         $data['updated_at'] = now();
 
         $id = DB::table('ats_interviews')->insertGetId($data);
+
+        $status = $data['status'] ?? 'scheduled';
+        $this->syncAtsCandidateStatus(
+            (int) $data['candidate_id'],
+            $status === 'completed' ? 'interviewed' : 'shortlisted'
+        );
+
         $interview = $this->getInterview($id)->getData();
 
         return response()->json($interview, 201);
@@ -1446,6 +1467,15 @@ class HRMController extends Controller
         $data['updated_at'] = now();
 
         DB::table('ats_interviews')->where('id', $id)->update($data);
+
+        $candidateId = (int) ($data['candidate_id'] ?? $interview->candidate_id);
+        $newStatus = $data['status'] ?? $interview->status;
+        if ($newStatus === 'completed') {
+            $this->syncAtsCandidateStatus($candidateId, 'interviewed');
+        } elseif (in_array($newStatus, ['scheduled', 'no_show'], true)) {
+            $this->syncAtsCandidateStatus($candidateId, 'shortlisted');
+        }
+
         $interview = $this->getInterview($id)->getData();
 
         return response()->json($interview);
@@ -1518,6 +1548,16 @@ class HRMController extends Controller
         $data['updated_at'] = now();
 
         $id = DB::table('ats_offers')->insertGetId($data);
+
+        $offerStatus = $data['status'] ?? 'pending';
+        if ($offerStatus === 'accepted') {
+            $this->syncAtsCandidateStatus((int) $data['candidate_id'], 'hired');
+        } elseif ($offerStatus === 'rejected') {
+            $this->syncAtsCandidateStatus((int) $data['candidate_id'], 'rejected');
+        } else {
+            $this->syncAtsCandidateStatus((int) $data['candidate_id'], 'offered');
+        }
+
         $offer = $this->getOffer($id)->getData();
 
         return response()->json($offer, 201);
@@ -1572,6 +1612,17 @@ class HRMController extends Controller
         $data['updated_at'] = now();
 
         DB::table('ats_offers')->where('id', $id)->update($data);
+
+        $candidateId = (int) ($data['candidate_id'] ?? $offer->candidate_id);
+        $offerStatus = $data['status'] ?? $offer->status;
+        if ($offerStatus === 'accepted') {
+            $this->syncAtsCandidateStatus($candidateId, 'hired');
+        } elseif ($offerStatus === 'rejected') {
+            $this->syncAtsCandidateStatus($candidateId, 'rejected');
+        } elseif (in_array($offerStatus, ['pending', 'sent'], true)) {
+            $this->syncAtsCandidateStatus($candidateId, 'offered');
+        }
+
         $offer = $this->getOffer($id)->getData();
 
         return response()->json($offer);
@@ -1607,6 +1658,8 @@ class HRMController extends Controller
             'updated_at' => now(),
         ]);
 
+        $this->syncAtsCandidateStatus((int) $offer->candidate_id, 'offered');
+
         $offer = $this->getOffer($id)->getData();
         return response()->json($offer);
     }
@@ -1626,6 +1679,8 @@ class HRMController extends Controller
             'response_date' => now()->toDateString(),
             'updated_at' => now(),
         ]);
+
+        $this->syncAtsCandidateStatus((int) $offer->candidate_id, 'hired');
 
         $offer = $this->getOffer($id)->getData();
         return response()->json($offer);
@@ -1647,8 +1702,60 @@ class HRMController extends Controller
             'updated_at' => now(),
         ]);
 
+        $this->syncAtsCandidateStatus((int) $offer->candidate_id, 'rejected');
+
         $offer = $this->getOffer($id)->getData();
         return response()->json($offer);
+    }
+
+    /**
+     * Advance ATS candidate pipeline status without downgrading terminal states incorrectly.
+     */
+    private function syncAtsCandidateStatus(int $candidateId, string $newStatus): void
+    {
+        if (!Schema::hasTable('ats_candidates')) {
+            return;
+        }
+
+        $candidate = DB::table('ats_candidates')->where('id', $candidateId)->first();
+        if (!$candidate) {
+            return;
+        }
+
+        $rank = [
+            'new' => 1,
+            'reviewing' => 2,
+            'shortlisted' => 3,
+            'interviewed' => 4,
+            'offered' => 5,
+            'hired' => 6,
+            'rejected' => 0,
+        ];
+
+        $current = $candidate->status ?? 'new';
+
+        // Terminal outcomes always apply
+        if (in_array($newStatus, ['hired', 'rejected'], true)) {
+            DB::table('ats_candidates')->where('id', $candidateId)->update([
+                'status' => $newStatus,
+                'updated_at' => now(),
+            ]);
+            return;
+        }
+
+        // Do not move backward from hired
+        if ($current === 'hired') {
+            return;
+        }
+
+        $currentRank = $rank[$current] ?? 0;
+        $newRank = $rank[$newStatus] ?? 0;
+        if ($newRank > $currentRank) {
+            DB::table('ats_candidates')->where('id', $candidateId)->update([
+                'status' => $newStatus,
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     // ============================================
@@ -1986,41 +2093,236 @@ class HRMController extends Controller
     /**
      * Get onboarding templates with task count (and tasks for template detail)
      */
-    public function getOnboardingTemplates()
+    public function getOnboardingTemplates(Request $request)
     {
-        $templates = DB::table('hrm_onboarding_templates')
-            ->where('is_active', 1)
-            ->orderBy('name')
-            ->get();
+        $query = DB::table('hrm_onboarding_templates')->orderBy('name');
+        if (!$request->boolean('all')) {
+            $query->where('is_active', 1);
+        }
+
+        $templates = $query->get();
 
         $result = $templates->map(function ($t) {
-            $tasks = DB::table('hrm_onboarding_template_tasks')
-                ->where('template_id', $t->id)
-                ->orderBy('order')
-                ->get()
-                ->map(function ($tt) {
-                    return [
-                        'id' => $tt->id,
-                        'template_id' => $tt->template_id,
-                        'name' => $tt->title,
-                        'description' => $tt->description,
-                        'category' => $tt->category ?? '',
-                        'default_responsible_role' => $tt->responsible_role,
-                        'days_from_start' => (int) $tt->due_days,
-                        'is_required' => (bool) $tt->is_required,
-                        'sort_order' => (int) $tt->order,
-                    ];
-                });
-            return [
-                'id' => $t->id,
-                'name' => $t->name,
-                'description' => $t->description,
-                'is_active' => (bool) $t->is_active,
-                'tasks' => $tasks,
-            ];
+            return $this->mapOnboardingTemplate($t);
         });
 
         return response()->json($result);
+    }
+
+    private function mapOnboardingTemplate($t): array
+    {
+        $tasks = DB::table('hrm_onboarding_template_tasks')
+            ->where('template_id', $t->id)
+            ->orderBy('order')
+            ->get()
+            ->map(function ($tt) {
+                return $this->mapOnboardingTemplateTask($tt);
+            });
+
+        return [
+            'id' => $t->id,
+            'name' => $t->name,
+            'description' => $t->description,
+            'is_active' => (bool) $t->is_active,
+            'tasks' => $tasks,
+        ];
+    }
+
+    private function mapOnboardingTemplateTask($tt): array
+    {
+        return [
+            'id' => $tt->id,
+            'template_id' => $tt->template_id,
+            'name' => $tt->title,
+            'description' => $tt->description,
+            'category' => $tt->category ?? '',
+            'default_responsible_role' => $tt->responsible_role,
+            'days_from_start' => (int) $tt->due_days,
+            'is_required' => (bool) $tt->is_required,
+            'sort_order' => (int) $tt->order,
+        ];
+    }
+
+    /**
+     * Create onboarding template (checklist container for options)
+     */
+    public function createOnboardingTemplate(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'is_active' => 'nullable|boolean',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $id = DB::table('hrm_onboarding_templates')->insertGetId([
+            'name' => $request->input('name'),
+            'description' => $request->input('description'),
+            'is_active' => $request->boolean('is_active', true) ? 1 : 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $template = DB::table('hrm_onboarding_templates')->where('id', $id)->first();
+        return response()->json($this->mapOnboardingTemplate($template), 201);
+    }
+
+    /**
+     * Update onboarding template
+     */
+    public function updateOnboardingTemplate(Request $request, $id)
+    {
+        $template = DB::table('hrm_onboarding_templates')->where('id', $id)->first();
+        if (!$template) {
+            return response()->json(['message' => 'Predložak nije pronađen.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'is_active' => 'nullable|boolean',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = [];
+        if ($request->has('name')) {
+            $data['name'] = $request->input('name');
+        }
+        if ($request->has('description')) {
+            $data['description'] = $request->input('description');
+        }
+        if ($request->has('is_active')) {
+            $data['is_active'] = $request->boolean('is_active') ? 1 : 0;
+        }
+        if (!empty($data)) {
+            $data['updated_at'] = now();
+            DB::table('hrm_onboarding_templates')->where('id', $id)->update($data);
+        }
+
+        $template = DB::table('hrm_onboarding_templates')->where('id', $id)->first();
+        return response()->json($this->mapOnboardingTemplate($template));
+    }
+
+    /**
+     * Add an option (template task) to an onboarding template
+     */
+    public function createOnboardingTemplateTask(Request $request, $id)
+    {
+        $template = DB::table('hrm_onboarding_templates')->where('id', $id)->first();
+        if (!$template) {
+            return response()->json(['message' => 'Predložak nije pronađen.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'category' => 'nullable|string|max:100',
+            'default_responsible_role' => 'nullable|string|max:100',
+            'days_from_start' => 'nullable|integer|min:0|max:365',
+            'is_required' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $maxOrder = (int) DB::table('hrm_onboarding_template_tasks')
+            ->where('template_id', $id)
+            ->max('order');
+
+        $taskId = DB::table('hrm_onboarding_template_tasks')->insertGetId([
+            'template_id' => $id,
+            'title' => $request->input('name'),
+            'description' => $request->input('description'),
+            'category' => $request->input('category') ?: 'default',
+            'responsible_role' => $request->input('default_responsible_role'),
+            'due_days' => (int) $request->input('days_from_start', 0),
+            'is_required' => $request->boolean('is_required', false) ? 1 : 0,
+            'order' => $request->filled('sort_order') ? (int) $request->input('sort_order') : $maxOrder + 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $task = DB::table('hrm_onboarding_template_tasks')->where('id', $taskId)->first();
+        return response()->json($this->mapOnboardingTemplateTask($task), 201);
+    }
+
+    /**
+     * Update an onboarding template option
+     */
+    public function updateOnboardingTemplateTask(Request $request, $id, $taskId)
+    {
+        $task = DB::table('hrm_onboarding_template_tasks')
+            ->where('template_id', $id)
+            ->where('id', $taskId)
+            ->first();
+        if (!$task) {
+            return response()->json(['message' => 'Opcija nije pronađena.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'category' => 'nullable|string|max:100',
+            'default_responsible_role' => 'nullable|string|max:100',
+            'days_from_start' => 'nullable|integer|min:0|max:365',
+            'is_required' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $data = [];
+        if ($request->has('name')) {
+            $data['title'] = $request->input('name');
+        }
+        if ($request->has('description')) {
+            $data['description'] = $request->input('description');
+        }
+        if ($request->has('category')) {
+            $data['category'] = $request->input('category') ?: 'default';
+        }
+        if ($request->has('default_responsible_role')) {
+            $data['responsible_role'] = $request->input('default_responsible_role');
+        }
+        if ($request->has('days_from_start')) {
+            $data['due_days'] = (int) $request->input('days_from_start');
+        }
+        if ($request->has('is_required')) {
+            $data['is_required'] = $request->boolean('is_required') ? 1 : 0;
+        }
+        if ($request->has('sort_order')) {
+            $data['order'] = (int) $request->input('sort_order');
+        }
+        if (!empty($data)) {
+            $data['updated_at'] = now();
+            DB::table('hrm_onboarding_template_tasks')->where('id', $taskId)->update($data);
+        }
+
+        $task = DB::table('hrm_onboarding_template_tasks')->where('id', $taskId)->first();
+        return response()->json($this->mapOnboardingTemplateTask($task));
+    }
+
+    /**
+     * Delete an onboarding template option
+     */
+    public function deleteOnboardingTemplateTask($id, $taskId)
+    {
+        $task = DB::table('hrm_onboarding_template_tasks')
+            ->where('template_id', $id)
+            ->where('id', $taskId)
+            ->first();
+        if (!$task) {
+            return response()->json(['message' => 'Opcija nije pronađena.'], 404);
+        }
+
+        DB::table('hrm_onboarding_template_tasks')->where('id', $taskId)->delete();
+        return response()->json(['message' => 'Opcija je obrisana.']);
     }
 
     /**
@@ -2032,6 +2334,8 @@ class HRMController extends Controller
             'employee_id' => 'required|exists:hrm_employees,id',
             'template_id' => 'required|exists:hrm_onboarding_templates,id',
             'start_date' => 'nullable|date',
+            'task_ids' => 'nullable|array',
+            'task_ids.*' => 'integer|exists:hrm_onboarding_template_tasks,id',
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
@@ -2040,6 +2344,7 @@ class HRMController extends Controller
         $employeeId = (int) $request->input('employee_id');
         $templateId = (int) $request->input('template_id');
         $startDate = $request->input('start_date') ?: now()->format('Y-m-d');
+        $selectedTaskIds = $request->input('task_ids');
 
         // Check for existing in-progress process for this employee
         $existing = DB::table('hrm_onboarding_processes')
@@ -2050,10 +2355,22 @@ class HRMController extends Controller
             return response()->json(['message' => 'Zaposlenik već ima aktivan onboarding proces.'], 422);
         }
 
-        $templateTasks = DB::table('hrm_onboarding_template_tasks')
+        $templateTasksQuery = DB::table('hrm_onboarding_template_tasks')
             ->where('template_id', $templateId)
-            ->orderBy('order')
-            ->get();
+            ->orderBy('order');
+
+        // Ako su proslijeđeni task_ids, uključi samo odabrane opcije
+        if (is_array($selectedTaskIds)) {
+            if (count($selectedTaskIds) === 0) {
+                return response()->json(['message' => 'Odaberite barem jednu onboarding opciju.'], 422);
+            }
+            $templateTasksQuery->whereIn('id', $selectedTaskIds);
+        }
+
+        $templateTasks = $templateTasksQuery->get();
+        if ($templateTasks->isEmpty()) {
+            return response()->json(['message' => 'Predložak nema odabranih opcija.'], 422);
+        }
 
         $processId = DB::table('hrm_onboarding_processes')->insertGetId([
             'employee_id' => $employeeId,
@@ -2189,10 +2506,17 @@ class HRMController extends Controller
 
         $data = [];
         if ($request->has('status')) {
-            $data['status'] = $request->input('status');
-            if ($request->input('status') === 'completed') {
+            $status = $request->input('status');
+            if (!in_array($status, ['pending', 'in_progress', 'completed', 'skipped'], true)) {
+                return response()->json(['message' => 'Neispravan status zadatka.'], 422);
+            }
+            $data['status'] = $status;
+            if ($status === 'completed') {
                 $data['completed_at'] = now();
                 $data['completed_by'] = $request->user()?->id;
+            } else {
+                $data['completed_at'] = null;
+                $data['completed_by'] = null;
             }
         }
         if ($request->has('assigned_to')) {
@@ -2262,15 +2586,30 @@ class HRMController extends Controller
 
     private function recalculateOnboardingProgress(int $processId)
     {
-        $total = DB::table('hrm_onboarding_tasks')->where('process_id', $processId)->count();
-        if ($total === 0) {
+        $active = DB::table('hrm_onboarding_tasks')
+            ->where('process_id', $processId)
+            ->where('status', '!=', 'skipped')
+            ->count();
+
+        if ($active === 0) {
+            // Sve opcije isključene / preskočene
+            DB::table('hrm_onboarding_processes')
+                ->where('id', $processId)
+                ->update([
+                    'progress_percentage' => 100,
+                    'actual_completion_date' => now()->format('Y-m-d'),
+                    'status' => 'completed',
+                    'updated_at' => now(),
+                ]);
             return;
         }
+
         $completed = DB::table('hrm_onboarding_tasks')
             ->where('process_id', $processId)
             ->where('status', 'completed')
             ->count();
-        $percentage = (int) round(($completed / $total) * 100);
+
+        $percentage = (int) round(($completed / $active) * 100);
         DB::table('hrm_onboarding_processes')
             ->where('id', $processId)
             ->update([

@@ -23,7 +23,7 @@ export interface Candidate {
   last_name: string;
   email: string;
   phone?: string;
-  position_id?: number;
+  position_id?: number | null;
   position_title?: string;
   status: 'new' | 'reviewing' | 'shortlisted' | 'interviewed' | 'offered' | 'rejected' | 'hired';
   resume_url?: string;
@@ -32,6 +32,8 @@ export interface Candidate {
   applied_date: string;
   created_at: string;
   updated_at: string;
+  interviews?: Interview[];
+  offers?: Offer[];
 }
 
 export interface Interview {
