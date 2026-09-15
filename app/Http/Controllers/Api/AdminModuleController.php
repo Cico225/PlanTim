@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ModulePermissionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -33,11 +34,7 @@ class AdminModuleController extends Controller
      */
     public function getUserModulePermissions(Request $request, $userId)
     {
-        $permissions = DB::table('user_module_permissions')
-            ->select('user_module_permissions.*', 'system_modules.display_name', 'system_modules.icon', 'system_modules.is_plugin')
-            ->join('system_modules', 'user_module_permissions.module_name', '=', 'system_modules.name')
-            ->where('user_id', $userId)
-            ->get();
+        $user = \App\Models\User::find($userId);
 
         // Get all available modules for comparison
         $allModules = DB::table('system_modules')
@@ -45,10 +42,10 @@ class AdminModuleController extends Controller
             ->orderBy('sort_order')
             ->get();
 
-        // Create permissions array with defaults for modules without explicit permissions
+        // Effective permissions = direct user + role_module + Spatie (via helper)
         $modulePermissions = [];
         foreach ($allModules as $module) {
-            $userPermission = $permissions->firstWhere('module_name', $module->name);
+            $effective = ModulePermissionHelper::getPermission((int) $userId, $module->name, $user);
             
             $modulePermissions[] = [
                 'module_name' => $module->name,
@@ -57,14 +54,16 @@ class AdminModuleController extends Controller
                 'icon' => $module->icon,
                 'is_plugin' => $module->is_plugin,
                 'available_permissions' => json_decode($module->available_permissions, true),
-                'can_view' => $userPermission ? $userPermission->can_view : false,
-                'can_read' => $userPermission ? $userPermission->can_read : false,
-                'can_create' => $userPermission ? $userPermission->can_create : false,
-                'can_update' => $userPermission ? $userPermission->can_update : false,
-                'can_delete' => $userPermission ? $userPermission->can_delete : false,
-                'can_export' => $userPermission ? $userPermission->can_export : false,
-                'can_import' => $userPermission ? $userPermission->can_import : false,
-                'custom_permissions' => $userPermission ? json_decode($userPermission->custom_permissions, true) : null,
+                'can_view' => $effective ? (bool) $effective->can_view : false,
+                'can_read' => $effective ? (bool) $effective->can_read : false,
+                'can_create' => $effective ? (bool) $effective->can_create : false,
+                'can_update' => $effective ? (bool) $effective->can_update : false,
+                'can_delete' => $effective ? (bool) $effective->can_delete : false,
+                'can_export' => $effective ? (bool) $effective->can_export : false,
+                'can_import' => $effective ? (bool) $effective->can_import : false,
+                'custom_permissions' => $effective
+                    ? (json_decode($effective->custom_permissions ?? '{}', true) ?: null)
+                    : null,
             ];
         }
 
@@ -167,47 +166,20 @@ class AdminModuleController extends Controller
     public function getUserAccessibleModules(Request $request)
     {
         try {
-            $userId = auth()->id();
             $user = auth()->user();
-            
-            // Check if user is admin using Spatie roles
-            $isAdmin = $user->hasAnyRole(['admin', 'super_admin', 'Super Admin', 'Admin']);
-            
-            Log::info('getUserAccessibleModules called', [
-                'user_id' => $userId,
-                'is_admin' => $isAdmin,
-                'roles' => $user->getRoleNames()->toArray()
-            ]);
 
-            // Admin users see all active modules
-            if ($isAdmin) {
-                $accessibleModules = DB::table('system_modules')
-                    ->where('is_active', true)
-                    ->orderBy('sort_order')
-                    ->get();
-                    
-                return response()->json($accessibleModules);
-            }
+            $moduleNames = ModulePermissionHelper::getAccessibleModuleNames($user);
 
-            // Get user's permissions for non-admin users
-            $userPermissions = DB::table('user_module_permissions')
-                ->where('user_id', $userId)
-                ->where('can_view', true)
-                ->pluck('module_name')
-                ->toArray();
-            
-            // Non-admin users only see modules they have can_view permission for
-            if (empty($userPermissions)) {
-                // User has no permissions - return empty array
+            if ($moduleNames === []) {
                 return response()->json([]);
             }
 
             $accessibleModules = DB::table('system_modules')
                 ->where('is_active', true)
-                ->whereIn('name', $userPermissions)
+                ->whereIn('name', $moduleNames)
                 ->orderBy('sort_order')
                 ->get();
-            
+
             return response()->json($accessibleModules);
         } catch (\Throwable $e) {
             Log::error('getUserAccessibleModules failed', [

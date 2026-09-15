@@ -79,6 +79,9 @@ export default function RoleAssignModal({ user, onClose, onSuccess }: RoleAssign
     }
   };
 
+  const selected = roles.find((r) => r.name === selectedRole);
+  const moduleCount = selected?.module_permissions_count ?? 0;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white dark:bg-dark-800 rounded-xl shadow-2xl max-w-md w-full">
@@ -120,23 +123,20 @@ export default function RoleAssignModal({ user, onClose, onSuccess }: RoleAssign
               {roles.map((role) => (
                 <option key={role.id} value={role.name}>
                   {role.name}
-                  {role.users_count ? ` (${role.users_count} korisnika)` : ''}
+                  {role.module_permissions_count
+                    ? ` (${role.module_permissions_count} modula)`
+                    : ''}
+                  {role.users_count ? ` · ${role.users_count} korisnika` : ''}
                 </option>
               ))}
             </select>
           </div>
 
           {selectedRole && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
-                Dozvole uloge:
-              </div>
-              <div className="text-sm text-blue-800 dark:text-blue-400">
-                {roles
-                  .find((r) => r.name === selectedRole)
-                  ?.permissions?.map((p: any) => p.name)
-                  .join(', ') || 'Nema dodjeljenih dozvola'}
-              </div>
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-900 dark:text-blue-300">
+              {moduleCount > 0
+                ? `Ova uloga ima ovlaštenja za ${moduleCount} modula. Korisnik će ih naslijediti automatski.`
+                : 'Ova uloga trenutno nema ovlaštenja za module. Postavite ih u Uloge i dozvole.'}
             </div>
           )}
 
