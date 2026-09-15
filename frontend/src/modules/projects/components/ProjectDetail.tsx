@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import CreateTaskModal from './CreateTaskModal';
 import TaskDetailModal from './TaskDetailModal';
 import { useAuthStore } from '@/store/authStore';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -330,7 +331,7 @@ export default function ProjectDetail() {
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <FiClock size={13} />
-                    {task.due_date ? new Date(task.due_date).toLocaleDateString('bs-BA') : 'Bez roka'}
+                    {formatDate(task.due_date, 'Bez roka')}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <FiUser size={13} />

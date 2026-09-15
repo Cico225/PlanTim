@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fi';
 import { lmsService, Badge } from '@/services/lmsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -225,7 +226,7 @@ export default function BadgesPage() {
 
                 {badge.is_earned && badge.earned_at && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Osvojeno: {new Date(badge.earned_at).toLocaleDateString('hr-HR')}
+                    Osvojeno: {formatDate(badge.earned_at)}
                   </p>
                 )}
               </div>

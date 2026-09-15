@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { RetailComplaint } from '@/types/retail-complaints';
+import { formatDate } from '@/utils/dateFormat';
 
 type ComplaintRejectionLetterProps = {
   complaint: Pick<
@@ -20,13 +21,6 @@ type ComplaintRejectionLetterProps = {
   >;
   responseText?: string;
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('bs-BA');
-}
 
 function formatPrice(value?: number | null) {
   if (value == null || Number.isNaN(Number(value))) return '—';
@@ -62,8 +56,8 @@ export default function ComplaintRejectionLetter({
   complaint,
   responseText,
 }: ComplaintRejectionLetterProps) {
-  const letterDate = formatDate(complaint.reviewed_at || complaint.created_at) || formatDate(new Date().toISOString());
-  const purchaseDate = formatDate(complaint.purchase_date);
+  const letterDate = formatDate(complaint.reviewed_at || complaint.created_at, '') || formatDate(new Date().toISOString(), '');
+  const purchaseDate = formatDate(complaint.purchase_date, '');
   const response = (responseText ?? complaint.admin_response ?? '').trim();
   const article = complaint.article_code?.trim() || 'artikal';
   const store = complaint.store_name?.trim() || 'prodajnom objektu';

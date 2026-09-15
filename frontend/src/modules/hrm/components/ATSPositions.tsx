@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Briefcase, Plus, Edit2, Trash2, Eye, MapPin, Calendar, Users as UsersIcon, Search, Filter } from 'lucide-react';
 import { atsService } from '../../../services/atsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 interface JobPosition {
   id: number;
@@ -156,7 +157,7 @@ export default function ATSPositions() {
                 {position.posted_date && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Calendar className="w-4 h-4" />
-                    {new Date(position.posted_date).toLocaleDateString('sr-RS')}
+                    {formatDate(position.posted_date)}
                   </div>
                 )}
               </div>

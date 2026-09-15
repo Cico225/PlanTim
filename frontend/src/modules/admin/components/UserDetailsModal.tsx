@@ -12,6 +12,7 @@ import {
   FiXCircle,
 } from 'react-icons/fi';
 import { apiService } from '@/services/api';
+import { formatDateTime } from '@/utils/dateFormat';
 
 interface UserDetailsModalProps {
   user: any;
@@ -52,17 +53,6 @@ export default function UserDetailsModal({ user, onClose }: UserDetailsModalProp
     } finally {
       setLoadingActivity(false);
     }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('bs-BA', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   return (
@@ -182,7 +172,7 @@ export default function UserDetailsModal({ user, onClose }: UserDetailsModalProp
                       Datum Kreiranja
                     </div>
                     <div className="text-gray-900 dark:text-white font-medium">
-                      {formatDate(user.created_at)}
+                      {formatDateTime(user.created_at, 'N/A')}
                     </div>
                   </div>
 
@@ -192,7 +182,7 @@ export default function UserDetailsModal({ user, onClose }: UserDetailsModalProp
                       Poslednja Prijava
                     </div>
                     <div className="text-gray-900 dark:text-white font-medium">
-                      {formatDate(user.last_login_at)}
+                      {formatDateTime(user.last_login_at, 'N/A')}
                     </div>
                   </div>
 
@@ -228,7 +218,7 @@ export default function UserDetailsModal({ user, onClose }: UserDetailsModalProp
                         {activity.action}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {formatDate(activity.timestamp)} • IP: {activity.ip}
+                        {formatDateTime(activity.timestamp, 'N/A')} • IP: {activity.ip}
                       </div>
                     </div>
                   </div>

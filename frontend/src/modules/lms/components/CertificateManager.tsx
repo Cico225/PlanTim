@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { lmsService, Certificate, Course } from '@/services/lmsService';
 import { useIsLmsAdmin } from '../pages/LMSMaloprodajaLandingPage';
 import { apiService } from '@/services/api';
+import { formatDate } from '@/utils/dateFormat';
 
 type AdminCertificate = Certificate & {
   course_title?: string;
@@ -160,7 +161,7 @@ export default function CertificateManager() {
                   <p className="mt-1 text-xs text-gray-400">
                     {cert.certificate_number}
                     {cert.issued_at
-                      ? ` · ${new Date(cert.issued_at).toLocaleDateString('bs-BA')}`
+                      ? ` · ${formatDate(cert.issued_at)}`
                       : ''}
                   </p>
                   <div className="mt-3 flex justify-end">
@@ -209,7 +210,7 @@ export default function CertificateManager() {
                       </td>
                       <td className="px-4 py-3 text-gray-500">
                         {cert.issued_at
-                          ? new Date(cert.issued_at).toLocaleDateString('bs-BA')
+                          ? formatDate(cert.issued_at)
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">

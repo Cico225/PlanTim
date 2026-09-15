@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { PAYMENT_METHODS, RetailComplaint } from '@/types/retail-complaints';
+import { formatDate } from '@/utils/dateFormat';
 
 type ComplaintPrintSheetProps = {
   complaint: Pick<
@@ -45,13 +46,6 @@ const labelCell: CSSProperties = {
   whiteSpace: 'nowrap',
   width: '88px',
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('bs-BA');
-}
 
 function formatPrice(value?: number | null) {
   if (value == null || Number.isNaN(Number(value))) return '';
@@ -130,7 +124,7 @@ function ComplaintCopy({ complaint }: ComplaintPrintSheetProps) {
         <tr>
           <td style={labelCell}>Datum :</td>
           <td style={cell} colSpan={3}>
-            {formatDate(complaint.created_at)}
+            {formatDate(complaint.created_at, '')}
           </td>
         </tr>
         <tr>
@@ -175,7 +169,7 @@ function ComplaintCopy({ complaint }: ComplaintPrintSheetProps) {
             <strong>,br. Računa:</strong> {val(complaint.receipt_number)}
           </td>
           <td style={cell} colSpan={2}>
-            <strong>Datum kupovine:</strong> {formatDate(complaint.purchase_date)}
+            <strong>Datum kupovine:</strong> {formatDate(complaint.purchase_date, '')}
           </td>
         </tr>
         <tr>

@@ -20,6 +20,7 @@ import {
   FiRefreshCw,
 } from 'react-icons/fi';
 import { apiService } from '@/services/api';
+import { formatDateTime } from '@/utils/dateFormat';
 import UserModal from '../components/UserModal';
 import UserDetailsModal from '../components/UserDetailsModal';
 import RoleAssignModal from '../components/RoleAssignModal';
@@ -247,17 +248,6 @@ export default function UserManagement() {
       setSelectedUsers(newSelected);
       setShowBulkActions(newSelected.length > 0);
     }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Nikad';
-    return new Date(dateString).toLocaleDateString('bs-BA', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   return (
@@ -516,7 +506,7 @@ export default function UserManagement() {
                       </button>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {formatDate(user.last_login_at)}
+                      {formatDateTime(user.last_login_at, 'Nikad')}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -639,7 +629,7 @@ export default function UserManagement() {
                 <div className="mb-3">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Poslednja prijava</p>
                   <p className="text-sm text-gray-900 dark:text-white">
-                    {formatDate(user.last_login_at)}
+                    {formatDateTime(user.last_login_at, 'Nikad')}
                   </p>
                 </div>
 

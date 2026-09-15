@@ -18,6 +18,7 @@ import CreateTaskModal from './CreateTaskModal';
 import PersonalTaskDetailModal from './PersonalTaskDetailModal';
 import AdvancedSearchModal from './AdvancedSearchModal';
 import toast from 'react-hot-toast';
+import { formatDate, formatMonthYear } from '@/utils/dateFormat';
 
 export default function PersonalTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -348,7 +349,7 @@ export default function PersonalTasks() {
                       {task.due_date && (
                         <div className="flex items-center gap-1">
                           <FiCalendar size={14} className="sm:w-4 sm:h-4" />
-                          <span>Rok: {new Date(task.due_date).toLocaleDateString('bs-BA')}</span>
+                          <span>Rok: {formatDate(task.due_date)}</span>
                         </div>
                       )}
                       {task.estimated_hours && (
@@ -415,7 +416,7 @@ export default function PersonalTasks() {
                 </div>
                 <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                   <p className={getPriorityColor(task.priority)}>Prioritet: {task.priority}</p>
-                  <p>Rok: {task.due_date ? new Date(task.due_date).toLocaleDateString('bs-BA') : '-'}</p>
+                  <p>Rok: {task.due_date ? formatDate(task.due_date) : '-'}</p>
                   <p>Izvršilac: {task.assignees?.length ? task.assignees.map((a: any) => a.user_name || a.name).join(', ') : (task as any).assigned_to_name || 'Nije dodeljen'}</p>
                 </div>
                 <div className="mt-3 flex justify-end gap-2 border-t border-gray-200 pt-3 dark:border-dark-700">
@@ -478,7 +479,7 @@ export default function PersonalTasks() {
                         <span className={getPriorityColor(task.priority)}>{task.priority}</span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {task.due_date ? new Date(task.due_date).toLocaleDateString('bs-BA') : '-'}
+                        {task.due_date ? formatDate(task.due_date) : '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {(task as any).created_by_name || '-'}
@@ -542,7 +543,7 @@ export default function PersonalTasks() {
                   <FiChevronRight className="w-4 h-4" />
                 </button>
                 <h3 className="text-sm sm:text-lg font-semibold text-gray-900 dark:text-white ml-2">
-                  {calendarDate.toLocaleDateString('bs-BA', { month: 'long', year: 'numeric' })}
+                  {formatMonthYear(calendarDate)}
                 </h3>
               </div>
             </div>

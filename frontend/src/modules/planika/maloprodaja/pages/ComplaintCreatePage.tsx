@@ -6,6 +6,7 @@ import ComplaintPhotoSlot from '../components/ComplaintPhotoSlot';
 import ComplaintPrintSheet from '../components/ComplaintPrintSheet';
 import { retailComplaintsService } from '@/services/retailComplaintsService';
 import { ComplaintCapabilities, CreateComplaintPayload, PAYMENT_METHODS, RetailComplaint } from '@/types/retail-complaints';
+import { formatDate } from '@/utils/dateFormat';
 
 const emptyForm = {
   customer_name: '',
@@ -85,7 +86,7 @@ export default function ComplaintCreatePage() {
   });
 
   const entryDateLabel = useMemo(
-    () => new Date().toLocaleDateString('bs-BA', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    () => formatDate(new Date()),
     []
   );
   const activeTab = searchParams.get('tab') === 'obrada' ? 'obrada' : 'unos';

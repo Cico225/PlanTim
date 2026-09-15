@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import Timeline from './Timeline';
 import DocumentList from './DocumentList';
 import TagManager from './TagManager';
+import { formatDateTime } from '@/utils/dateFormat';
 
 export default function AccountDetail() {
   const { id } = useParams<{ id: string }>();
@@ -368,7 +369,7 @@ export default function AccountDetail() {
                     </div>
                     {activity.scheduled_at && (
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {new Date(activity.scheduled_at).toLocaleString('bs-BA')}
+                        {formatDateTime(activity.scheduled_at)}
                       </div>
                     )}
                   </div>

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Plus, Edit2, Trash2, FileText, Mail, Phone, Calendar, Search, Filter, Upload } from 'lucide-react';
 import { atsService, type Candidate } from '../../../services/atsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function ATSCandidates() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -157,7 +158,7 @@ export default function ATSCandidates() {
                 {candidate.applied_date && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Calendar className="w-4 h-4" />
-                    {new Date(candidate.applied_date).toLocaleDateString('sr-RS')}
+                    {formatDate(candidate.applied_date)}
                   </div>
                 )}
                 {candidate.resume_url && (

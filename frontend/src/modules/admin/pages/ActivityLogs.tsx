@@ -11,8 +11,8 @@ import {
   FiEye,
   FiX,
 } from 'react-icons/fi';
-import { format, parseISO } from 'date-fns';
 import { apiService } from '@/services/api';
+import { formatDateTimeSeconds } from '@/utils/dateFormat';
 import toast from 'react-hot-toast';
 import MeetingRoomCalendar from './MeetingRoomCalendar';
 
@@ -168,14 +168,6 @@ export default function ActivityLogs() {
       return 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400';
     }
     return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return format(parseISO(dateString), 'dd.MM.yyyy HH:mm:ss');
-    } catch {
-      return dateString;
-    }
   };
 
   const exportLogs = () => {
@@ -431,7 +423,7 @@ export default function ActivityLogs() {
                         )}
                         <div className="flex items-center gap-1">
                           <FiClock size={14} />
-                          <span>{formatDate(log.created_at)}</span>
+                          <span>{formatDateTimeSeconds(log.created_at)}</span>
                         </div>
                         {log.log_name && (
                           <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
@@ -519,7 +511,7 @@ export default function ActivityLogs() {
                 <div>
                   <label className="label mb-1">Datum i Vreme</label>
                   <p className="text-gray-600 dark:text-gray-400">
-                    {formatDate(selectedLog.created_at)}
+                    {formatDateTimeSeconds(selectedLog.created_at)}
                   </p>
                 </div>
                 {selectedLog.log_name && (

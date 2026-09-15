@@ -13,6 +13,7 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks,
 import { apiService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 interface MeetingRoom {
   id: number;
@@ -243,7 +244,7 @@ export default function MeetingRoomCalendarCompact() {
           </button>
           <div className="text-center">
             <div className="font-medium text-gray-900 dark:text-white">
-              {format(weekStart, 'dd.MM')} - {format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'dd.MM.yyyy')}
+              {format(weekStart, 'dd.MM')} - {formatDate(endOfWeek(currentDate, { weekStartsOn: 1 }))}
             </div>
           </div>
           <button

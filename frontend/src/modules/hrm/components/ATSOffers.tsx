@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Award, Plus, Edit2, Trash2, Mail, Calendar, DollarSign, CheckCircle, XCircle, Search, Filter, Send } from 'lucide-react';
 import { atsService, type Offer } from '../../../services/atsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function ATSOffers() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -162,13 +163,13 @@ export default function ATSOffers() {
                 {offer.start_date && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Calendar className="w-4 h-4" />
-                    Početak: {new Date(offer.start_date).toLocaleDateString('sr-RS')}
+                    Početak: {formatDate(offer.start_date)}
                   </div>
                 )}
                 {offer.sent_date && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Mail className="w-4 h-4" />
-                    Poslato: {new Date(offer.sent_date).toLocaleDateString('sr-RS')}
+                    Poslato: {formatDate(offer.sent_date)}
                   </div>
                 )}
                 {offer.response_date && (
@@ -178,7 +179,7 @@ export default function ATSOffers() {
                     ) : (
                       <XCircle className="w-4 h-4 text-red-500" />
                     )}
-                    Odgovor: {new Date(offer.response_date).toLocaleDateString('sr-RS')}
+                    Odgovor: {formatDate(offer.response_date)}
                   </div>
                 )}
               </div>

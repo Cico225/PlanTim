@@ -6,6 +6,7 @@ import { FiPlus, FiEdit, FiEye, FiUsers, FiArrowLeft, FiTrash2 } from 'react-ico
 import { EmployeeEvaluation } from '@/types/planika-maloprodaja';
 import EvaluationForm from '../components/EvaluationForm';
 import { useAuthStore } from '@/stores/authStore';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function EvaluationsPage() {
   const navigate = useNavigate();
@@ -189,8 +190,8 @@ export default function EvaluationsPage() {
             </h3>
             <div className="space-y-2">
               <p className="text-sm">
-                {new Date(selectedEvaluation.period_start).toLocaleDateString('bs-BA')} -{' '}
-                {new Date(selectedEvaluation.period_end).toLocaleDateString('bs-BA')}
+                {formatDate(selectedEvaluation.period_start)} -{' '}
+                {formatDate(selectedEvaluation.period_end)}
               </p>
             </div>
           </div>
@@ -293,7 +294,7 @@ export default function EvaluationsPage() {
                   <span>{evaluation.store?.name}</span>
                   <span>•</span>
                   <span>
-                    {new Date(evaluation.evaluation_date).toLocaleDateString('bs-BA')}
+                    {formatDate(evaluation.evaluation_date)}
                   </span>
                   <span>•</span>
                   <span className="font-semibold text-gray-900 dark:text-white">

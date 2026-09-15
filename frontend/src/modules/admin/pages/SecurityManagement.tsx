@@ -20,8 +20,8 @@ import {
   FiEyeOff,
   FiSettings,
 } from 'react-icons/fi';
-import { format, parseISO } from 'date-fns';
 import { apiService } from '@/services/api';
+import { formatDateTime } from '@/utils/dateFormat';
 
 interface SecuritySetting {
   value: any;
@@ -362,15 +362,6 @@ function SecurityManagementContent() {
     } catch (error: any) {
       console.error('Error processing deletion:', error);
       toast.error('Greška pri obradi zahteva za brisanje');
-    }
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    try {
-      return format(parseISO(dateString), 'dd.MM.yyyy HH:mm');
-    } catch {
-      return dateString;
     }
   };
 
@@ -808,7 +799,7 @@ function SecurityManagementContent() {
                       <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">{attempt.email}</td>
                       <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{attempt.ip_address}</td>
                       <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                        {formatDate(attempt.created_at)}
+                        {formatDateTime(attempt.created_at, 'N/A')}
                       </td>
                       <td className="py-3 px-4">
                         {attempt.blocked ? (
@@ -887,10 +878,10 @@ function SecurityManagementContent() {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                        {session.last_used_at ? formatDate(session.last_used_at) : 'Nikad'}
+                        {formatDateTime(session.last_used_at, 'Nikad')}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                        {formatDate(session.created_at)}
+                        {formatDateTime(session.created_at, 'N/A')}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end">
@@ -1001,7 +992,7 @@ function SecurityManagementContent() {
                         )}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                        {formatDate(consent.accepted_at || consent.revoked_at || consent.created_at)}
+                        {formatDateTime(consent.accepted_at || consent.revoked_at || consent.created_at, 'N/A')}
                       </td>
                     </tr>
                   ))}
@@ -1052,7 +1043,7 @@ function SecurityManagementContent() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                        {formatDate(exportReq.created_at)}
+                        {formatDateTime(exportReq.created_at, 'N/A')}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-2">
@@ -1133,7 +1124,7 @@ function SecurityManagementContent() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                        {formatDate(deletionReq.created_at)}
+                        {formatDateTime(deletionReq.created_at, 'N/A')}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-2">

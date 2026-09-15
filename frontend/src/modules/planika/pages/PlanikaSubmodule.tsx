@@ -35,26 +35,44 @@ export default function PlanikaSubmodule() {
     return <FinanceLandingPage />;
   }
 
+  const heroStyles: Record<string, { accent: string; gradient: string }> = {
+    orange: {
+      accent: 'text-orange-600 dark:text-orange-400',
+      gradient: 'from-white via-orange-50/40 to-amber-50/30 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900',
+    },
+    purple: {
+      accent: 'text-purple-600 dark:text-purple-400',
+      gradient: 'from-white via-purple-50/40 to-violet-50/30 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900',
+    },
+    yellow: {
+      accent: 'text-amber-600 dark:text-amber-400',
+      gradient: 'from-white via-amber-50/40 to-yellow-50/30 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900',
+    },
+  };
+  const hero = heroStyles[submodule.color] ?? heroStyles.orange;
+
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+      <div
+        className={`rounded-3xl border border-gray-200 bg-gradient-to-br ${hero.gradient} p-6 shadow-sm dark:border-dark-700 sm:p-8`}
+      >
+        <Link
+          to="/planika"
+          className="inline-block text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 sm:text-sm"
+        >
+          ← Planika
+        </Link>
+        <div className="mt-3">
+          <p className={`text-sm font-medium uppercase tracking-[0.2em] ${hero.accent}`}>
             {t('planika.title')}
           </p>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="mt-2 text-2xl font-bold text-gray-900 dark:text-white sm:text-4xl">
             {t(submodule.nameKey)}
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1 max-w-3xl">
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-400 sm:text-base">
             {t(submodule.descriptionKey)}
           </p>
         </div>
-        <Link
-          to="/planika"
-          className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
-        >
-          ← {t('planika.title')}
-        </Link>
       </div>
 
       <PlanikaSubmoduleAnimation

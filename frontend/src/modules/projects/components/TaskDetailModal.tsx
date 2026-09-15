@@ -13,8 +13,7 @@ import {
 } from 'react-icons/fi';
 import { projectsService, Task } from '@/services/projectsService';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
-import { sr } from 'date-fns/locale';
+import { formatDateTime } from '@/utils/dateFormat';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -395,7 +394,7 @@ export default function TaskDetailModal({
                       {comment.user_name}
                     </span>
                     <span>
-                      {format(new Date(comment.created_at), 'dd.MM.yyyy HH:mm', { locale: sr })}
+                      {formatDateTime(comment.created_at)}
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">

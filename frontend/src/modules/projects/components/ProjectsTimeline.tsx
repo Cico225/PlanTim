@@ -11,7 +11,9 @@ import {
   FiCalendar,
   FiClock,
 } from 'react-icons/fi';
+import { format } from 'date-fns';
 import { apiService } from '@/services/api';
+import { formatDate, parseAppDate } from '@/utils/dateFormat';
 import { projectsService } from '@/services/projectsService';
 import toast from 'react-hot-toast';
 
@@ -151,25 +153,12 @@ export default function ProjectsTimeline() {
     };
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const getTimelineDateParts = (dateString: string) => {
+    const d = parseAppDate(dateString);
+    if (!d) return { date: '—', time: '' };
     return {
-      full: date.toLocaleDateString('bs-BA', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      date: date.toLocaleDateString('bs-BA', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-      time: date.toLocaleTimeString('bs-BA', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      date: formatDate(dateString),
+      time: format(d, 'HH:mm'),
     };
   };
 
@@ -391,7 +380,7 @@ export default function ProjectsTimeline() {
             
             <div className="space-y-6">
               {timeline.map((item, index) => {
-                const dateInfo = formatDate(item.date);
+                const dateInfo = getTimelineDateParts(item.date);
                 const colorStyle = getColorStyle(item.color);
                 
                 return (

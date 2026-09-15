@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiBook, FiClock, FiCheckCircle, FiTrendingUp } from 'react-icons/fi';
 import { lmsService, Enrollment } from '@/services/lmsService';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function MyCourses() {
   const navigate = useNavigate();
@@ -113,7 +114,7 @@ export default function MyCourses() {
                 )}
                 {enrollment.enrolled_at && (
                   <div className="mt-3 text-xs text-gray-500 dark:text-gray-500">
-                    Upisan: {new Date(enrollment.enrolled_at).toLocaleDateString('sr-RS')}
+                    Upisan: {formatDate(enrollment.enrolled_at)}
                   </div>
                 )}
               </div>

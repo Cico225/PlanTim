@@ -32,6 +32,7 @@ import type {
   TalentProfile,
   TalentReadiness,
 } from '../../../types/hrm';
+import { formatDate } from '@/utils/dateFormat';
 
 type TabKey = 'pool' | 'paths' | 'succession' | 'ninebox';
 
@@ -48,11 +49,6 @@ const READINESS_LABELS: Record<TalentReadiness, string> = {
 };
 
 const LEVELS: TalentLevel[] = ['high', 'medium', 'low'];
-
-function formatDate(value?: string | null) {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('bs-BA');
-}
 
 export default function TalentManagement() {
   const queryClient = useQueryClient();

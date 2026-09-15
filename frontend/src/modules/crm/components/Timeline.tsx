@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiActivity, FiEdit, FiTrash2, FiCheckCircle, FiClock, FiUser } from 'react-icons/fi';
 import { apiService } from '@/services/api';
 import toast from 'react-hot-toast';
+import { formatDateTime } from '@/utils/dateFormat';
 
 interface TimelineItem {
   type: 'activity' | 'audit';
@@ -102,7 +103,7 @@ export default function Timeline({ entityType, entityId }: TimelineProps) {
                       )}
                       <div className="flex items-center gap-1">
                         <FiClock size={14} />
-                        {new Date(item.date).toLocaleString('bs-BA')}
+                        {formatDateTime(item.date)}
                       </div>
                     </div>
                   </div>

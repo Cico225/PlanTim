@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FiArrowLeft, FiShield, FiLock, FiEye, FiUserCheck } from 'react-icons/fi';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function PrivacyPolicy() {
   return (
@@ -29,7 +30,7 @@ export default function PrivacyPolicy() {
 
           <div className="prose dark:prose-invert max-w-none">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Posljednje ažurirano: {new Date().toLocaleDateString('bs-BA')}
+              Posljednje ažurirano: {formatDate(new Date())}
             </p>
 
             <section className="mb-8">

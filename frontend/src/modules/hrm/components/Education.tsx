@@ -35,6 +35,7 @@ import type {
   EducationProgram,
   EducationType,
 } from '../../../types/hrm';
+import { formatDate } from '@/utils/dateFormat';
 
 type TabKey = 'programs' | 'enrollments' | 'certificates' | 'plans';
 
@@ -60,11 +61,6 @@ const ENROLLMENT_STATUS: Record<string, string> = {
   cancelled: 'Otkazano',
   no_show: 'Nije došao/la',
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('bs-BA');
-}
 
 export default function Education() {
   const queryClient = useQueryClient();

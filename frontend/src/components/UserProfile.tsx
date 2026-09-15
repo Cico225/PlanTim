@@ -6,6 +6,7 @@ import { useInboxCount } from '@/hooks/useInboxCount';
 import { useUserModules } from '@/hooks/useUserModules';
 import QRCode from 'react-qr-code';
 import toast from 'react-hot-toast';
+import { formatDateTime } from '@/utils/dateFormat';
 import {
   FiUser,
   FiShield,
@@ -742,7 +743,7 @@ function SecurityTab({ profileData, targetUserId, isViewingOtherUser, isAdmin, o
         <div className="pt-4 border-t border-gray-200 dark:border-dark-700">
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
             <span className="font-medium">Posljednja promjena lozinke:</span>{' '}
-            <span className="break-words">{new Date(profileData.password_changed_at).toLocaleString('bs-BA')}</span>
+            <span className="break-words">{formatDateTime(profileData.password_changed_at)}</span>
           </p>
         </div>
       )}
@@ -1040,7 +1041,7 @@ function ActivityTab({ activityData }: any) {
           <div className="space-y-2 text-xs sm:text-sm">
             <p className="text-gray-600 dark:text-gray-400 break-words">
               <span className="font-medium">Datum:</span>{' '}
-              {new Date(activityData.logins[0].created_at).toLocaleString('bs-BA')}
+              {formatDateTime(activityData.logins[0].created_at)}
             </p>
             <p className="text-gray-600 dark:text-gray-400 break-words">
               <span className="font-medium">IP adresa:</span> {activityData.logins[0].ip_address}
@@ -1068,7 +1069,7 @@ function ActivityTab({ activityData }: any) {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{activity.description}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {new Date(activity.created_at).toLocaleString('bs-BA')}
+                    {formatDateTime(activity.created_at)}
                   </p>
                 </div>
               </div>

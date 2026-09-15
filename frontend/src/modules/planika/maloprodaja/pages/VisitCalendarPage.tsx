@@ -16,6 +16,7 @@ import {
   FiPlus,
   FiFilter,
 } from 'react-icons/fi';
+import { formatDate, formatMonthYear } from '@/utils/dateFormat';
 
 interface VisitSchedule {
   id: number;
@@ -199,14 +200,11 @@ export default function VisitCalendarPage() {
 
   const formatDateHeader = (): string => {
     if (viewMode === 'month') {
-      return currentDate.toLocaleDateString('bs-BA', { month: 'long', year: 'numeric' });
-    } else {
-      const start = getStartOfView(currentDate);
-      const end = getEndOfView(currentDate);
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-      return `${startDate.toLocaleDateString('bs-BA')} - ${endDate.toLocaleDateString('bs-BA')}`;
+      return formatMonthYear(currentDate);
     }
+    const start = getStartOfView(currentDate);
+    const end = getEndOfView(currentDate);
+    return `${formatDate(start)} - ${formatDate(end)}`;
   };
 
   const daysInView = getDaysInView();
@@ -368,7 +366,7 @@ export default function VisitCalendarPage() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <h3 className={`font-semibold ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                        {day.toLocaleDateString('bs-BA', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {formatDate(day)}
                       </h3>
                       {isToday && (
                         <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full">Danas</span>
@@ -474,7 +472,7 @@ export default function VisitCalendarPage() {
                 <div>
                   <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Datum</label>
                   <p className="text-gray-900 dark:text-white mt-1">
-                    {new Date(selectedSchedule.scheduled_date).toLocaleDateString('bs-BA')}
+                    {formatDate(selectedSchedule.scheduled_date)}
                   </p>
                 </div>
                 {selectedSchedule.scheduled_time && (

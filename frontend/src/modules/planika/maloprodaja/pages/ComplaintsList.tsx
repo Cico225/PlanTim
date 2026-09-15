@@ -10,6 +10,7 @@ import {
   isComplaintSubmitted,
 } from '@/types/retail-complaints';
 import { ComplaintStatusBadge, getComplaintPhaseLabel } from '../components/ComplaintStatusUI';
+import { formatDate } from '@/utils/dateFormat';
 
 export default function ComplaintsList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -220,7 +221,7 @@ export default function ComplaintsList() {
                     </p>
                     <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                       {complaint.store_name} · {complaint.article_code || 'Bez šifre'} ·{' '}
-                      {new Date(complaint.created_at).toLocaleDateString('bs-BA')}
+                      {formatDate(complaint.created_at)}
                     </p>
                   </div>
                   <FiArrowRight className="shrink-0 text-gray-400" />
