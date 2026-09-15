@@ -1,11 +1,21 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Plus, Edit2, Trash2, FileText, Mail, Phone, Calendar, Search, Filter, Upload } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, FileText, Mail, Phone, Calendar, Search, Filter, ClipboardCheck, Award } from 'lucide-react';
 import { atsService, type Candidate } from '../../../services/atsService';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/utils/dateFormat';
 
-export default function ATSCandidates() {
+export type AtsLinkTarget = {
+  candidate_id: number;
+  position_id?: number;
+};
+
+type Props = {
+  onScheduleInterview?: (target: AtsLinkTarget) => void;
+  onCreateOffer?: (target: AtsLinkTarget) => void;
+};
+
+export default function ATSCandidates({ onScheduleInterview, onCreateOffer }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [positionFilter, setPositionFilter] = useState<string>('all');
@@ -13,11 +23,17 @@ export default function ATSCandidates() {
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
   const queryClient = useQueryClient();
 
+  const { data: positions } = useQuery({
+    queryKey: ['ats-positions-options'],
+    queryFn: () => atsService.getPositions(),
+  });
+
   const { data: candidates, isLoading } = useQuery({
     queryKey: ['ats-candidates', statusFilter, positionFilter, searchTerm],
-    queryFn: () => atsService.getCandidates({ 
+    queryFn: () => atsService.getCandidates({
       status: statusFilter !== 'all' ? statusFilter : undefined,
-      search: searchTerm,
+      position_id: positionFilter !== 'all' ? Number(positionFilter) : undefined,
+      search: searchTerm || undefined,
     }),
   });
 
@@ -66,7 +82,6 @@ export default function ATSCandidates() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -87,9 +102,8 @@ export default function ATSCandidates() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-4 items-center">
-        <div className="flex-1 relative">
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
@@ -115,10 +129,19 @@ export default function ATSCandidates() {
             <option value="rejected">Odbijen</option>
             <option value="hired">Zaposlen</option>
           </select>
+          <select
+            value={positionFilter}
+            onChange={(e) => setPositionFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          >
+            <option value="all">Sve pozicije</option>
+            {(positions?.data || []).map((p) => (
+              <option key={p.id} value={p.id}>{p.title}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Candidates List */}
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -135,8 +158,10 @@ export default function ATSCandidates() {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
                     {candidate.first_name} {candidate.last_name}
                   </h3>
-                  {candidate.position_title && (
+                  {candidate.position_title ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400">{candidate.position_title}</p>
+                  ) : (
+                    <p className="text-sm text-amber-600 dark:text-amber-400">Bez povezane pozicije</p>
                   )}
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(candidate.status)}`}>
@@ -171,7 +196,31 @@ export default function ATSCandidates() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                {onScheduleInterview && (
+                  <button
+                    onClick={() => onScheduleInterview({
+                      candidate_id: candidate.id,
+                      position_id: candidate.position_id,
+                    })}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                  >
+                    <ClipboardCheck className="w-4 h-4" />
+                    Intervju
+                  </button>
+                )}
+                {onCreateOffer && (
+                  <button
+                    onClick={() => onCreateOffer({
+                      candidate_id: candidate.id,
+                      position_id: candidate.position_id,
+                    })}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors"
+                  >
+                    <Award className="w-4 h-4" />
+                    Ponuda
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setEditingCandidate(candidate);
@@ -200,7 +249,6 @@ export default function ATSCandidates() {
         </div>
       )}
 
-      {/* Candidate Form Modal */}
       {showForm && (
         <CandidateFormModal
           candidate={editingCandidate}
@@ -220,7 +268,7 @@ function CandidateFormModal({ candidate, onClose }: { candidate: Candidate | nul
     last_name: candidate?.last_name || '',
     email: candidate?.email || '',
     phone: candidate?.phone || '',
-    position_id: candidate?.position_id || '',
+    position_id: candidate?.position_id ? String(candidate.position_id) : '',
     status: candidate?.status || 'new',
     cover_letter: candidate?.cover_letter || '',
     notes: candidate?.notes || '',
@@ -228,8 +276,13 @@ function CandidateFormModal({ candidate, onClose }: { candidate: Candidate | nul
 
   const queryClient = useQueryClient();
 
+  const { data: positions } = useQuery({
+    queryKey: ['ats-positions-options'],
+    queryFn: () => atsService.getPositions(),
+  });
+
   const createMutation = useMutation({
-    mutationFn: (data: any) => atsService.createCandidate(data),
+    mutationFn: (data: Partial<Candidate>) => atsService.createCandidate(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Kandidat je uspješno kreiran');
@@ -241,7 +294,7 @@ function CandidateFormModal({ candidate, onClose }: { candidate: Candidate | nul
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => atsService.updateCandidate(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Candidate> }) => atsService.updateCandidate(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Kandidat je uspješno ažuriran');
@@ -254,10 +307,14 @@ function CandidateFormModal({ candidate, onClose }: { candidate: Candidate | nul
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      position_id: formData.position_id ? Number(formData.position_id) : null,
+    } as Partial<Candidate>;
     if (candidate) {
-      updateMutation.mutate({ id: candidate.id, data: formData });
+      updateMutation.mutate({ id: candidate.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -323,23 +380,42 @@ function CandidateFormModal({ candidate, onClose }: { candidate: Candidate | nul
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Status
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="new">Nov</option>
-              <option value="reviewing">U pregledu</option>
-              <option value="shortlisted">Uža lista</option>
-              <option value="interviewed">Intervjuisan</option>
-              <option value="offered">Ponuda poslata</option>
-              <option value="rejected">Odbijen</option>
-              <option value="hired">Zaposlen</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Pozicija (ATS)
+              </label>
+              <select
+                value={formData.position_id}
+                onChange={(e) => setFormData({ ...formData, position_id: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">— Odaberite poziciju —</option>
+                {(positions?.data || []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}{p.status === 'open' ? '' : ` (${p.status})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as Candidate['status'] })}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="new">Nov</option>
+                <option value="reviewing">U pregledu</option>
+                <option value="shortlisted">Uža lista</option>
+                <option value="interviewed">Intervjuisan</option>
+                <option value="offered">Ponuda poslata</option>
+                <option value="rejected">Odbijen</option>
+                <option value="hired">Zaposlen</option>
+              </select>
+            </div>
           </div>
 
           <div>
@@ -386,12 +462,3 @@ function CandidateFormModal({ candidate, onClose }: { candidate: Candidate | nul
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

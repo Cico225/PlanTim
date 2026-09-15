@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, Plus, Edit2, Trash2, Eye, MapPin, Calendar, Users as UsersIcon, Search, Filter } from 'lucide-react';
+import { Briefcase, Plus, Edit2, Trash2, MapPin, Calendar, Search, Filter } from 'lucide-react';
 import { atsService } from '../../../services/atsService';
+import { getDepartments, getStores } from '../../../services/hrmService';
+import type { HRDepartment, HRStore } from '../../../types/hrm';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/utils/dateFormat';
 
@@ -208,7 +210,7 @@ export default function ATSPositions() {
 function PositionFormModal({ position, onClose }: { position: JobPosition | null; onClose: () => void }) {
   const [formData, setFormData] = useState({
     title: position?.title || '',
-    department_id: position?.department_id || '',
+    department_id: position?.department_id ? String(position.department_id) : '',
     location: position?.location || '',
     employment_type: position?.employment_type || 'full-time',
     status: position?.status || 'draft',
@@ -218,6 +220,72 @@ function PositionFormModal({ position, onClose }: { position: JobPosition | null
   });
 
   const queryClient = useQueryClient();
+
+  const { data: departmentsRaw, isLoading: loadingDepartments } = useQuery({
+    queryKey: ['hrm-departments'],
+    queryFn: () => getDepartments(),
+  });
+
+  const { data: storesRaw, isLoading: loadingStores } = useQuery({
+    queryKey: ['hrm-stores', { is_active: true }],
+    queryFn: () => getStores({ is_active: true }),
+  });
+
+  const departments: HRDepartment[] = useMemo(() => {
+    const raw: any = departmentsRaw;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.data)) return raw.data;
+    return [];
+  }, [departmentsRaw]);
+
+  const stores: HRStore[] = useMemo(() => {
+    const raw: any = storesRaw;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.data)) return raw.data;
+    return [];
+  }, [storesRaw]);
+
+  const locationOptions = useMemo(() => {
+    const deptOptions = departments.map((d) => ({
+      value: `dept:${d.id}`,
+      label: d.name,
+      location: d.name,
+      department_id: String(d.id),
+      group: 'Odjeli' as const,
+    }));
+
+    const storeOptions = stores.map((s) => {
+      const label = s.city ? `${s.name} (${s.city})` : s.name;
+      return {
+        value: `store:${s.id}`,
+        label,
+        location: label,
+        department_id: s.department_id ? String(s.department_id) : '',
+        group: 'Prodavnice' as const,
+      };
+    });
+
+    return [...deptOptions, ...storeOptions];
+  }, [departments, stores]);
+
+  const selectedLocationValue = useMemo(() => {
+    const match = locationOptions.find(
+      (o) =>
+        o.location === formData.location ||
+        o.label === formData.location ||
+        (formData.department_id &&
+          o.department_id === formData.department_id &&
+          o.group === 'Odjeli' &&
+          o.location === formData.location)
+    );
+    if (match) return match.value;
+
+    // Prefer store match by name when editing legacy free-text location
+    const byLabel = locationOptions.find(
+      (o) => o.label.toLowerCase() === (formData.location || '').toLowerCase()
+    );
+    return byLabel?.value || '';
+  }, [locationOptions, formData.location, formData.department_id]);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => atsService.createPosition(data),
@@ -243,14 +311,34 @@ function PositionFormModal({ position, onClose }: { position: JobPosition | null
     },
   });
 
+  const handleLocationChange = (value: string) => {
+    if (!value) {
+      setFormData((prev) => ({ ...prev, location: '', department_id: '' }));
+      return;
+    }
+    const option = locationOptions.find((o) => o.value === value);
+    if (!option) return;
+    setFormData((prev) => ({
+      ...prev,
+      location: option.location,
+      department_id: option.department_id,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      department_id: formData.department_id ? Number(formData.department_id) : null,
+    };
     if (position) {
-      updateMutation.mutate({ id: position.id, data: formData });
+      updateMutation.mutate({ id: position.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
+
+  const locationsLoading = loadingDepartments || loadingStores;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -274,17 +362,53 @@ function PositionFormModal({ position, onClose }: { position: JobPosition | null
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Lokacija
               </label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              <select
+                value={selectedLocationValue}
+                onChange={(e) => handleLocationChange(e.target.value)}
+                disabled={locationsLoading}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
+              >
+                <option value="">
+                  {locationsLoading ? 'Učitavanje…' : '— Odaberi odjel ili prodavnicu —'}
+                </option>
+                {departments.length > 0 && (
+                  <optgroup label="Odjeli">
+                    {locationOptions
+                      .filter((o) => o.group === 'Odjeli')
+                      .map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+                {stores.length > 0 && (
+                  <optgroup label="Prodavnice">
+                    {locationOptions
+                      .filter((o) => o.group === 'Prodavnice')
+                      .map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+              </select>
+              {!locationsLoading && departments.length === 0 && stores.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  Nema odjela/prodavnica. Dodajte ih u HR → Odjeli.
+                </p>
+              )}
+              {formData.location && !selectedLocationValue && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Trenutna vrijednost: {formData.location} (nije u listi Odjeli)
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -363,6 +487,7 @@ function PositionFormModal({ position, onClose }: { position: JobPosition | null
     </div>
   );
 }
+
 
 
 

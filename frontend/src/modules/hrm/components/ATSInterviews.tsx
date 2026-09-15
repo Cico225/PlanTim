@@ -1,20 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ClipboardCheck, Plus, Edit2, Trash2, Calendar, Clock, User, Video, Phone, MapPin, Search, Filter } from 'lucide-react';
-import { atsService, type Interview } from '../../../services/atsService';
+import { atsService, type Candidate, type Interview, type JobPosition } from '../../../services/atsService';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/utils/dateFormat';
+import type { AtsLinkTarget } from './ATSCandidates';
 
-export default function ATSInterviews() {
+type Props = {
+  initialPrefill?: AtsLinkTarget | null;
+  onPrefillConsumed?: () => void;
+};
+
+export default function ATSInterviews({ initialPrefill, onPrefillConsumed }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingInterview, setEditingInterview] = useState<Interview | null>(null);
+  const [prefill, setPrefill] = useState<AtsLinkTarget | null>(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (initialPrefill?.candidate_id) {
+      setPrefill(initialPrefill);
+      setEditingInterview(null);
+      setShowForm(true);
+      onPrefillConsumed?.();
+    }
+  }, [initialPrefill, onPrefillConsumed]);
 
   const { data: interviews, isLoading } = useQuery({
     queryKey: ['ats-interviews', statusFilter, searchTerm],
-    queryFn: () => atsService.getInterviews({ 
+    queryFn: () => atsService.getInterviews({
       status: statusFilter !== 'all' ? statusFilter : undefined,
     }),
   });
@@ -23,6 +39,7 @@ export default function ATSInterviews() {
     mutationFn: (id: number) => atsService.deleteInterview(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-interviews'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Intervju je uspješno obrisan');
     },
     onError: () => {
@@ -76,9 +93,17 @@ export default function ATSInterviews() {
     }
   };
 
+  const filtered = (interviews?.data || []).filter((interview: Interview) => {
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (interview.candidate_name || '').toLowerCase().includes(q) ||
+      (interview.position_title || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -90,6 +115,7 @@ export default function ATSInterviews() {
         <button
           onClick={() => {
             setEditingInterview(null);
+            setPrefill(null);
             setShowForm(true);
           }}
           className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -99,7 +125,6 @@ export default function ATSInterviews() {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -127,14 +152,13 @@ export default function ATSInterviews() {
         </div>
       </div>
 
-      {/* Interviews List */}
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
         </div>
-      ) : interviews?.data && interviews.data.length > 0 ? (
+      ) : filtered.length > 0 ? (
         <div className="space-y-4">
-          {interviews.data.map((interview: Interview) => (
+          {filtered.map((interview: Interview) => (
             <div
               key={interview.id}
               className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow"
@@ -190,6 +214,7 @@ export default function ATSInterviews() {
               <div className="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => {
+                    setPrefill(null);
                     setEditingInterview(interview);
                     setShowForm(true);
                   }}
@@ -216,13 +241,14 @@ export default function ATSInterviews() {
         </div>
       )}
 
-      {/* Interview Form Modal */}
       {showForm && (
         <InterviewFormModal
           interview={editingInterview}
+          prefill={prefill}
           onClose={() => {
             setShowForm(false);
             setEditingInterview(null);
+            setPrefill(null);
           }}
         />
       )}
@@ -230,26 +256,55 @@ export default function ATSInterviews() {
   );
 }
 
-function InterviewFormModal({ interview, onClose }: { interview: Interview | null; onClose: () => void }) {
+function InterviewFormModal({
+  interview,
+  prefill,
+  onClose,
+}: {
+  interview: Interview | null;
+  prefill?: AtsLinkTarget | null;
+  onClose: () => void;
+}) {
   const [formData, setFormData] = useState({
-    candidate_id: interview?.candidate_id || '',
-    position_id: interview?.position_id || '',
-    interviewer_id: interview?.interviewer_id || '',
+    candidate_id: interview?.candidate_id
+      ? String(interview.candidate_id)
+      : prefill?.candidate_id
+        ? String(prefill.candidate_id)
+        : '',
+    position_id: interview?.position_id
+      ? String(interview.position_id)
+      : prefill?.position_id
+        ? String(prefill.position_id)
+        : '',
     interview_type: interview?.interview_type || 'phone',
     scheduled_date: interview?.scheduled_date ? interview.scheduled_date.split('T')[0] : '',
     scheduled_time: interview?.scheduled_time || '',
     status: interview?.status || 'scheduled',
     notes: interview?.notes || '',
     feedback: interview?.feedback || '',
-    rating: interview?.rating || '',
+    rating: interview?.rating ? String(interview.rating) : '',
   });
 
   const queryClient = useQueryClient();
 
+  const { data: candidatesData } = useQuery({
+    queryKey: ['ats-candidates-options'],
+    queryFn: () => atsService.getCandidates(),
+  });
+
+  const { data: positionsData } = useQuery({
+    queryKey: ['ats-positions-options'],
+    queryFn: () => atsService.getPositions(),
+  });
+
+  const candidates: Candidate[] = candidatesData?.data || [];
+  const positions: JobPosition[] = positionsData?.data || [];
+
   const createMutation = useMutation({
-    mutationFn: (data: any) => atsService.createInterview(data),
+    mutationFn: (data: Partial<Interview>) => atsService.createInterview(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-interviews'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Intervju je uspješno kreiran');
       onClose();
     },
@@ -259,9 +314,10 @@ function InterviewFormModal({ interview, onClose }: { interview: Interview | nul
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => atsService.updateInterview(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Interview> }) => atsService.updateInterview(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ats-interviews'] });
+      queryClient.invalidateQueries({ queryKey: ['ats-candidates'] });
       toast.success('Intervju je uspješno ažuriran');
       onClose();
     },
@@ -270,12 +326,36 @@ function InterviewFormModal({ interview, onClose }: { interview: Interview | nul
     },
   });
 
+  const handleCandidateChange = (candidateId: string) => {
+    const selected = candidates.find((c) => String(c.id) === candidateId);
+    setFormData((prev) => ({
+      ...prev,
+      candidate_id: candidateId,
+      position_id: selected?.position_id ? String(selected.position_id) : prev.position_id,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.candidate_id || !formData.position_id) {
+      toast.error('Odaberite kandidata i poziciju');
+      return;
+    }
+    const payload: Partial<Interview> = {
+      candidate_id: Number(formData.candidate_id),
+      position_id: Number(formData.position_id),
+      interview_type: formData.interview_type as Interview['interview_type'],
+      scheduled_date: formData.scheduled_date,
+      scheduled_time: formData.scheduled_time,
+      status: formData.status as Interview['status'],
+      notes: formData.notes || undefined,
+      feedback: formData.feedback || undefined,
+      rating: formData.rating ? Number(formData.rating) : undefined,
+    };
     if (interview) {
-      updateMutation.mutate({ id: interview.id, data: formData });
+      updateMutation.mutate({ id: interview.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -291,12 +371,50 @@ function InterviewFormModal({ interview, onClose }: { interview: Interview | nul
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Kandidat *
+              </label>
+              <select
+                required
+                value={formData.candidate_id}
+                onChange={(e) => handleCandidateChange(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">— Odaberite kandidata —</option>
+                {candidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.first_name} {c.last_name}
+                    {c.position_title ? ` · ${c.position_title}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Pozicija *
+              </label>
+              <select
+                required
+                value={formData.position_id}
+                onChange={(e) => setFormData({ ...formData, position_id: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="">— Odaberite poziciju —</option>
+                {positions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.title}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Tip intervjua *
               </label>
               <select
                 required
                 value={formData.interview_type}
-                onChange={(e) => setFormData({ ...formData, interview_type: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, interview_type: e.target.value as Interview['interview_type'] })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="phone">Telefonski</option>
@@ -311,7 +429,7 @@ function InterviewFormModal({ interview, onClose }: { interview: Interview | nul
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as Interview['status'] })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="scheduled">Zakazan</option>
@@ -407,12 +525,3 @@ function InterviewFormModal({ interview, onClose }: { interview: Interview | nul
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

@@ -422,6 +422,11 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
         // Onboarding
         Route::get('/onboarding', [HRMController::class, 'getOnboardingProcesses']);
         Route::get('/onboarding/templates', [HRMController::class, 'getOnboardingTemplates']);
+        Route::post('/onboarding/templates', [HRMController::class, 'createOnboardingTemplate']);
+        Route::put('/onboarding/templates/{id}', [HRMController::class, 'updateOnboardingTemplate']);
+        Route::post('/onboarding/templates/{id}/tasks', [HRMController::class, 'createOnboardingTemplateTask']);
+        Route::put('/onboarding/templates/{id}/tasks/{taskId}', [HRMController::class, 'updateOnboardingTemplateTask']);
+        Route::delete('/onboarding/templates/{id}/tasks/{taskId}', [HRMController::class, 'deleteOnboardingTemplateTask']);
         Route::post('/onboarding', [HRMController::class, 'startOnboardingProcess']);
         Route::get('/onboarding/{id}', [HRMController::class, 'getOnboardingProcess']);
         Route::get('/onboarding/{id}/tasks', [HRMController::class, 'getOnboardingProcessTasks']);

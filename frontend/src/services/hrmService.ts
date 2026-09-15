@@ -7,6 +7,7 @@ import type {
   HROnboardingProcess,
   HROnboardingTask,
   HROnboardingTemplate,
+  HROnboardingTemplateTask,
   HREmployeeDocument,
   HRDocumentType,
   HRDecision,
@@ -305,14 +306,42 @@ export const deleteSuccessionPlan = (id: number) =>
 export const getOnboardingProcesses = (filters?: { status?: string }) =>
   apiService.get<PaginatedResponse<HROnboardingProcess>>('/hrm/onboarding', filters);
 
-export const getOnboardingTemplates = () =>
-  apiService.get<HROnboardingTemplate[]>('/hrm/onboarding/templates');
+export const getOnboardingTemplates = (all = false) =>
+  apiService.get<HROnboardingTemplate[]>('/hrm/onboarding/templates', all ? { all: 1 } : undefined);
 
-export const startOnboarding = (employeeId: number, templateId: number, startDate?: string) =>
+export const createOnboardingTemplate = (data: { name: string; description?: string; is_active?: boolean }) =>
+  apiService.post<HROnboardingTemplate>('/hrm/onboarding/templates', data);
+
+export const updateOnboardingTemplate = (
+  id: number,
+  data: Partial<{ name: string; description?: string; is_active?: boolean }>
+) => apiService.put<HROnboardingTemplate>(`/hrm/onboarding/templates/${id}`, data);
+
+export const createOnboardingTemplateTask = (
+  templateId: number,
+  data: Partial<HROnboardingTemplateTask> & { name: string }
+) => apiService.post<HROnboardingTemplateTask>(`/hrm/onboarding/templates/${templateId}/tasks`, data);
+
+export const updateOnboardingTemplateTask = (
+  templateId: number,
+  taskId: number,
+  data: Partial<HROnboardingTemplateTask>
+) => apiService.put<HROnboardingTemplateTask>(`/hrm/onboarding/templates/${templateId}/tasks/${taskId}`, data);
+
+export const deleteOnboardingTemplateTask = (templateId: number, taskId: number) =>
+  apiService.delete(`/hrm/onboarding/templates/${templateId}/tasks/${taskId}`);
+
+export const startOnboarding = (
+  employeeId: number,
+  templateId: number,
+  startDate?: string,
+  taskIds?: number[]
+) =>
   apiService.post<HROnboardingProcess>('/hrm/onboarding', {
     employee_id: employeeId,
     template_id: templateId,
     ...(startDate && { start_date: startDate }),
+    ...(taskIds ? { task_ids: taskIds } : {}),
   });
 
 export const getOnboardingProcess = (processId: number) =>

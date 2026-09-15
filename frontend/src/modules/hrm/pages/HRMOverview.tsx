@@ -1938,12 +1938,21 @@ function OffboardingList() {
 
 function ATSList() {
   const [activePhase, setActivePhase] = useState<'overview' | 'positions' | 'candidates' | 'interviews' | 'offers'>('overview');
+  const [linkPrefill, setLinkPrefill] = useState<{ candidate_id: number; position_id?: number } | null>(null);
+
+  const goToPhase = (
+    phase: 'overview' | 'positions' | 'candidates' | 'interviews' | 'offers',
+    prefill?: { candidate_id: number; position_id?: number } | null,
+  ) => {
+    setLinkPrefill(prefill ?? null);
+    setActivePhase(phase);
+  };
 
   if (activePhase === 'positions') {
     return (
       <div>
         <button
-          onClick={() => setActivePhase('overview')}
+          onClick={() => goToPhase('overview')}
           className="mb-4 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
         >
           <ChevronRight className="w-4 h-4 rotate-180" />
@@ -1958,13 +1967,16 @@ function ATSList() {
     return (
       <div>
         <button
-          onClick={() => setActivePhase('overview')}
+          onClick={() => goToPhase('overview')}
           className="mb-4 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
         >
           <ChevronRight className="w-4 h-4 rotate-180" />
           Nazad na pregled
         </button>
-        <ATSCandidates />
+        <ATSCandidates
+          onScheduleInterview={(target) => goToPhase('interviews', target)}
+          onCreateOffer={(target) => goToPhase('offers', target)}
+        />
       </div>
     );
   }
@@ -1973,13 +1985,16 @@ function ATSList() {
     return (
       <div>
         <button
-          onClick={() => setActivePhase('overview')}
+          onClick={() => goToPhase('overview')}
           className="mb-4 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
         >
           <ChevronRight className="w-4 h-4 rotate-180" />
           Nazad na pregled
         </button>
-        <ATSInterviews />
+        <ATSInterviews
+          initialPrefill={linkPrefill}
+          onPrefillConsumed={() => setLinkPrefill(null)}
+        />
       </div>
     );
   }
@@ -1988,13 +2003,16 @@ function ATSList() {
     return (
       <div>
         <button
-          onClick={() => setActivePhase('overview')}
+          onClick={() => goToPhase('overview')}
           className="mb-4 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
         >
           <ChevronRight className="w-4 h-4 rotate-180" />
           Nazad na pregled
         </button>
-        <ATSOffers />
+        <ATSOffers
+          initialPrefill={linkPrefill}
+          onPrefillConsumed={() => setLinkPrefill(null)}
+        />
       </div>
     );
   }
