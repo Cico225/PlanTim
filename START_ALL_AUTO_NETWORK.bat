@@ -103,6 +103,23 @@ if "!LOCAL_IP!"=="" (
     exit /b 1
 )
 
+REM Regenerisi Vite cert ako je za drugi IP (npr. server 126 na laptopu)
+set "NEED_CERT=0"
+if not exist "frontend\certs\server-cert.pem" set "NEED_CERT=1"
+if exist "frontend\certs\server-cert.pem" (
+    "%PHP_PATH%" -r "echo @openssl_x509_parse(file_get_contents('frontend/certs/server-cert.pem'))['extensions']['subjectAltName'] ?? '';" > "%TEMP%\plantim-cert-san.txt" 2>nul
+    findstr /C:"!LOCAL_IP!" "%TEMP%\plantim-cert-san.txt" >nul 2>&1
+    if errorlevel 1 set "NEED_CERT=1"
+    del /F /Q "%TEMP%\plantim-cert-san.txt" 2>nul
+)
+if "!NEED_CERT!"=="1" (
+    echo [KORAK 1b] SSL certifikat za !LOCAL_IP!...
+    call "%~dp0GENERATE_VITE_SSL_CERT.bat"
+    if errorlevel 1 (
+        echo UPOZORENJE: Certifikat nije regenerisan - Vite mozda nece startati.
+    )
+)
+
 echo.
 echo [KORAK 2] MySQL...
 tasklist /FI "IMAGENAME eq mysqld.exe" 2>NUL | find /I /N "mysqld.exe">NUL
@@ -139,7 +156,7 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":5173 .*LISTENING"') d
 timeout /t 2 /nobreak >nul
 echo        https://!LOCAL_IP!:5173
 start "PlanTim Frontend" cmd /k "set PATH=%NODE_DIR%;%APPDATA%\npm;%PATH% && cd /d "%~dp0frontend" && if not exist node_modules\.bin\vite.cmd (echo GRESKA: Pokrenite INSTALL_FRONTEND_DEPS.bat && pause) else (if exist node_modules\.vite rmdir /s /q node_modules\.vite & call node_modules\.bin\vite.cmd --host 0.0.0.0 --force)"
-timeout /t 8 /nobreak >nul
+timeout /t 12 /nobreak >nul
 
 echo.
 echo [KORAK 5] Provjera portova...

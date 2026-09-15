@@ -85,9 +85,8 @@ echo API proxy:  https://!LOCAL_IP!:5173/api
 echo Backend:    http://127.0.0.1:8000
 ) > TRENUTNA_IP_ADRESA.txt
 
-if not exist "PLANTIM_SERVER_IP.txt" (
-    echo !LOCAL_IP!> PLANTIM_SERVER_IP.txt
-)
+REM Uvijek uskladi PLANTIM_SERVER_IP.txt sa IP-om OVOG racunara
+echo !LOCAL_IP!> PLANTIM_SERVER_IP.txt
 
 echo.
 echo ============================================================
