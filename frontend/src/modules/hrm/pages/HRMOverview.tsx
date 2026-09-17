@@ -32,7 +32,7 @@ import {
   DollarSign,
   Briefcase as BriefcaseIcon
 } from 'lucide-react';
-import { getHRDashboard, getEmployees, getAlerts, createEmployee, importEmployees, getDepartments, getEmployee, updateEmployee, deleteEmployee, getStores, getWorkPositions } from '../../../services/hrmService';
+import { getHRDashboard, getEmployees, getAlerts, createEmployee, importEmployees, getDepartments, getEmployee, updateEmployee, deleteEmployee, getStores, getWorkPositions, getAvailableUsers } from '../../../services/hrmService';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/utils/dateFormat';
 import type { EmployeeStatus } from '../../../types/hrm';
@@ -321,8 +321,13 @@ function EmployeesList() {
       queryClient.invalidateQueries({ queryKey: ['hrm-employees'] });
       queryClient.invalidateQueries({ queryKey: ['hrm-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['hrm-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-available-users'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-available-users-edit'] });
       setShowAddModal(false);
-      // Reset form
+      toast.success('Zaposlenik je uspješno kreiran');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Greška pri kreiranju zaposlenika');
     },
   });
 
@@ -563,12 +568,21 @@ function EmployeesList() {
 }
 
 // Add Employee Modal Component
+function splitUserName(name: string): { first_name: string; last_name: string } {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    first_name: parts[0] || '',
+    last_name: parts.slice(1).join(' ') || '',
+  };
+}
+
 function AddEmployeeModal({ onClose, onSubmit, isLoading }: { 
   onClose: () => void; 
   onSubmit: (data: any) => void;
   isLoading: boolean;
 }) {
   const [formData, setFormData] = useState({
+    user_id: '' as string | number,
     first_name: '',
     last_name: '',
     email: '',
@@ -588,6 +602,7 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
     employment_type: 'full-time',
     status: 'active',
   });
+  const [userSearch, setUserSearch] = useState('');
 
   const { data: departments } = useQuery({
     queryKey: ['hrm-departments'],
@@ -604,9 +619,48 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
     queryFn: () => getWorkPositions({ is_active: true }),
   });
 
+  const { data: availableUsers = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ['hrm-available-users', userSearch],
+    queryFn: () => getAvailableUsers({ search: userSearch || undefined, active_only: true }),
+  });
+
+  const applyUserToForm = (userId: string) => {
+    if (!userId) {
+      setFormData((prev) => ({ ...prev, user_id: '' }));
+      return;
+    }
+    const user = availableUsers.find((u) => String(u.id) === String(userId));
+    if (!user) {
+      setFormData((prev) => ({ ...prev, user_id: userId }));
+      return;
+    }
+    const { first_name, last_name } = splitUserName(user.name);
+    const deptList = Array.isArray(departments) ? departments : [];
+    const matchedDept = user.department
+      ? deptList.find((d: any) => String(d.name).toLowerCase() === String(user.department).toLowerCase())
+      : null;
+
+    setFormData((prev) => ({
+      ...prev,
+      user_id: user.id,
+      first_name: first_name || prev.first_name,
+      last_name: last_name || prev.last_name,
+      email: user.email || prev.email,
+      mobile_phone: user.phone || prev.mobile_phone,
+      position: user.position || prev.position,
+      department_id: matchedDept?.id ? String(matchedDept.id) : prev.department_id,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    const payload = {
+      ...formData,
+      user_id: formData.user_id ? Number(formData.user_id) : undefined,
+      department_id: formData.department_id ? Number(formData.department_id) : null,
+      children_count: formData.children_count ? Number(formData.children_count) : 0,
+    };
+    onSubmit(payload);
   };
 
   return (
@@ -621,7 +675,51 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
         
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Osnovni podaci */}
+            <div className="md:col-span-2 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-4 space-y-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Poveži korisnika (Administracija)</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Odaberite postojećeg korisnika — ime, email, telefon i pozicija se automatski prepisuju. Zatim dopunite HR polja koja nedostaju.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Pretraga korisnika
+                </label>
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Ime ili email..."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Korisnik iz Administracije
+                </label>
+                <select
+                  value={formData.user_id}
+                  onChange={(e) => applyUserToForm(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">— Novi zaposlenik (bez postojećeg korisnika) —</option>
+                  {loadingUsers ? (
+                    <option disabled>Učitavanje...</option>
+                  ) : (
+                    availableUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              {formData.user_id ? (
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Povezano sa korisnikom #{formData.user_id}. Polja ispod možete dopuniti ili ispraviti.
+                </p>
+              ) : null}
+            </div>
+
             <div className="md:col-span-2">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Osnovni podaci</h3>
             </div>
@@ -703,7 +801,6 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
               />
             </div>
 
-            {/* Poslovni podaci */}
             <div className="md:col-span-2 mt-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Poslovni podaci</h3>
             </div>
@@ -775,7 +872,6 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
               </select>
             </div>
 
-            {/* Lični podaci */}
             <div className="md:col-span-2 mt-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Lični podaci</h3>
             </div>
@@ -1029,6 +1125,17 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
     },
   });
 
+  const empForLink = employee?.data || employee;
+  const { data: availableUsers = [] } = useQuery({
+    queryKey: ['hrm-available-users-edit', empForLink?.user_id],
+    queryFn: () =>
+      getAvailableUsers({
+        include_user_id: empForLink?.user_id ? Number(empForLink.user_id) : undefined,
+        active_only: true,
+      }),
+    enabled: isEditMode,
+  });
+
   const { data: workPositionsData } = useQuery({
     queryKey: ['hrm-work-positions-edit'],
     queryFn: () => getWorkPositions({ is_active: true }),
@@ -1037,11 +1144,12 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
   useEffect(() => {
     if (employee?.data || employee) {
       const emp = employee.data || employee;
-      const nameParts = emp.name?.split(' ') || [];
+      const nameParts = (emp.name || emp.user_name || '')?.split(' ') || [];
       setFormData({
+        user_id: emp.user_id || '',
         first_name: nameParts[0] || '',
         last_name: nameParts.slice(1).join(' ') || '',
-        email: emp.email || '',
+        email: emp.email || emp.user_email || '',
         employee_number: emp.employee_id || emp.employee_number || '',
         personal_id_number: emp.personal_id_number || '',
         municipality_code: emp.municipality_code || '',
@@ -1075,6 +1183,8 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
       queryClient.invalidateQueries({ queryKey: ['hrm-employees'] });
       queryClient.invalidateQueries({ queryKey: ['hrm-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['hrm-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-available-users'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-available-users-edit'] });
       toast.success('Zaposlenik je uspješno ažuriran');
       setIsEditMode(false);
     },
@@ -1087,6 +1197,7 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
     e.preventDefault();
     const submitData = {
       ...formData,
+      user_id: formData.user_id ? Number(formData.user_id) : undefined,
       department_id: formData.department_id ? Number(formData.department_id) : null,
       manager_id: formData.manager_id ? Number(formData.manager_id) : null,
       mentor_id: formData.mentor_id ? Number(formData.mentor_id) : null,
@@ -1094,6 +1205,36 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
       children_count: formData.children_count ? Number(formData.children_count) : 0,
     };
     updateMutation.mutate(submitData);
+  };
+
+  const applyLinkedUser = (userId: string) => {
+    if (!userId) {
+      setFormData((prev: any) => ({ ...prev, user_id: '' }));
+      return;
+    }
+    const user = availableUsers.find((u) => String(u.id) === String(userId));
+    if (!user) {
+      setFormData((prev: any) => ({ ...prev, user_id: userId }));
+      return;
+    }
+    const { first_name, last_name } = splitUserName(user.name);
+    const deptList = Array.isArray(departmentsData)
+      ? departmentsData
+      : (departmentsData as any)?.data || [];
+    const matchedDept = user.department
+      ? deptList.find((d: any) => String(d.name).toLowerCase() === String(user.department).toLowerCase())
+      : null;
+
+    setFormData((prev: any) => ({
+      ...prev,
+      user_id: user.id,
+      first_name: first_name || prev.first_name,
+      last_name: last_name || prev.last_name,
+      email: user.email || prev.email,
+      mobile_phone: user.phone || prev.mobile_phone,
+      position: user.position || prev.position,
+      department_id: matchedDept?.id ? String(matchedDept.id) : prev.department_id,
+    }));
   };
 
   if (isLoading) {
@@ -1198,6 +1339,36 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
         {/* Content */}
         {isEditMode ? (
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-4 space-y-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Poveži korisnika (Administracija)</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Odaberite korisnika iz Administracije — ime, email, telefon i pozicija se prepisuju u zaposlenika. Zatim dopunite preostala HR polja.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Korisnik
+                </label>
+                <select
+                  value={formData.user_id || ''}
+                  onChange={(e) => applyLinkedUser(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">— Bez promjene / nije povezan —</option>
+                  {availableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({u.email})
+                      {emp.user_id && Number(emp.user_id) === Number(u.id) ? ' — trenutno povezan' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {formData.user_id ? (
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Povezano sa korisnikom #{formData.user_id}. Sačuvajte izmjene da se veza i polja trajno primijene.
+                </p>
+              ) : null}
+            </div>
+
             {/* Osnovni podaci */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Osnovni podaci</h3>
@@ -1564,6 +1735,24 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
           </form>
         ) : (
           <div className="p-6 space-y-6">
+            {emp.user_id ? (
+              <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10 px-4 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Povezani korisnik (Administracija)</p>
+                <p className="text-base font-medium text-gray-900 dark:text-white">
+                  {emp.user_name || emp.name || `Korisnik #${emp.user_id}`}
+                  {emp.user_email || emp.email ? (
+                    <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                      ({emp.user_email || emp.email})
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                Nije povezan sa korisnikom iz Administracije. Kliknite Izmjeni da povežete postojećeg korisnika.
+              </div>
+            )}
+
             {/* Osnovni podaci */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Osnovni podaci</h3>

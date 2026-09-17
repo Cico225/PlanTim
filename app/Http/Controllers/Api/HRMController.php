@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\EmployeesImport;
 
@@ -374,6 +375,54 @@ class HRMController extends Controller
     }
 
     /**
+     * Users from Administration not yet linked to an HR employee.
+     * Optional include_user_id keeps currently linked user visible when editing.
+     */
+    public function getAvailableUsers(Request $request)
+    {
+        $linkedIds = DB::table('hrm_employees')
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->all();
+
+        $includeUserId = $request->filled('include_user_id')
+            ? (int) $request->input('include_user_id')
+            : null;
+
+        $select = ['id', 'name', 'email', 'created_at'];
+        foreach (['phone', 'position', 'department', 'avatar', 'is_active'] as $col) {
+            if (Schema::hasColumn('users', $col)) {
+                $select[] = $col;
+            }
+        }
+
+        $query = DB::table('users')->select($select)->orderBy('name');
+
+        $query->where(function ($q) use ($linkedIds, $includeUserId) {
+            if (count($linkedIds) > 0) {
+                $q->whereNotIn('id', $linkedIds);
+            }
+            if ($includeUserId) {
+                $q->orWhere('id', $includeUserId);
+            }
+        });
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if (Schema::hasColumn('users', 'is_active') && $request->boolean('active_only', true)) {
+            $query->where('is_active', 1);
+        }
+
+        return response()->json($query->limit(200)->get());
+    }
+
+    /**
      * Get single employee
      */
     public function show($id)
@@ -421,17 +470,22 @@ class HRMController extends Controller
      */
     public function store(Request $request)
     {
+        $linkUserId = $request->filled('user_id') ? (int) $request->input('user_id') : null;
+
+        $emailRules = ['required', 'email'];
+        if ($linkUserId) {
+            // Allow existing Admin user's email when linking
+            $emailRules[] = 'unique:users,email,' . $linkUserId;
+        } else {
+            $emailRules[] = 'unique:users,email';
+        }
+
         $validator = Validator::make($request->all(), [
-            // Osnovni podaci
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => $emailRules,
             'employee_number' => 'required|string|unique:hrm_employees,employee_id',
-            
-            // Opcioni user_id (ako se kreira novi korisnik, ne treba)
             'user_id' => 'nullable|exists:users,id|unique:hrm_employees,user_id',
-            
-            // Poslovni podaci
             'municipality_code' => 'nullable|string|max:20',
             'department_id' => 'nullable|exists:hrm_departments,id',
             'position' => 'required|string|max:255',
@@ -442,8 +496,6 @@ class HRMController extends Controller
             'status' => 'nullable|in:active,on-leave,terminated,candidate,hiring,on_hold,offboarding,former',
             'salary' => 'nullable|numeric|min:0',
             'manager_id' => 'nullable|exists:hrm_employees,id',
-            
-            // Lični podaci
             'gender' => 'nullable|in:M,F',
             'mobile_phone' => 'nullable|string|max:50',
             'private_address' => 'nullable|string',
@@ -458,24 +510,53 @@ class HRMController extends Controller
         }
 
         $data = $validator->validated();
-
-        // Kreiranje korisnika ako user_id nije prosleđen
         $userId = $data['user_id'] ?? null;
-        if (!$userId) {
-            $userId = DB::table('users')->insertGetId([
+
+        if ($userId) {
+            $existingUser = DB::table('users')->where('id', $userId)->first();
+            if (!$existingUser) {
+                return response()->json(['message' => 'Korisnik nije pronađen.'], 404);
+            }
+
+            $alreadyLinked = DB::table('hrm_employees')->where('user_id', $userId)->exists();
+            if ($alreadyLinked) {
+                return response()->json(['message' => 'Korisnik je već povezan sa drugim zaposlenikom.'], 422);
+            }
+
+            // Sync name / email / phone from form onto the Admin user
+            $userUpdate = [
+                'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                'email' => $data['email'],
+                'updated_at' => now(),
+            ];
+            if (Schema::hasColumn('users', 'phone') && !empty($data['mobile_phone'])) {
+                $userUpdate['phone'] = $data['mobile_phone'];
+            }
+            if (Schema::hasColumn('users', 'position') && !empty($data['position'])) {
+                $userUpdate['position'] = $data['position'];
+            }
+            DB::table('users')->where('id', $userId)->update($userUpdate);
+        } else {
+            $userInsert = [
                 'name' => $data['first_name'] . ' ' . $data['last_name'],
                 'email' => $data['email'],
-                'password' => Hash::make('password123'), // Default password
+                'password' => Hash::make('password123'),
                 'email_verified_at' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+            if (Schema::hasColumn('users', 'phone') && !empty($data['mobile_phone'])) {
+                $userInsert['phone'] = $data['mobile_phone'];
+            }
+            if (Schema::hasColumn('users', 'position') && !empty($data['position'])) {
+                $userInsert['position'] = $data['position'];
+            }
+            $userId = DB::table('users')->insertGetId($userInsert);
         }
 
-        // Priprema podataka za unos u hrm_employees
         $employeeData = [
             'user_id' => $userId,
-            'employee_id' => $data['employee_number'], // Mapiranje employee_number na employee_id (tabela koristi employee_id)
+            'employee_id' => $data['employee_number'],
             'municipality_code' => $data['municipality_code'] ?? null,
             'department_id' => $data['department_id'] ?? null,
             'position' => $data['position'],
@@ -484,10 +565,10 @@ class HRMController extends Controller
             'gender' => $data['gender'] ?? null,
             'employment_type' => $data['employment_type'] ?? 'full-time',
             'hire_date' => $data['hire_date'],
-            'phone' => $data['mobile_phone'] ?? null, // Koristimo postojeće 'phone' polje
-            'mobile_phone' => $data['mobile_phone'] ?? null, // Također dodajemo mobile_phone ako postoji
-            'address' => $data['private_address'] ?? null, // Koristimo postojeće 'address' polje
-            'private_address' => $data['private_address'] ?? null, // Također dodajemo private_address ako postoji
+            'phone' => $data['mobile_phone'] ?? null,
+            'mobile_phone' => $data['mobile_phone'] ?? null,
+            'address' => $data['private_address'] ?? null,
+            'private_address' => $data['private_address'] ?? null,
             'date_of_birth' => $data['date_of_birth'] ?? null,
             'marital_status' => $data['marital_status'] ?? null,
             'children_count' => $data['children_count'] ?? 0,
@@ -520,11 +601,19 @@ class HRMController extends Controller
             return response()->json(['message' => 'Employee not found'], 404);
         }
 
+        $linkUserId = $request->filled('user_id') ? (int) $request->input('user_id') : null;
+        $emailIgnoreId = $linkUserId ?: $employee->user_id;
+
         $validator = Validator::make($request->all(), [
             'first_name' => 'sometimes|required|string|max:255',
             'last_name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|unique:users,email,' . $employee->user_id,
+            'email' => 'sometimes|required|email|unique:users,email,' . $emailIgnoreId,
             'employee_number' => 'sometimes|required|string|unique:hrm_employees,employee_id,' . $id,
+            'user_id' => [
+                'nullable',
+                'exists:users,id',
+                Rule::unique('hrm_employees', 'user_id')->ignore($id),
+            ],
             'municipality_code' => 'nullable|string|max:20',
             'department_id' => 'nullable|exists:hrm_departments,id',
             'position' => 'sometimes|required|string|max:255',
@@ -558,23 +647,31 @@ class HRMController extends Controller
         $employeeData = [];
         $userData = [];
 
-        // Ažuriranje user podataka ako su promenjeni
-        if (isset($data['first_name']) || isset($data['last_name']) || isset($data['email'])) {
+        // Link / change Admin user
+        if (array_key_exists('user_id', $data) && $data['user_id'] && (int) $data['user_id'] !== (int) $employee->user_id) {
+            $employeeData['user_id'] = (int) $data['user_id'];
+            $employee->user_id = (int) $data['user_id'];
+        }
+
+        if (isset($data['first_name']) || isset($data['last_name']) || isset($data['email']) || isset($data['mobile_phone'])) {
             if (isset($data['first_name']) || isset($data['last_name'])) {
                 $currentUser = DB::table('users')->where('id', $employee->user_id)->first();
                 $firstName = $data['first_name'] ?? explode(' ', $currentUser->name ?? '')[0];
                 $lastName = $data['last_name'] ?? (explode(' ', $currentUser->name ?? '', 2)[1] ?? '');
-                $userData['name'] = $firstName . ' ' . $lastName;
+                $userData['name'] = trim($firstName . ' ' . $lastName);
             }
             if (isset($data['email'])) {
                 $userData['email'] = $data['email'];
             }
-            if (!empty($userData)) {
+            if (isset($data['mobile_phone']) && Schema::hasColumn('users', 'phone')) {
+                $userData['phone'] = $data['mobile_phone'];
+            }
+            if (!empty($userData) && $employee->user_id) {
+                $userData['updated_at'] = now();
                 DB::table('users')->where('id', $employee->user_id)->update($userData);
             }
         }
 
-        // Priprema podataka za hrm_employees
         $allowedFields = [
             'employee_id' => 'employee_number',
             'municipality_code',
@@ -612,10 +709,10 @@ class HRMController extends Controller
                     $employeeData['employee_id'] = $data['employee_number'];
                 } elseif ($inputField === 'mobile_phone') {
                     $employeeData['mobile_phone'] = $data['mobile_phone'];
-                    $employeeData['phone'] = $data['mobile_phone']; // Također ažuriraj phone polje
+                    $employeeData['phone'] = $data['mobile_phone'];
                 } elseif ($inputField === 'private_address') {
                     $employeeData['private_address'] = $data['private_address'];
-                    $employeeData['address'] = $data['private_address']; // Također ažuriraj address polje
+                    $employeeData['address'] = $data['private_address'];
                 } else {
                     $employeeData[$dbField] = $data[$inputField];
                 }

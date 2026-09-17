@@ -1332,7 +1332,7 @@ export default function EmploymentContracts() {
                       ...prev,
                       file,
                       name: prev.name || (file ? file.name.replace(/\.[^.]+$/, '') : ''),
-                      output_format: ext === 'docx' ? 'docx' : prev.output_format === 'docx' && ext === 'doc' ? 'pdf' : prev.output_format,
+                      output_format: ext === 'pdf' ? 'pdf' : 'docx',
                     }));
                   }}
                   className="input"
@@ -1396,8 +1396,8 @@ export default function EmploymentContracts() {
                   }
                   className="input"
                 >
-                  <option value="docx">DOCX (popunjavanje šablona)</option>
-                  <option value="pdf">PDF (Blade šablon)</option>
+                  <option value="docx">DOCX (cijeli šablon + popunjavanje)</option>
+                  <option value="pdf">PDF (puni tekst ugovora)</option>
                 </select>
               </Field>
             </div>

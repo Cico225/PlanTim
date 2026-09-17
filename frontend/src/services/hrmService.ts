@@ -58,6 +58,18 @@ export const getHRDashboard = () =>
 export const getEmployees = (filters?: EmployeeFilters) =>
   apiService.get<PaginatedResponse<HREmployee>>('/hrm/employees', filters);
 
+export const getAvailableUsers = (params?: { search?: string; include_user_id?: number; active_only?: boolean }) =>
+  apiService.get<Array<{
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+    position?: string;
+    department?: string;
+    avatar?: string;
+    is_active?: boolean;
+  }>>('/hrm/available-users', params);
+
 export const getEmployee = (id: number) =>
   apiService.get<HREmployee>(`/hrm/employees/${id}`);
 
