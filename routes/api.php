@@ -434,6 +434,20 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
         Route::put('/onboarding/{id}/tasks/{taskId}', [HRMController::class, 'updateOnboardingTask']);
         Route::put('/onboarding/{id}/status', [HRMController::class, 'updateOnboardingProcessStatus']);
 
+        // Offboarding
+        Route::get('/offboarding', [HRMController::class, 'getOffboardingProcesses']);
+        Route::get('/offboarding/reasons', [HRMController::class, 'getOffboardingReasons']);
+        Route::get('/offboarding/checklist', [HRMController::class, 'getOffboardingChecklistItems']);
+        Route::post('/offboarding', [HRMController::class, 'initiateOffboarding']);
+        Route::get('/offboarding/{id}', [HRMController::class, 'getOffboardingProcess']);
+        Route::get('/offboarding/{id}/tasks', [HRMController::class, 'getOffboardingProcessTasks']);
+        Route::put('/offboarding/{id}/tasks/{taskId}', [HRMController::class, 'updateOffboardingTask']);
+        Route::put('/offboarding/{id}/complete', [HRMController::class, 'completeOffboarding']);
+        Route::put('/offboarding/{id}/status', [HRMController::class, 'updateOffboardingProcessStatus']);
+
+        // Reports
+        Route::get('/reports/overview', [HRMController::class, 'getReportsOverview']);
+
         Route::prefix('education')->group(function () {
             Route::get('/summary', [HRMEducationController::class, 'summary']);
             Route::get('/programs', [HRMEducationController::class, 'programs']);
