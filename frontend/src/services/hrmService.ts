@@ -58,7 +58,13 @@ export const getHRDashboard = () =>
 export const getEmployees = (filters?: EmployeeFilters) =>
   apiService.get<PaginatedResponse<HREmployee>>('/hrm/employees', filters);
 
-export const getAvailableUsers = (params?: { search?: string; include_user_id?: number; active_only?: boolean }) =>
+export const getAvailableUsers = (params?: {
+  search?: string;
+  include_user_id?: number;
+  active_only?: boolean;
+  include_linked?: boolean;
+  limit?: number;
+}) =>
   apiService.get<Array<{
     id: number;
     name: string;
@@ -68,6 +74,7 @@ export const getAvailableUsers = (params?: { search?: string; include_user_id?: 
     department?: string;
     avatar?: string;
     is_active?: boolean;
+    is_linked?: boolean;
   }>>('/hrm/available-users', params);
 
 export const getEmployee = (id: number) =>
@@ -416,19 +423,41 @@ export const submitEvaluation = (id: number, data: { scores: Record<number, numb
 // ============================================
 // OFFBOARDING
 // ============================================
-export const getOffboardingProcesses = (filters?: { status?: string }) =>
+export const getOffboardingProcesses = (filters?: { status?: string; employee_id?: number }) =>
   apiService.get<PaginatedResponse<HROffboardingProcess>>('/hrm/offboarding', filters);
 
 export const getOffboardingReasons = () =>
   apiService.get<HROffboardingReason[]>('/hrm/offboarding/reasons');
 
-export const initiateOffboarding = (employeeId: number, reasonId: number, lastWorkingDate: string, notes?: string) =>
-  apiService.post<HROffboardingProcess>('/hrm/offboarding', { 
-    employee_id: employeeId, 
-    reason_id: reasonId, 
+export const getOffboardingChecklistItems = () =>
+  apiService.get<Array<{
+    id: number;
+    name: string;
+    title?: string;
+    description?: string;
+    category: string;
+    due_days: number;
+    is_required: boolean;
+    sort_order: number;
+  }>>('/hrm/offboarding/checklist');
+
+export const initiateOffboarding = (
+  employeeId: number,
+  reasonId: number,
+  lastWorkingDate: string,
+  notes?: string,
+  checklistItemIds?: number[]
+) =>
+  apiService.post<HROffboardingProcess>('/hrm/offboarding', {
+    employee_id: employeeId,
+    reason_id: reasonId,
     last_working_date: lastWorkingDate,
-    notes 
+    notes,
+    checklist_item_ids: checklistItemIds,
   });
+
+export const getOffboardingProcess = (id: number) =>
+  apiService.get<HROffboardingProcess>(`/hrm/offboarding/${id}`);
 
 export const getOffboardingTasks = (processId: number) =>
   apiService.get<HROffboardingTask[]>(`/hrm/offboarding/${processId}/tasks`);
@@ -436,8 +465,11 @@ export const getOffboardingTasks = (processId: number) =>
 export const updateOffboardingTask = (processId: number, taskId: number, data: Partial<HROffboardingTask>) =>
   apiService.put(`/hrm/offboarding/${processId}/tasks/${taskId}`, data);
 
-export const completeOffboarding = (processId: number) =>
-  apiService.put(`/hrm/offboarding/${processId}/complete`);
+export const completeOffboarding = (processId: number, force = false) =>
+  apiService.put(`/hrm/offboarding/${processId}/complete`, { force });
+
+export const updateOffboardingProcessStatus = (processId: number, status: string) =>
+  apiService.put(`/hrm/offboarding/${processId}/status`, { status });
 
 // ============================================
 // LEAVES
@@ -466,6 +498,31 @@ export const clockInOut = (action: 'clock_in' | 'clock_out' | 'break_start' | 'b
 // ============================================
 // REPORTS
 // ============================================
+export type HRReportsOverview = {
+  kpis: {
+    total_employees: number;
+    active_employees: number;
+    new_hires_this_month: number;
+    terminations_this_month: number;
+    onboarding_in_progress: number;
+    offboarding_in_progress: number;
+    avg_tenure_months: number;
+    departments_count: number;
+  };
+  by_status: Array<{ key: string; name: string; value: number; color: string }>;
+  by_department: Array<{ name: string; value: number }>;
+  by_position: Array<{ name: string; value: number }>;
+  by_employment_type: Array<{ name: string; value: number }>;
+  by_gender: Array<{ name: string; value: number }>;
+  hires_vs_exits: Array<{ month: string; ym: string; hires: number; exits: number }>;
+  headcount_trend: Array<{ month: string; ym: string; count: number }>;
+  offboarding_reasons: Array<{ name: string; value: number }>;
+  generated_at?: string;
+};
+
+export const getReportsOverview = (params?: { months?: number }) =>
+  apiService.get<HRReportsOverview>('/hrm/reports/overview', params);
+
 export const getReports = (type: string, params?: Record<string, unknown>) =>
   apiService.get(`/hrm/reports/${type}`, params);
 

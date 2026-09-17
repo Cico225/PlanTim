@@ -43,6 +43,8 @@ import ATSInterviews from '../components/ATSInterviews';
 import ATSOffers from '../components/ATSOffers';
 import OrganizationalStructure from '../components/OrganizationalStructure';
 import Onboarding from '../components/Onboarding';
+import Offboarding from '../components/Offboarding';
+import HRReports from '../components/HRReports';
 import EmploymentContracts from '../components/EmploymentContracts';
 import Education from '../components/Education';
 import TalentManagement from '../components/TalentManagement';
@@ -300,6 +302,9 @@ function HRDashboard() {
 // Employees List Component
 function EmployeesList() {
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -307,13 +312,30 @@ function EmployeesList() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<any>(null);
   const queryClient = useQueryClient();
-  
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const { data: employeesData, isLoading, error } = useQuery({
-    queryKey: ['hrm-employees', statusFilter],
-    queryFn: () => getEmployees({ status: (statusFilter || undefined) as EmployeeStatus | undefined }),
+    queryKey: ['hrm-employees', statusFilter, debouncedSearch, page],
+    queryFn: () =>
+      getEmployees({
+        status: (statusFilter || undefined) as EmployeeStatus | undefined,
+        search: debouncedSearch || undefined,
+        page,
+        per_page: 50,
+      }),
   });
 
   const employees = employeesData?.data || [];
+  const total = employeesData?.total ?? employees.length;
+  const lastPage = employeesData?.last_page ?? 1;
+  const currentPage = employeesData?.current_page ?? page;
 
   const createEmployeeMutation = useMutation({
     mutationFn: createEmployee,
@@ -424,16 +446,29 @@ function EmployeesList() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Pretraži ime, email, broj zaposlenog..."
+            className="flex-1 min-w-[200px] max-w-md px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white"
+          />
           <select 
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm"
           >
             {statusOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+            {total} zaposlenik{total === 1 ? '' : 'a'}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -525,6 +560,31 @@ function EmployeesList() {
               ))}
             </tbody>
           </table>
+          {lastPage > 1 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-700/30">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Stranica {currentPage} / {lastPage}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-white dark:hover:bg-gray-700"
+                >
+                  Prethodna
+                </button>
+                <button
+                  type="button"
+                  disabled={currentPage >= lastPage}
+                  onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-white dark:hover:bg-gray-700"
+                >
+                  Sljedeća
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -621,7 +681,13 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
 
   const { data: availableUsers = [], isLoading: loadingUsers } = useQuery({
     queryKey: ['hrm-available-users', userSearch],
-    queryFn: () => getAvailableUsers({ search: userSearch || undefined, active_only: true }),
+    queryFn: () =>
+      getAvailableUsers({
+        search: userSearch || undefined,
+        active_only: true,
+        include_linked: true,
+        limit: 500,
+      }),
   });
 
   const applyUserToForm = (userId: string) => {
@@ -630,8 +696,10 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
       return;
     }
     const user = availableUsers.find((u) => String(u.id) === String(userId));
-    if (!user) {
-      setFormData((prev) => ({ ...prev, user_id: userId }));
+    if (!user || user.is_linked) {
+      if (user?.is_linked) {
+        toast.error('Ovaj korisnik je već povezan sa drugim zaposlenikom');
+      }
       return;
     }
     const { first_name, last_name } = splitUserName(user.name);
@@ -678,7 +746,7 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
             <div className="md:col-span-2 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-4 space-y-3">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Poveži korisnika (Administracija)</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Odaberite postojećeg korisnika — ime, email, telefon i pozicija se automatski prepisuju. Zatim dopunite HR polja koja nedostaju.
+                Odaberite postojećeg korisnika iz Administracije — ime, email, telefon i pozicija se automatski prepisuju. Korisnici već povezani sa zaposlenikom su onemogućeni.
               </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -694,7 +762,7 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Korisnik iz Administracije
+                  Korisnik iz Administracije ({availableUsers.length})
                 </label>
                 <select
                   value={formData.user_id}
@@ -706,8 +774,8 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
                     <option disabled>Učitavanje...</option>
                   ) : (
                     availableUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.email})
+                      <option key={u.id} value={u.id} disabled={!!u.is_linked}>
+                        {u.name} ({u.email}){u.is_linked ? ' — već povezan' : ''}
                       </option>
                     ))
                   )}
@@ -1132,6 +1200,8 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
       getAvailableUsers({
         include_user_id: empForLink?.user_id ? Number(empForLink.user_id) : undefined,
         active_only: true,
+        include_linked: true,
+        limit: 500,
       }),
     enabled: isEditMode,
   });
@@ -1215,6 +1285,10 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
     const user = availableUsers.find((u) => String(u.id) === String(userId));
     if (!user) {
       setFormData((prev: any) => ({ ...prev, user_id: userId }));
+      return;
+    }
+    if (user.is_linked && Number(user.id) !== Number(empForLink?.user_id)) {
+      toast.error('Ovaj korisnik je već povezan sa drugim zaposlenikom');
       return;
     }
     const { first_name, last_name } = splitUserName(user.name);
@@ -1346,7 +1420,7 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
               </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Korisnik
+                  Korisnik ({availableUsers.length})
                 </label>
                 <select
                   value={formData.user_id || ''}
@@ -1354,12 +1428,16 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="">— Bez promjene / nije povezan —</option>
-                  {availableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.email})
-                      {emp.user_id && Number(emp.user_id) === Number(u.id) ? ' — trenutno povezan' : ''}
-                    </option>
-                  ))}
+                  {availableUsers.map((u) => {
+                    const isCurrent = emp.user_id && Number(emp.user_id) === Number(u.id);
+                    const disabled = !!u.is_linked && !isCurrent;
+                    return (
+                      <option key={u.id} value={u.id} disabled={disabled}>
+                        {u.name} ({u.email})
+                        {isCurrent ? ' — trenutno povezan' : u.is_linked ? ' — već povezan' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               {formData.user_id ? (
@@ -2099,32 +2177,6 @@ function EvaluationsList() {
   );
 }
 
-function OffboardingList() {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <UserMinus className="w-6 h-6 text-red-500" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Offboarding procesi</h3>
-      </div>
-      <p className="text-gray-500 dark:text-gray-400 mb-4">Upravljanje procesima odlaska zaposlenika</p>
-      <div className="space-y-3">
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-300">• Razlozi odlaska (otkaz, sporazumni raskid, istek ugovora)</p>
-        </div>
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-300">• Checklista offboarding zadataka</p>
-        </div>
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-300">• Exit intervju i završna dokumentacija</p>
-        </div>
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-300">• Arhiviranje podataka zaposlenika</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ATSList() {
   const [activePhase, setActivePhase] = useState<'overview' | 'positions' | 'candidates' | 'interviews' | 'offers'>('overview');
   const [linkPrefill, setLinkPrefill] = useState<{ candidate_id: number; position_id?: number } | null>(null);
@@ -2265,48 +2317,6 @@ function ATSList() {
   );
 }
 
-function HRReports() {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <BarChart3 className="w-6 h-6 text-cyan-500" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">HR Izvještaji</h3>
-      </div>
-      <p className="text-gray-500 dark:text-gray-400 mb-4">Analitika i izvještaji ljudskih resursa</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Users className="w-5 h-5 text-blue-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Headcount izvještaj</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Broj zaposlenika po odjelima i statusima</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <TrendingDown className="w-5 h-5 text-red-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Turnover izvještaj</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Fluktuacija zaposlenika i razlozi odlaska</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Calendar className="w-5 h-5 text-green-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Izvještaj odsustva</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Korištenje godišnjeg i bolovanja</p>
-        </button>
-        <button className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-          <div className="flex items-center gap-3 mb-2">
-            <Clock className="w-5 h-5 text-orange-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Izvještaj radnog vremena</span>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Radni sati i prekovremeni rad</p>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // Main Component
 interface HRMOverviewProps {
   initialTab?: TabKey;
@@ -2338,7 +2348,7 @@ export default function HRMOverview({
       case 'education': return <Education />;
       case 'talent': return <TalentManagement />;
       case 'evaluations': return <EvaluationsList />;
-      case 'offboarding': return <OffboardingList />;
+      case 'offboarding': return <Offboarding />;
       case 'reports': return <HRReports />;
       default: return <HRDashboard />;
     }

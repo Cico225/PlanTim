@@ -1,8 +1,9 @@
 {
-    "version": "1.2.25",
+    "version": "1.2.26",
     "version_name": "Release 2026-09-17",
-    "release_notes": "HR dorada dio Zaposlenici",
+    "release_notes": "Dorada modul HR",
     "changelog": [
+        "Dorada modul HR",
         "HR dorada dio Zaposlenici",
         "dorada modula HR",
         "DOrada formata datuma",
@@ -21,7 +22,6 @@
         "Razvoj i dorada modula LMS",
         "DOrada modula sistem učenja",
         "Implementacija korisničkog uputstva",
-        "Nove funkcionalnosti u modulu HR",
-        "Popravak dizajna na Ljudskim resursima"
+        "Nove funkcionalnosti u modulu HR"
     ]
 }

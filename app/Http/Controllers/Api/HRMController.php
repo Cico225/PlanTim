@@ -56,7 +56,14 @@ class HRMController extends Controller
         if (Schema::hasTable('hrm_employees')) {
             $stats['total_employees'] = $this->employeesQuery()->count();
             $stats['active_employees'] = $this->employeesQuery()->where('status', 'active')->count();
-            $stats['offboarding_in_progress'] = $this->employeesQuery()->where('status', 'offboarding')->count();
+
+            if (Schema::hasTable('hrm_offboarding_processes')) {
+                $stats['offboarding_in_progress'] = DB::table('hrm_offboarding_processes')
+                    ->whereIn('status', ['initiated', 'in_progress'])
+                    ->count();
+            } else {
+                $stats['offboarding_in_progress'] = $this->employeesQuery()->where('status', 'offboarding')->count();
+            }
 
             if (Schema::hasColumn('hrm_employees', 'hire_date')) {
                 $stats['new_hires_this_month'] = $this->employeesQuery()
@@ -333,61 +340,71 @@ class HRMController extends Controller
             )
             ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
             ->leftJoin('hrm_departments', 'hrm_employees.department_id', '=', 'hrm_departments.id')
-            ->orderBy('hrm_employees.hire_date', 'desc');
+            ->orderByRaw("{$nameExpr} asc");
 
         // Check for soft deletes
         if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
             $query->whereNull('hrm_employees.deleted_at');
         }
 
-        if ($request->has('department_id') && $request->input('department_id')) {
+        if ($request->filled('department_id')) {
             $query->where('hrm_employees.department_id', $request->input('department_id'));
         }
 
-        if ($request->has('status') && $request->input('status')) {
+        if ($request->filled('status')) {
             $query->where('hrm_employees.status', $request->input('status'));
         }
 
-        if ($request->has('position') && $request->input('position')) {
-            $position = $request->input('position');
-            // Use LIKE for case-insensitive partial matching
-            // Check both position and job_title fields
-            // Also check if position field exists in schema
-            $query->where(function($q) use ($position) {
-                $q->where('hrm_employees.position', 'like', '%' . $position . '%');
-                // Check job_title if column exists
-                if (Schema::hasColumn('hrm_employees', 'job_title')) {
-                    $q->orWhere('hrm_employees.job_title', 'like', '%' . $position . '%');
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+            $query->where(function ($q) use ($search, $nameExpr) {
+                $q->where('users.name', 'like', "%{$search}%")
+                    ->orWhere('users.email', 'like', "%{$search}%")
+                    ->orWhere('hrm_employees.employee_id', 'like', "%{$search}%")
+                    ->orWhere('hrm_employees.position', 'like', "%{$search}%")
+                    ->orWhereRaw("{$nameExpr} like ?", ["%{$search}%"]);
+                if (Schema::hasColumn('hrm_employees', 'first_name')) {
+                    $q->orWhere('hrm_employees.first_name', 'like', "%{$search}%")
+                        ->orWhere('hrm_employees.last_name', 'like', "%{$search}%");
                 }
             });
         }
 
-        // If filtering by position, return all results (no pagination)
-        // Otherwise use pagination
-        if ($request->has('position') && $request->input('position')) {
+        if ($request->filled('position')) {
+            $position = $request->input('position');
+            $query->where(function ($q) use ($position) {
+                $q->where('hrm_employees.position', 'like', '%' . $position . '%');
+                if (Schema::hasColumn('hrm_employees', 'job_title')) {
+                    $q->orWhere('hrm_employees.job_title', 'like', '%' . $position . '%');
+                }
+            });
             $employees = $query->get();
             return response()->json($employees);
         }
 
-        $employees = $query->paginate(20);
+        $perPage = min(max((int) $request->input('per_page', 50), 1), 200);
+        $employees = $query->paginate($perPage);
 
         return response()->json($employees);
     }
 
     /**
-     * Users from Administration not yet linked to an HR employee.
-     * Optional include_user_id keeps currently linked user visible when editing.
+     * Users from Administration for linking to HR employees.
+     * By default returns unlinked users; with include_linked=1 returns all (with is_linked flag).
      */
     public function getAvailableUsers(Request $request)
     {
-        $linkedIds = DB::table('hrm_employees')
-            ->whereNotNull('user_id')
-            ->pluck('user_id')
-            ->all();
+        $linkedQuery = DB::table('hrm_employees')->whereNotNull('user_id');
+        if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
+            $linkedQuery->whereNull('deleted_at');
+        }
+        $linkedIds = $linkedQuery->pluck('user_id')->all();
+        $linkedSet = array_flip($linkedIds);
 
         $includeUserId = $request->filled('include_user_id')
             ? (int) $request->input('include_user_id')
             : null;
+        $includeLinked = $request->boolean('include_linked', false);
 
         $select = ['id', 'name', 'email', 'created_at'];
         foreach (['phone', 'position', 'department', 'avatar', 'is_active'] as $col) {
@@ -398,14 +415,16 @@ class HRMController extends Controller
 
         $query = DB::table('users')->select($select)->orderBy('name');
 
-        $query->where(function ($q) use ($linkedIds, $includeUserId) {
-            if (count($linkedIds) > 0) {
-                $q->whereNotIn('id', $linkedIds);
-            }
-            if ($includeUserId) {
-                $q->orWhere('id', $includeUserId);
-            }
-        });
+        if (!$includeLinked) {
+            $query->where(function ($q) use ($linkedIds, $includeUserId) {
+                if (count($linkedIds) > 0) {
+                    $q->whereNotIn('id', $linkedIds);
+                }
+                if ($includeUserId) {
+                    $q->orWhere('id', $includeUserId);
+                }
+            });
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -416,10 +435,29 @@ class HRMController extends Controller
         }
 
         if (Schema::hasColumn('users', 'is_active') && $request->boolean('active_only', true)) {
-            $query->where('is_active', 1);
+            $query->where(function ($q) {
+                $q->where('is_active', 1)->orWhereNull('is_active');
+            });
         }
 
-        return response()->json($query->limit(200)->get());
+        $limit = min(max((int) $request->input('limit', 500), 1), 1000);
+        $users = $query->limit($limit)->get()->map(function ($u) use ($linkedSet, $includeUserId) {
+            $isLinked = isset($linkedSet[$u->id]);
+            return [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'phone' => $u->phone ?? null,
+                'position' => $u->position ?? null,
+                'department' => $u->department ?? null,
+                'avatar' => $u->avatar ?? null,
+                'is_active' => isset($u->is_active) ? (bool) $u->is_active : true,
+                'is_linked' => $isLinked && (int) $u->id !== (int) $includeUserId,
+                'created_at' => $u->created_at,
+            ];
+        });
+
+        return response()->json($users->values());
     }
 
     /**
@@ -2716,5 +2754,724 @@ class HRMController extends Controller
                 'updated_at' => now(),
             ]);
     }
-}
 
+    // ============================================
+    // OFFBOARDING (uses existing DB column names)
+    // ============================================
+
+    private function mapReasonTypeFromCode(?string $code): string
+    {
+        $code = strtolower((string) $code);
+        if (str_contains($code, 'resign')) {
+            return 'resignation';
+        }
+        if (str_contains($code, 'termin')) {
+            return 'termination';
+        }
+        if (str_contains($code, 'expir') || str_contains($code, 'contract')) {
+            return 'contract_expiry';
+        }
+        if (str_contains($code, 'mutual')) {
+            return 'mutual_agreement';
+        }
+        if (str_contains($code, 'retir')) {
+            return 'retirement';
+        }
+        return $code ?: 'resignation';
+    }
+
+    public function getOffboardingProcesses(Request $request)
+    {
+        if (!Schema::hasTable('hrm_offboarding_processes')) {
+            return response()->json(['data' => [], 'current_page' => 1, 'last_page' => 1, 'per_page' => 15, 'total' => 0]);
+        }
+
+        $query = DB::table('hrm_offboarding_processes')
+            ->select(
+                'hrm_offboarding_processes.*',
+                'users.name as employee_name',
+                'hrm_offboarding_reasons.name as reason_name',
+                'hrm_offboarding_reasons.code as reason_code'
+            )
+            ->leftJoin('hrm_employees', 'hrm_offboarding_processes.employee_id', '=', 'hrm_employees.id')
+            ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
+            ->leftJoin('hrm_offboarding_reasons', 'hrm_offboarding_processes.reason_id', '=', 'hrm_offboarding_reasons.id')
+            ->orderByDesc('hrm_offboarding_processes.notification_date')
+            ->orderByDesc('hrm_offboarding_processes.id');
+
+        if ($request->filled('status')) {
+            $query->where('hrm_offboarding_processes.status', $request->input('status'));
+        }
+        if ($request->filled('employee_id')) {
+            $query->where('hrm_offboarding_processes.employee_id', (int) $request->input('employee_id'));
+        }
+
+        $perPage = min((int) $request->input('per_page', 15), 50);
+        $paginated = $query->paginate($perPage);
+        $items = collect($paginated->items())->map(fn ($row) => $this->mapOffboardingProcess($row));
+
+        return response()->json([
+            'data' => $items,
+            'current_page' => $paginated->currentPage(),
+            'last_page' => $paginated->lastPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+        ]);
+    }
+
+    public function getOffboardingReasons()
+    {
+        if (!Schema::hasTable('hrm_offboarding_reasons')) {
+            return response()->json([]);
+        }
+
+        $reasons = DB::table('hrm_offboarding_reasons')
+            ->where('is_active', 1)
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'name' => $r->name,
+                'code' => $r->code,
+                'reason_type' => $this->mapReasonTypeFromCode($r->code),
+                'description' => $r->description,
+                'is_active' => (bool) $r->is_active,
+            ]);
+
+        return response()->json($reasons);
+    }
+
+    public function getOffboardingChecklistItems()
+    {
+        if (!Schema::hasTable('hrm_offboarding_checklist_items')) {
+            return response()->json([]);
+        }
+
+        $items = DB::table('hrm_offboarding_checklist_items')
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($i) => [
+                'id' => $i->id,
+                'name' => $i->title,
+                'title' => $i->title,
+                'description' => $i->description,
+                'category' => $i->category,
+                'due_days' => (int) $i->due_days,
+                'is_required' => (bool) $i->is_required,
+                'sort_order' => (int) $i->sort_order,
+            ]);
+
+        return response()->json($items);
+    }
+
+    public function initiateOffboarding(Request $request)
+    {
+        if (!Schema::hasTable('hrm_offboarding_processes')) {
+            return response()->json(['message' => 'Offboarding tabele nisu kreirane. Pokrenite migracije.'], 503);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'employee_id' => 'required|exists:hrm_employees,id',
+            'reason_id' => 'required|exists:hrm_offboarding_reasons,id',
+            'last_working_date' => 'required|date',
+            'notes' => 'nullable|string',
+            'checklist_item_ids' => 'nullable|array',
+            'checklist_item_ids.*' => 'integer|exists:hrm_offboarding_checklist_items,id',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $employeeId = (int) $request->input('employee_id');
+        $reasonId = (int) $request->input('reason_id');
+        $lastWorkingDate = $request->input('last_working_date');
+        $selectedIds = $request->input('checklist_item_ids');
+
+        $existing = DB::table('hrm_offboarding_processes')
+            ->where('employee_id', $employeeId)
+            ->whereIn('status', ['initiated', 'in_progress', 'pending'])
+            ->first();
+        if ($existing) {
+            return response()->json(['message' => 'Zaposlenik već ima aktivan offboarding proces.'], 422);
+        }
+
+        $reason = DB::table('hrm_offboarding_reasons')->where('id', $reasonId)->first();
+        if (!$reason) {
+            return response()->json(['message' => 'Razlog nije pronađen.'], 404);
+        }
+
+        $itemsQuery = DB::table('hrm_offboarding_checklist_items')
+            ->where('is_active', 1)
+            ->orderBy('sort_order');
+
+        if (is_array($selectedIds)) {
+            if (count($selectedIds) === 0) {
+                return response()->json(['message' => 'Odaberite barem jednu stavku checkliste.'], 422);
+            }
+            $itemsQuery->whereIn('id', $selectedIds);
+        }
+
+        $checklistItems = $itemsQuery->get();
+        if ($checklistItems->isEmpty()) {
+            return response()->json(['message' => 'Nema aktivnih stavki checkliste za offboarding.'], 422);
+        }
+
+        $processId = DB::table('hrm_offboarding_processes')->insertGetId([
+            'employee_id' => $employeeId,
+            'reason_id' => $reasonId,
+            'notification_date' => now()->format('Y-m-d'),
+            'last_working_day' => $lastWorkingDate,
+            'status' => 'in_progress',
+            'progress_percentage' => 0,
+            'exit_interview_completed' => 0,
+            'exit_interview_notes' => null,
+            'notes' => $request->input('notes'),
+            'initiated_by' => $request->user()?->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach ($checklistItems as $item) {
+            $dueDate = now()->parse($lastWorkingDate)->addDays((int) $item->due_days)->format('Y-m-d');
+            DB::table('hrm_offboarding_tasks')->insert([
+                'process_id' => $processId,
+                'title' => $item->title,
+                'description' => $item->description,
+                'category' => $item->category,
+                'due_date' => $dueDate,
+                'status' => 'pending',
+                'order' => (int) $item->sort_order,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $employeeUpdate = ['status' => 'offboarding', 'updated_at' => now()];
+        if (Schema::hasColumn('hrm_employees', 'termination_date')) {
+            $employeeUpdate['termination_date'] = $lastWorkingDate;
+        }
+        DB::table('hrm_employees')->where('id', $employeeId)->update($employeeUpdate);
+
+        return response()->json($this->getOffboardingProcessRow($processId), 201);
+    }
+
+    public function getOffboardingProcess($id)
+    {
+        $process = $this->getOffboardingProcessRow($id);
+        if (!$process) {
+            return response()->json(['message' => 'Offboarding proces nije pronađen.'], 404);
+        }
+        return response()->json($process);
+    }
+
+    public function getOffboardingProcessTasks($id)
+    {
+        $process = DB::table('hrm_offboarding_processes')->where('id', $id)->first();
+        if (!$process) {
+            return response()->json(['message' => 'Offboarding proces nije pronađen.'], 404);
+        }
+
+        return response()->json($this->listOffboardingTasks((int) $id));
+    }
+
+    public function updateOffboardingTask(Request $request, $id, $taskId)
+    {
+        $task = DB::table('hrm_offboarding_tasks')
+            ->where('process_id', $id)
+            ->where('id', $taskId)
+            ->first();
+        if (!$task) {
+            return response()->json(['message' => 'Zadatak nije pronađen.'], 404);
+        }
+
+        $data = [];
+        if ($request->has('status')) {
+            $status = $request->input('status');
+            if (!in_array($status, ['pending', 'in_progress', 'completed', 'skipped'], true)) {
+                return response()->json(['message' => 'Neispravan status zadatka.'], 422);
+            }
+            $data['status'] = $status;
+            if ($status === 'completed') {
+                $data['completed_at'] = now();
+                $data['completed_by'] = $request->user()?->id;
+            } else {
+                $data['completed_at'] = null;
+                $data['completed_by'] = null;
+            }
+        }
+        if ($request->has('notes')) {
+            $data['notes'] = $request->input('notes');
+        }
+        if ($request->has('assigned_to')) {
+            $data['assigned_to'] = $request->input('assigned_to') ?: null;
+        }
+        if (!empty($data)) {
+            $data['updated_at'] = now();
+            DB::table('hrm_offboarding_tasks')->where('id', $taskId)->update($data);
+        }
+
+        $this->recalculateOffboardingProgress((int) $id);
+
+        return response()->json($this->listOffboardingTasks((int) $id));
+    }
+
+    public function completeOffboarding(Request $request, $id)
+    {
+        $process = DB::table('hrm_offboarding_processes')->where('id', $id)->first();
+        if (!$process) {
+            return response()->json(['message' => 'Offboarding proces nije pronađen.'], 404);
+        }
+        if ($process->status === 'completed') {
+            return response()->json($this->getOffboardingProcessRow($id));
+        }
+        if ($process->status === 'cancelled') {
+            return response()->json(['message' => 'Otkazani proces se ne može završiti.'], 422);
+        }
+
+        $pendingRequired = DB::table('hrm_offboarding_tasks')
+            ->where('process_id', $id)
+            ->whereNotIn('status', ['completed', 'skipped'])
+            ->count();
+
+        $force = $request->boolean('force', false);
+        if ($pendingRequired > 0 && !$force) {
+            return response()->json([
+                'message' => 'Postoje nezavršeni zadaci. Označite ih kao završene/preskočene ili pošaljite force=1.',
+                'pending_tasks' => $pendingRequired,
+            ], 422);
+        }
+
+        if ($force && $pendingRequired > 0) {
+            DB::table('hrm_offboarding_tasks')
+                ->where('process_id', $id)
+                ->whereNotIn('status', ['completed', 'skipped'])
+                ->update([
+                    'status' => 'skipped',
+                    'updated_at' => now(),
+                ]);
+        }
+
+        DB::table('hrm_offboarding_processes')->where('id', $id)->update([
+            'status' => 'completed',
+            'progress_percentage' => 100,
+            'updated_at' => now(),
+        ]);
+
+        $employeeUpdate = ['status' => 'former', 'updated_at' => now()];
+        if (Schema::hasColumn('hrm_employees', 'termination_date') && $process->last_working_day) {
+            $employeeUpdate['termination_date'] = $process->last_working_day;
+        }
+        DB::table('hrm_employees')->where('id', $process->employee_id)->update($employeeUpdate);
+
+        return response()->json($this->getOffboardingProcessRow($id));
+    }
+
+    public function updateOffboardingProcessStatus(Request $request, $id)
+    {
+        $process = DB::table('hrm_offboarding_processes')->where('id', $id)->first();
+        if (!$process) {
+            return response()->json(['message' => 'Offboarding proces nije pronađen.'], 404);
+        }
+
+        $status = $request->input('status');
+        if (!in_array($status, ['initiated', 'in_progress', 'completed', 'cancelled'], true)) {
+            return response()->json(['message' => 'Neispravan status.'], 422);
+        }
+
+        $update = ['status' => $status, 'updated_at' => now()];
+        if ($status === 'completed') {
+            $update['progress_percentage'] = 100;
+            DB::table('hrm_employees')->where('id', $process->employee_id)->update([
+                'status' => 'former',
+                'termination_date' => $process->last_working_day,
+                'updated_at' => now(),
+            ]);
+        } elseif ($status === 'cancelled') {
+            $emp = DB::table('hrm_employees')->where('id', $process->employee_id)->first();
+            if ($emp && $emp->status === 'offboarding') {
+                DB::table('hrm_employees')->where('id', $process->employee_id)->update([
+                    'status' => 'active',
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        DB::table('hrm_offboarding_processes')->where('id', $id)->update($update);
+
+        return response()->json($this->getOffboardingProcessRow($id));
+    }
+
+    private function getOffboardingProcessRow($id): ?array
+    {
+        $row = DB::table('hrm_offboarding_processes')
+            ->select(
+                'hrm_offboarding_processes.*',
+                'users.name as employee_name',
+                'hrm_offboarding_reasons.name as reason_name',
+                'hrm_offboarding_reasons.code as reason_code'
+            )
+            ->leftJoin('hrm_employees', 'hrm_offboarding_processes.employee_id', '=', 'hrm_employees.id')
+            ->leftJoin('users', 'hrm_employees.user_id', '=', 'users.id')
+            ->leftJoin('hrm_offboarding_reasons', 'hrm_offboarding_processes.reason_id', '=', 'hrm_offboarding_reasons.id')
+            ->where('hrm_offboarding_processes.id', $id)
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        return $this->mapOffboardingProcess($row);
+    }
+
+    private function mapOffboardingProcess($row): array
+    {
+        return [
+            'id' => $row->id,
+            'employee_id' => $row->employee_id,
+            'employee_name' => $row->employee_name,
+            'reason_id' => $row->reason_id,
+            'reason_name' => $row->reason_name,
+            'reason_type' => $this->mapReasonTypeFromCode($row->reason_code ?? null),
+            'initiated_date' => $row->notification_date,
+            'last_working_date' => $row->last_working_day,
+            'status' => $row->status,
+            'progress_percentage' => (int) ($row->progress_percentage ?? 0),
+            'notes' => $row->notes,
+            'exit_interview_date' => null,
+            'exit_interview_notes' => $row->exit_interview_notes,
+            'completed_date' => $row->status === 'completed' ? ($row->updated_at ? \Carbon\Carbon::parse($row->updated_at)->format('Y-m-d') : null) : null,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ];
+    }
+
+    private function listOffboardingTasks(int $processId)
+    {
+        return DB::table('hrm_offboarding_tasks')
+            ->select(
+                'hrm_offboarding_tasks.*',
+                'assigned_user.name as responsible_name'
+            )
+            ->leftJoin('users as assigned_user', 'hrm_offboarding_tasks.assigned_to', '=', 'assigned_user.id')
+            ->where('hrm_offboarding_tasks.process_id', $processId)
+            ->orderBy('hrm_offboarding_tasks.order')
+            ->orderBy('hrm_offboarding_tasks.id')
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'process_id' => $t->process_id,
+                    'name' => $t->title,
+                    'description' => $t->description,
+                    'category' => $t->category ?? '',
+                    'responsible_id' => $t->assigned_to,
+                    'responsible_name' => $t->responsible_name,
+                    'due_date' => $t->due_date,
+                    'completed_date' => $t->completed_at
+                        ? \Carbon\Carbon::parse($t->completed_at)->format('Y-m-d')
+                        : null,
+                    'status' => $t->status,
+                    'sort_order' => (int) $t->order,
+                    'notes' => $t->notes,
+                ];
+            });
+    }
+
+    private function recalculateOffboardingProgress(int $processId): void
+    {
+        $active = DB::table('hrm_offboarding_tasks')
+            ->where('process_id', $processId)
+            ->where('status', '!=', 'skipped')
+            ->count();
+
+        if ($active === 0) {
+            DB::table('hrm_offboarding_processes')->where('id', $processId)->update([
+                'progress_percentage' => 100,
+                'updated_at' => now(),
+            ]);
+            return;
+        }
+
+        $completed = DB::table('hrm_offboarding_tasks')
+            ->where('process_id', $processId)
+            ->where('status', 'completed')
+            ->count();
+
+        $percentage = (int) round(($completed / $active) * 100);
+        DB::table('hrm_offboarding_processes')->where('id', $processId)->update([
+            'progress_percentage' => $percentage,
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * Aggregated analytics for HR Reports dashboard.
+     */
+    public function getReportsOverview(Request $request)
+    {
+        $months = max(3, min((int) $request->input('months', 12), 24));
+        $start = now()->copy()->subMonths($months - 1)->startOfMonth();
+
+        $kpis = [
+            'total_employees' => 0,
+            'active_employees' => 0,
+            'new_hires_this_month' => 0,
+            'terminations_this_month' => 0,
+            'onboarding_in_progress' => 0,
+            'offboarding_in_progress' => 0,
+            'avg_tenure_months' => 0,
+            'departments_count' => 0,
+        ];
+
+        $byStatus = [];
+        $byDepartment = [];
+        $byPosition = [];
+        $byEmploymentType = [];
+        $byGender = [];
+        $hiresVsExits = [];
+        $headcountTrend = [];
+        $offboardingReasons = [];
+
+        if (!Schema::hasTable('hrm_employees')) {
+            return response()->json(compact(
+                'kpis', 'byStatus', 'byDepartment', 'byPosition', 'byEmploymentType',
+                'byGender', 'hiresVsExits', 'headcountTrend', 'offboardingReasons'
+            ));
+        }
+
+        $empBase = $this->employeesQuery();
+        $kpis['total_employees'] = (clone $empBase)->count();
+        $kpis['active_employees'] = (clone $empBase)->where('status', 'active')->count();
+
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+
+        if (Schema::hasColumn('hrm_employees', 'hire_date')) {
+            $kpis['new_hires_this_month'] = (clone $empBase)
+                ->whereBetween('hire_date', [$monthStart, $monthEnd])
+                ->count();
+
+            $avgDays = (clone $empBase)
+                ->whereNotNull('hire_date')
+                ->where('status', 'active')
+                ->selectRaw('AVG(DATEDIFF(CURDATE(), hire_date)) as avg_days')
+                ->value('avg_days');
+            $kpis['avg_tenure_months'] = $avgDays ? round(((float) $avgDays) / 30.44, 1) : 0;
+        }
+
+        if (Schema::hasColumn('hrm_employees', 'termination_date')) {
+            $kpis['terminations_this_month'] = (clone $empBase)
+                ->whereBetween('termination_date', [$monthStart, $monthEnd])
+                ->count();
+        }
+
+        if (Schema::hasTable('hrm_onboarding_processes')) {
+            $kpis['onboarding_in_progress'] = DB::table('hrm_onboarding_processes')
+                ->whereIn('status', ['pending', 'in_progress', 'active', 'not_started'])
+                ->count();
+        }
+
+        if (Schema::hasTable('hrm_offboarding_processes')) {
+            $kpis['offboarding_in_progress'] = DB::table('hrm_offboarding_processes')
+                ->whereIn('status', ['initiated', 'in_progress'])
+                ->count();
+        } else {
+            $kpis['offboarding_in_progress'] = (clone $empBase)->where('status', 'offboarding')->count();
+        }
+
+        if (Schema::hasTable('hrm_departments')) {
+            $kpis['departments_count'] = DB::table('hrm_departments')->count();
+        }
+
+        $statusLabels = [
+            'active' => 'Aktivni',
+            'candidate' => 'Kandidati',
+            'hiring' => 'Zapošljavanje',
+            'on_hold' => 'Na čekanju',
+            'offboarding' => 'Offboarding',
+            'former' => 'Bivši',
+            'on-leave' => 'Na odsustvu',
+            'terminated' => 'Prekinuto',
+        ];
+        $statusColors = [
+            'active' => '#0d9488',
+            'candidate' => '#6366f1',
+            'hiring' => '#2563eb',
+            'on_hold' => '#f59e0b',
+            'offboarding' => '#ea580c',
+            'former' => '#64748b',
+            'on-leave' => '#0891b2',
+            'terminated' => '#dc2626',
+        ];
+
+        $byStatus = $this->employeesQuery()
+            ->select('status', DB::raw('COUNT(*) as value'))
+            ->groupBy('status')
+            ->get()
+            ->map(fn ($r) => [
+                'key' => $r->status,
+                'name' => $statusLabels[$r->status] ?? $r->status,
+                'value' => (int) $r->value,
+                'color' => $statusColors[$r->status] ?? '#94a3b8',
+            ])
+            ->values()
+            ->all();
+
+        $byDepartment = $this->employeesQuery()
+            ->leftJoin('hrm_departments', 'hrm_employees.department_id', '=', 'hrm_departments.id')
+            ->select(DB::raw("COALESCE(NULLIF(hrm_departments.name, ''), 'Bez odjela') as name"), DB::raw('COUNT(*) as value'))
+            ->groupBy('name')
+            ->orderByDesc('value')
+            ->limit(12)
+            ->get()
+            ->map(fn ($r) => ['name' => $r->name, 'value' => (int) $r->value])
+            ->values()
+            ->all();
+
+        $byPosition = $this->employeesQuery()
+            ->select(DB::raw("COALESCE(NULLIF(position, ''), 'Nepoznato') as name"), DB::raw('COUNT(*) as value'))
+            ->groupBy('name')
+            ->orderByDesc('value')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => ['name' => $r->name, 'value' => (int) $r->value])
+            ->values()
+            ->all();
+
+        if (Schema::hasColumn('hrm_employees', 'employment_type')) {
+            $typeLabels = [
+                'full-time' => 'Puno vrijeme',
+                'part-time' => 'Djelimično',
+                'contract' => 'Ugovor',
+                'intern' => 'Praksa',
+            ];
+            $byEmploymentType = $this->employeesQuery()
+                ->select(
+                    DB::raw("COALESCE(NULLIF(employment_type, ''), 'Nepoznato') as type_key"),
+                    DB::raw('COUNT(*) as value')
+                )
+                ->groupBy('type_key')
+                ->get()
+                ->map(fn ($r) => [
+                    'name' => $typeLabels[$r->type_key] ?? $r->type_key,
+                    'value' => (int) $r->value,
+                ])
+                ->values()
+                ->all();
+        }
+
+        if (Schema::hasColumn('hrm_employees', 'gender')) {
+            $genderLabels = ['M' => 'Muški', 'F' => 'Ženski'];
+            $byGender = $this->employeesQuery()
+                ->whereNotNull('gender')
+                ->where('gender', '!=', '')
+                ->select('gender as gender_key', DB::raw('COUNT(*) as value'))
+                ->groupBy('gender_key')
+                ->get()
+                ->map(fn ($r) => [
+                    'name' => $genderLabels[$r->gender_key] ?? $r->gender_key,
+                    'value' => (int) $r->value,
+                ])
+                ->values()
+                ->all();
+        }
+
+        // Monthly hires / exits
+        $hiresMap = [];
+        $exitsMap = [];
+        if (Schema::hasColumn('hrm_employees', 'hire_date')) {
+            $hiresMap = $this->employeesQuery()
+                ->whereNotNull('hire_date')
+                ->where('hire_date', '>=', $start->toDateString())
+                ->select(DB::raw("DATE_FORMAT(hire_date, '%Y-%m') as ym"), DB::raw('COUNT(*) as c'))
+                ->groupBy('ym')
+                ->pluck('c', 'ym')
+                ->all();
+        }
+        if (Schema::hasColumn('hrm_employees', 'termination_date')) {
+            $exitsMap = $this->employeesQuery()
+                ->whereNotNull('termination_date')
+                ->where('termination_date', '>=', $start->toDateString())
+                ->select(DB::raw("DATE_FORMAT(termination_date, '%Y-%m') as ym"), DB::raw('COUNT(*) as c'))
+                ->groupBy('ym')
+                ->pluck('c', 'ym')
+                ->all();
+        }
+        // Also count completed offboarding by last_working_day
+        if (Schema::hasTable('hrm_offboarding_processes') && Schema::hasColumn('hrm_offboarding_processes', 'last_working_day')) {
+            $obExits = DB::table('hrm_offboarding_processes')
+                ->where('status', 'completed')
+                ->whereNotNull('last_working_day')
+                ->where('last_working_day', '>=', $start->toDateString())
+                ->select(DB::raw("DATE_FORMAT(last_working_day, '%Y-%m') as ym"), DB::raw('COUNT(*) as c'))
+                ->groupBy('ym')
+                ->pluck('c', 'ym')
+                ->all();
+            foreach ($obExits as $ym => $c) {
+                $exitsMap[$ym] = max((int) ($exitsMap[$ym] ?? 0), (int) $c);
+            }
+        }
+
+        $cursor = $start->copy();
+        $running = 0;
+        // Approximate starting headcount: current - net change after start
+        $netAfterStart = 0;
+        for ($i = 0; $i < $months; $i++) {
+            $ym = $cursor->format('Y-m');
+            $h = (int) ($hiresMap[$ym] ?? 0);
+            $e = (int) ($exitsMap[$ym] ?? 0);
+            $netAfterStart += ($h - $e);
+            $cursor->addMonth();
+        }
+        $running = max(0, $kpis['total_employees'] - $netAfterStart);
+
+        $cursor = $start->copy();
+        $monthNames = ['sij', 'velj', 'ožu', 'tra', 'svi', 'lip', 'srp', 'kol', 'ruj', 'lis', 'stu', 'pro'];
+        for ($i = 0; $i < $months; $i++) {
+            $ym = $cursor->format('Y-m');
+            $h = (int) ($hiresMap[$ym] ?? 0);
+            $e = (int) ($exitsMap[$ym] ?? 0);
+            $running = max(0, $running + $h - $e);
+            $label = $monthNames[(int) $cursor->format('n') - 1] . ' ' . $cursor->format('y');
+            $hiresVsExits[] = [
+                'month' => $label,
+                'ym' => $ym,
+                'hires' => $h,
+                'exits' => $e,
+            ];
+            $headcountTrend[] = [
+                'month' => $label,
+                'ym' => $ym,
+                'count' => $running,
+            ];
+            $cursor->addMonth();
+        }
+
+        if (Schema::hasTable('hrm_offboarding_processes') && Schema::hasTable('hrm_offboarding_reasons')) {
+            $offboardingReasons = DB::table('hrm_offboarding_processes')
+                ->leftJoin('hrm_offboarding_reasons', 'hrm_offboarding_processes.reason_id', '=', 'hrm_offboarding_reasons.id')
+                ->select(DB::raw("COALESCE(hrm_offboarding_reasons.name, 'Nepoznato') as name"), DB::raw('COUNT(*) as value'))
+                ->groupBy('name')
+                ->orderByDesc('value')
+                ->get()
+                ->map(fn ($r) => ['name' => $r->name, 'value' => (int) $r->value])
+                ->values()
+                ->all();
+        }
+
+        return response()->json([
+            'kpis' => $kpis,
+            'by_status' => $byStatus,
+            'by_department' => $byDepartment,
+            'by_position' => $byPosition,
+            'by_employment_type' => $byEmploymentType,
+            'by_gender' => $byGender,
+            'hires_vs_exits' => $hiresVsExits,
+            'headcount_trend' => $headcountTrend,
+            'offboarding_reasons' => $offboardingReasons,
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+}
