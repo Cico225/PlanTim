@@ -359,6 +359,7 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
         Route::put('/employees/{id}', [HRMController::class, 'update']);
         Route::delete('/employees/{id}', [HRMController::class, 'destroy']);
         Route::post('/employees/import', [HRMController::class, 'import']);
+        Route::get('/available-users', [HRMController::class, 'getAvailableUsers']);
         
         Route::get('/departments', [HRMController::class, 'getDepartments']);
         Route::get('/departments/{id}', [HRMController::class, 'getDepartment']);

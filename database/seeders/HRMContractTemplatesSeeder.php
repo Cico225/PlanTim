@@ -21,15 +21,15 @@ class HRMContractTemplatesSeeder extends Seeder
         }
 
         $templates = [
-            ['code' => 'fbih_store_manager', 'name' => 'FBiH — Šef prodavnice', 'legal_entity' => 'fbih', 'job_role' => 'store_manager', 'document_kind' => 'full_contract', 'template_file' => 'FBiH - Šef prodavnice.doc', 'output_format' => 'pdf'],
-            ['code' => 'fbih_deputy_manager', 'name' => 'FBiH — Zamjenik šefa prodavnice', 'legal_entity' => 'fbih', 'job_role' => 'deputy_manager', 'document_kind' => 'full_contract', 'template_file' => 'FBiH - Zamjenik šefa prodavnice.doc', 'output_format' => 'pdf'],
-            ['code' => 'fbih_salesperson', 'name' => 'FBiH — Prodavač', 'legal_entity' => 'fbih', 'job_role' => 'salesperson', 'document_kind' => 'full_contract', 'template_file' => 'KFBiH - prodavač.doc', 'output_format' => 'pdf'],
-            ['code' => 'rs_store_manager', 'name' => 'RS — Šef prodavnice (aneks)', 'legal_entity' => 'rs', 'job_role' => 'store_manager', 'document_kind' => 'annex', 'template_file' => 'RS - Šef prodavnice.docx', 'output_format' => 'docx'],
-            ['code' => 'rs_deputy_manager', 'name' => 'RS — Zamjenik šefa prodavnice (aneks)', 'legal_entity' => 'rs', 'job_role' => 'deputy_manager', 'document_kind' => 'annex', 'template_file' => 'RS - Zamjenik šefa prodavnice.docx', 'output_format' => 'docx'],
-            ['code' => 'rs_salesperson', 'name' => 'RS — Prodavač (aneks)', 'legal_entity' => 'rs', 'job_role' => 'salesperson', 'document_kind' => 'annex', 'template_file' => 'RS - prodavač.docx', 'output_format' => 'docx'],
-            ['code' => 'bd_store_manager', 'name' => 'BD — Šef prodavnice', 'legal_entity' => 'bd', 'job_role' => 'store_manager', 'document_kind' => 'full_contract', 'template_file' => 'BD - Šef prodavnica.doc', 'output_format' => 'pdf'],
-            ['code' => 'bd_deputy_manager', 'name' => 'BD — Zamjenik šefa prodavnice', 'legal_entity' => 'bd', 'job_role' => 'deputy_manager', 'document_kind' => 'full_contract', 'template_file' => 'BD - Zamjenik šefa prodavnice.doc', 'output_format' => 'pdf'],
-            ['code' => 'bd_salesperson', 'name' => 'BD — Prodavač', 'legal_entity' => 'bd', 'job_role' => 'salesperson', 'document_kind' => 'full_contract', 'template_file' => 'BD - Prodavač.doc', 'output_format' => 'pdf'],
+            ['code' => 'fbih_store_manager', 'name' => 'FBiH — Šef prodavnice', 'legal_entity' => 'fbih', 'job_role' => 'store_manager', 'document_kind' => 'full_contract', 'template_file' => 'FBiH - Sef prodavnice.doc', 'output_format' => 'docx'],
+            ['code' => 'fbih_deputy_manager', 'name' => 'FBiH — Zamjenik šefa prodavnice', 'legal_entity' => 'fbih', 'job_role' => 'deputy_manager', 'document_kind' => 'full_contract', 'template_file' => 'FBiH - Zamjenik sefa prodavnice.doc', 'output_format' => 'docx'],
+            ['code' => 'fbih_salesperson', 'name' => 'FBiH — Prodavač', 'legal_entity' => 'fbih', 'job_role' => 'salesperson', 'document_kind' => 'full_contract', 'template_file' => 'KFBiH - prodavac.doc', 'output_format' => 'docx'],
+            ['code' => 'rs_store_manager', 'name' => 'RS — Šef prodavnice (aneks)', 'legal_entity' => 'rs', 'job_role' => 'store_manager', 'document_kind' => 'annex', 'template_file' => 'RS - Sef prodavnice.docx', 'output_format' => 'docx'],
+            ['code' => 'rs_deputy_manager', 'name' => 'RS — Zamjenik šefa prodavnice (aneks)', 'legal_entity' => 'rs', 'job_role' => 'deputy_manager', 'document_kind' => 'annex', 'template_file' => 'RS - Zamjenik sefa prodavnice.docx', 'output_format' => 'docx'],
+            ['code' => 'rs_salesperson', 'name' => 'RS — Prodavač (aneks)', 'legal_entity' => 'rs', 'job_role' => 'salesperson', 'document_kind' => 'annex', 'template_file' => 'RS - prodavac.docx', 'output_format' => 'docx'],
+            ['code' => 'bd_store_manager', 'name' => 'BD — Šef prodavnice', 'legal_entity' => 'bd', 'job_role' => 'store_manager', 'document_kind' => 'full_contract', 'template_file' => 'BD - Sef prodavnica.doc', 'output_format' => 'docx'],
+            ['code' => 'bd_deputy_manager', 'name' => 'BD — Zamjenik šefa prodavnice', 'legal_entity' => 'bd', 'job_role' => 'deputy_manager', 'document_kind' => 'full_contract', 'template_file' => 'BD - Zamjenik sefa prodavnice.doc', 'output_format' => 'docx'],
+            ['code' => 'bd_salesperson', 'name' => 'BD — Prodavač', 'legal_entity' => 'bd', 'job_role' => 'salesperson', 'document_kind' => 'full_contract', 'template_file' => 'BD - Prodavac.doc', 'output_format' => 'docx'],
         ];
 
         foreach ($templates as $template) {
@@ -45,6 +45,28 @@ class HRMContractTemplatesSeeder extends Seeder
         }
 
         $this->prepareRsDocxTemplates();
+        $this->prepareFbihBdDocxTemplates();
+    }
+
+    private function prepareFbihBdDocxTemplates(): void
+    {
+        $preparedDir = storage_path('app/hr-contract-templates/prepared');
+        File::ensureDirectoryExists($preparedDir);
+
+        $builder = new \App\Services\HRM\FullContractDocxBuilder();
+        $fbih = $builder->fbihParagraphs();
+        $bd = $builder->bdParagraphs();
+
+        foreach ([
+            'FBiH - Sef prodavnice.docx' => $fbih,
+            'FBiH - Zamjenik sefa prodavnice.docx' => $fbih,
+            'KFBiH - prodavac.docx' => $fbih,
+            'BD - Sef prodavnica.docx' => $bd,
+            'BD - Zamjenik sefa prodavnice.docx' => $bd,
+            'BD - Prodavac.docx' => $bd,
+        ] as $file => $paragraphs) {
+            $builder->build($preparedDir . DIRECTORY_SEPARATOR . $file, $paragraphs);
+        }
     }
 
     private function defaultPlaceholders(string $documentKind): array

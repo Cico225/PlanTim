@@ -63,9 +63,15 @@ class HRMContractsController extends Controller
 
         $storedName = $this->storeTemplateFile($file, $extension);
 
-        $outputFormat = $request->input('output_format')
-            ?: ($extension === 'docx' ? 'docx' : 'pdf');
-
+        $outputFormat = $request->input('output_format');
+        if (!$outputFormat) {
+            // DOCX/DOC Word files must use docx fill path so all clauses stay identical to the template.
+            // PDF Blade is only for templates without a fillable Word file.
+            $outputFormat = in_array($extension, ['docx', 'doc'], true) ? 'docx' : 'pdf';
+        }
+        if ($extension === 'docx') {
+            $outputFormat = 'docx';
+        }
         $code = $request->input('code')
             ?: $this->makeTemplateCode(
                 $request->input('legal_entity'),
@@ -135,10 +141,14 @@ class HRMContractsController extends Controller
 
         if ($request->filled('output_format')) {
             $updates['output_format'] = $request->input('output_format');
-        } elseif (in_array($extension, ['docx', 'pdf'], true)) {
-            $updates['output_format'] = $extension === 'docx' ? 'docx' : 'pdf';
+        } elseif ($extension === 'docx') {
+            $updates['output_format'] = 'docx';
+        } elseif ($extension === 'doc') {
+            // Keep full Word content path when a sibling/prepared DOCX exists later.
+            $updates['output_format'] = 'docx';
+        } elseif ($extension === 'pdf') {
+            $updates['output_format'] = 'pdf';
         }
-
         if ($request->has('is_active')) {
             $updates['is_active'] = $request->boolean('is_active');
         }
