@@ -679,16 +679,19 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
     queryFn: () => getWorkPositions({ is_active: true }),
   });
 
-  const { data: availableUsers = [], isLoading: loadingUsers } = useQuery({
+  const { data: availableUsers = [], isLoading: loadingUsers, isError: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ['hrm-available-users', userSearch],
     queryFn: () =>
       getAvailableUsers({
         search: userSearch || undefined,
-        active_only: true,
+        active_only: false,
         include_linked: true,
-        limit: 500,
+        limit: 1000,
       }),
   });
+
+  const freeUsers = availableUsers.filter((u) => !u.is_linked);
+  const linkedUsers = availableUsers.filter((u) => u.is_linked);
 
   const applyUserToForm = (userId: string) => {
     if (!userId) {
@@ -746,7 +749,8 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
             <div className="md:col-span-2 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-4 space-y-3">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Poveži korisnika (Administracija)</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Odaberite postojećeg korisnika iz Administracije — ime, email, telefon i pozicija se automatski prepisuju. Korisnici već povezani sa zaposlenikom su onemogućeni.
+                Odaberite postojećeg korisnika iz Administracije — ime, email, telefon i pozicija se automatski prepisuju.
+                Dostupni: {freeUsers.length}, već povezani: {linkedUsers.length}.
               </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -764,22 +768,48 @@ function AddEmployeeModal({ onClose, onSubmit, isLoading }: {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Korisnik iz Administracije ({availableUsers.length})
                 </label>
-                <select
-                  value={formData.user_id}
-                  onChange={(e) => applyUserToForm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="">— Novi zaposlenik (bez postojećeg korisnika) —</option>
-                  {loadingUsers ? (
-                    <option disabled>Učitavanje...</option>
-                  ) : (
-                    availableUsers.map((u) => (
-                      <option key={u.id} value={u.id} disabled={!!u.is_linked}>
-                        {u.name} ({u.email}){u.is_linked ? ' — već povezan' : ''}
-                      </option>
-                    ))
-                  )}
-                </select>
+                {usersError ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                    Greška pri učitavanju korisnika.{' '}
+                    <button type="button" onClick={() => refetchUsers()} className="underline font-medium">
+                      Pokušaj ponovo
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={formData.user_id}
+                    onChange={(e) => applyUserToForm(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">— Novi zaposlenik (bez postojećeg korisnika) —</option>
+                    {loadingUsers ? (
+                      <option disabled>Učitavanje...</option>
+                    ) : availableUsers.length === 0 ? (
+                      <option disabled>Nema korisnika u Administraciji</option>
+                    ) : (
+                      <>
+                        {freeUsers.length > 0 && (
+                          <optgroup label={`Dostupni za povezivanje (${freeUsers.length})`}>
+                            {freeUsers.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.name} ({u.email})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {linkedUsers.length > 0 && (
+                          <optgroup label={`Već povezani — nije moguće odabrati (${linkedUsers.length})`}>
+                            {linkedUsers.map((u) => (
+                              <option key={u.id} value={u.id} disabled>
+                                {u.name} ({u.email})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </>
+                    )}
+                  </select>
+                )}
               </div>
               {formData.user_id ? (
                 <p className="text-xs text-blue-700 dark:text-blue-300">
@@ -1194,14 +1224,14 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
   });
 
   const empForLink = employee?.data || employee;
-  const { data: availableUsers = [] } = useQuery({
+  const { data: availableUsers = [], isError: editUsersError } = useQuery({
     queryKey: ['hrm-available-users-edit', empForLink?.user_id],
     queryFn: () =>
       getAvailableUsers({
         include_user_id: empForLink?.user_id ? Number(empForLink.user_id) : undefined,
-        active_only: true,
+        active_only: false,
         include_linked: true,
-        limit: 500,
+        limit: 1000,
       }),
     enabled: isEditMode,
   });
@@ -1422,23 +1452,38 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Korisnik ({availableUsers.length})
                 </label>
-                <select
-                  value={formData.user_id || ''}
-                  onChange={(e) => applyLinkedUser(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="">— Bez promjene / nije povezan —</option>
-                  {availableUsers.map((u) => {
-                    const isCurrent = emp.user_id && Number(emp.user_id) === Number(u.id);
-                    const disabled = !!u.is_linked && !isCurrent;
-                    return (
-                      <option key={u.id} value={u.id} disabled={disabled}>
-                        {u.name} ({u.email})
-                        {isCurrent ? ' — trenutno povezan' : u.is_linked ? ' — već povezan' : ''}
-                      </option>
-                    );
-                  })}
-                </select>
+                {editUsersError ? (
+                  <p className="text-sm text-red-600">Greška pri učitavanju korisnika iz Administracije.</p>
+                ) : (
+                  <select
+                    value={formData.user_id || ''}
+                    onChange={(e) => applyLinkedUser(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">— Bez promjene / nije povezan —</option>
+                    <optgroup label="Dostupni">
+                      {availableUsers
+                        .filter((u) => !u.is_linked || (emp.user_id && Number(emp.user_id) === Number(u.id)))
+                        .map((u) => {
+                          const isCurrent = emp.user_id && Number(emp.user_id) === Number(u.id);
+                          return (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.email}){isCurrent ? ' — trenutno povezan' : ''}
+                            </option>
+                          );
+                        })}
+                    </optgroup>
+                    <optgroup label="Već povezani (nije moguće odabrati)">
+                      {availableUsers
+                        .filter((u) => u.is_linked && !(emp.user_id && Number(emp.user_id) === Number(u.id)))
+                        .map((u) => (
+                          <option key={u.id} value={u.id} disabled>
+                            {u.name} ({u.email})
+                          </option>
+                        ))}
+                    </optgroup>
+                  </select>
+                )}
               </div>
               {formData.user_id ? (
                 <p className="text-xs text-blue-700 dark:text-blue-300">
