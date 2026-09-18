@@ -43,7 +43,8 @@ class AdminController extends Controller
         }
 
         // Paginate and load roles
-        $users = $query->paginate(20);
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 1000);
+        $users = $query->paginate($perPage);
         
         // Transform users to include roles as array of names
         $users->getCollection()->transform(function ($user) {

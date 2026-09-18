@@ -65,16 +65,7 @@ export const getAvailableUsers = async (params?: {
   include_linked?: boolean;
   limit?: number;
 }) => {
-  const raw = await apiService.get<any>('/hrm/available-users', {
-    search: params?.search || undefined,
-    include_user_id: params?.include_user_id || undefined,
-    // Send as 1/0 so Laravel/query-string parsing is reliable on all servers
-    active_only: params?.active_only === undefined ? 0 : params.active_only ? 1 : 0,
-    include_linked: params?.include_linked === false ? 0 : 1,
-    limit: params?.limit ?? 1000,
-  });
-
-  const list: Array<{
+  type AvailableUser = {
     id: number;
     name: string;
     email: string;
@@ -84,19 +75,73 @@ export const getAvailableUsers = async (params?: {
     avatar?: string;
     is_active?: boolean;
     is_linked?: boolean;
-  }> = Array.isArray(raw)
-    ? raw
-    : Array.isArray(raw?.data)
-      ? raw.data
-      : [];
+  };
 
-  // Available (not linked) first, then alphabetically
-  return [...list].sort((a, b) => {
-    const la = a.is_linked ? 1 : 0;
-    const lb = b.is_linked ? 1 : 0;
-    if (la !== lb) return la - lb;
-    return String(a.name || '').localeCompare(String(b.name || ''), 'bs');
-  });
+  const queryParams = {
+    search: params?.search || undefined,
+    include_user_id: params?.include_user_id || undefined,
+    active_only: params?.active_only === undefined ? 0 : params.active_only ? 1 : 0,
+    include_linked: params?.include_linked === false ? 0 : 1,
+    limit: params?.limit ?? 1000,
+  };
+
+  const normalize = (raw: any): AvailableUser[] => {
+    const list: AvailableUser[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.data)
+        ? raw.data
+        : [];
+    return [...list].sort((a, b) => {
+      const la = a.is_linked ? 1 : 0;
+      const lb = b.is_linked ? 1 : 0;
+      if (la !== lb) return la - lb;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'bs');
+    });
+  };
+
+  // Primary + alias (servers with stale route cache may miss one path)
+  const endpoints = ['/hrm/available-users', '/hrm/users-for-employees'];
+  let lastError: any = null;
+
+  for (const url of endpoints) {
+    try {
+      const raw = await apiService.get<any>(url, queryParams);
+      return normalize(raw);
+    } catch (err: any) {
+      lastError = err;
+      if (err?.response?.status !== 404) {
+        throw err;
+      }
+    }
+  }
+
+  // Fallback: Administration users list (works even if HR route not yet deployed)
+  try {
+    const adminRaw = await apiService.get<any>('/admin/users', {
+      search: params?.search || undefined,
+      per_page: params?.limit ?? 1000,
+    });
+    const rows = Array.isArray(adminRaw?.data)
+      ? adminRaw.data
+      : Array.isArray(adminRaw)
+        ? adminRaw
+        : [];
+    return normalize(
+      rows.map((u: any) => ({
+        id: Number(u.id),
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        position: u.position,
+        department: u.department,
+        avatar: u.avatar,
+        is_active: u.is_active !== false,
+        is_linked: false,
+      }))
+    );
+  } catch {
+    throw lastError;
+  }
 };
 
 export const getEmployee = (id: number) =>

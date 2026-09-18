@@ -202,7 +202,7 @@ cd /d "%PROJECT_DIR%"
 :after_frontend
 
 echo.
-echo [5/7] Migracije...
+echo [5/7] Migracije i cache...
 if exist "migrate.php" (
     "%PHP_PATH%" migrate.php
 )
@@ -210,6 +210,11 @@ if exist "migrate.php" (
 if errorlevel 1 (
     echo UPOZORENJE: migrate nije uspio u potpunosti - nastavljam.
 )
+echo Brisem Laravel route/config/cache ^(bitno za nove API rute^)...
+"%PHP_PATH%" artisan route:clear >nul 2>&1
+"%PHP_PATH%" artisan config:clear >nul 2>&1
+"%PHP_PATH%" artisan cache:clear >nul 2>&1
+"%PHP_PATH%" artisan view:clear >nul 2>&1
 "%PHP_PATH%" artisan app:version-sync >nul 2>&1
 
 echo.

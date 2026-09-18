@@ -1,8 +1,9 @@
 {
-    "version": "1.2.27",
+    "version": "1.2.28",
     "version_name": "Release 2026-09-18",
-    "release_notes": "Korekcija dio zaposlenici",
+    "release_notes": "Korekcije zaposleni",
     "changelog": [
+        "Korekcije zaposleni",
         "Korekcija dio zaposlenici",
         "Dorada modul HR",
         "HR dorada dio Zaposlenici",
@@ -21,7 +22,6 @@
         "DOrada modula HR",
         "Dorada modula Reklamacije",
         "Razvoj i dorada modula LMS",
-        "DOrada modula sistem učenja",
-        "Implementacija korisničkog uputstva"
+        "DOrada modula sistem učenja"
     ]
 }
