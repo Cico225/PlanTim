@@ -496,17 +496,24 @@ export const getOffboardingProcesses = (filters?: { status?: string; employee_id
 export const getOffboardingReasons = () =>
   apiService.get<HROffboardingReason[]>('/hrm/offboarding/reasons');
 
-export const getOffboardingChecklistItems = () =>
-  apiService.get<Array<{
-    id: number;
-    name: string;
-    title?: string;
-    description?: string;
-    category: string;
-    due_days: number;
-    is_required: boolean;
-    sort_order: number;
-  }>>('/hrm/offboarding/checklist');
+export const getOffboardingChecklistItems = async () => {
+  const raw = await apiService.get<any>('/hrm/offboarding/checklist');
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.data)
+      ? raw.data
+      : [];
+  return list.map((item: any) => ({
+    id: Number(item.id),
+    name: item.name || item.title || '',
+    title: item.title || item.name || '',
+    description: item.description,
+    category: item.category || 'default',
+    due_days: Number(item.due_days ?? 0),
+    is_required: !!item.is_required,
+    sort_order: Number(item.sort_order ?? 0),
+  }));
+};
 
 export const initiateOffboarding = (
   employeeId: number,

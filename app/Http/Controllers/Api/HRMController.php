@@ -2866,6 +2866,8 @@ class HRMController extends Controller
 
     public function getOffboardingReasons()
     {
+        $this->ensureOffboardingDefaults();
+
         if (!Schema::hasTable('hrm_offboarding_reasons')) {
             return response()->json([]);
         }
@@ -2888,27 +2890,127 @@ class HRMController extends Controller
 
     public function getOffboardingChecklistItems()
     {
+        $this->ensureOffboardingDefaults();
+
         if (!Schema::hasTable('hrm_offboarding_checklist_items')) {
-            return response()->json([]);
+            return response()->json([
+                'message' => 'Offboarding checklist tabela ne postoji. Pokrenite migracije.',
+            ], 503);
         }
 
         $items = DB::table('hrm_offboarding_checklist_items')
-            ->where('is_active', 1)
+            ->where(function ($q) {
+                $q->where('is_active', 1)->orWhere('is_active', true);
+            })
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
             ->map(fn ($i) => [
-                'id' => $i->id,
+                'id' => (int) $i->id,
                 'name' => $i->title,
                 'title' => $i->title,
                 'description' => $i->description,
-                'category' => $i->category,
-                'due_days' => (int) $i->due_days,
+                'category' => $i->category ?? 'default',
+                'due_days' => (int) ($i->due_days ?? 0),
                 'is_required' => (bool) $i->is_required,
-                'sort_order' => (int) $i->sort_order,
-            ]);
+                'sort_order' => (int) ($i->sort_order ?? 0),
+            ])
+            ->values();
 
         return response()->json($items);
+    }
+
+    /**
+     * Seed default offboarding reasons + checklist if missing (safe for production servers).
+     */
+    private function ensureOffboardingDefaults(): void
+    {
+        $now = now();
+
+        if (!Schema::hasTable('hrm_offboarding_checklist_items')) {
+            Schema::create('hrm_offboarding_checklist_items', function ($table) {
+                $table->id();
+                $table->string('title');
+                $table->text('description')->nullable();
+                $table->string('category', 100)->default('default');
+                $table->unsignedInteger('due_days')->default(0);
+                $table->boolean('is_required')->default(false);
+                $table->boolean('is_active')->default(true);
+                $table->unsignedInteger('sort_order')->default(0);
+                $table->timestamps();
+            });
+        }
+
+        if (!Schema::hasTable('hrm_offboarding_reasons')) {
+            Schema::create('hrm_offboarding_reasons', function ($table) {
+                $table->id();
+                $table->string('name');
+                $table->string('code', 80)->unique();
+                $table->text('description')->nullable();
+                $table->boolean('initiated_by_employee')->default(false);
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+            });
+        }
+
+        if (Schema::hasTable('hrm_offboarding_reasons')) {
+            $reasons = [
+                ['name' => 'Otkaz od strane zaposlenika', 'code' => 'employee_resignation', 'description' => 'Zaposlenik dao otkaz', 'initiated_by_employee' => 1],
+                ['name' => 'Otkaz od strane poslodavca', 'code' => 'employer_termination', 'description' => 'Prekid ugovora od strane poslodavca', 'initiated_by_employee' => 0],
+                ['name' => 'Istek ugovora', 'code' => 'contract_expiry', 'description' => 'Ugovor na određeno vrijeme istekao', 'initiated_by_employee' => 0],
+                ['name' => 'Sporazumni raskid', 'code' => 'mutual_agreement', 'description' => 'Sporazumni prekid radnog odnosa', 'initiated_by_employee' => 0],
+                ['name' => 'Odlazak u penziju', 'code' => 'retirement', 'description' => 'Odlazak u penziju', 'initiated_by_employee' => 1],
+            ];
+
+            foreach ($reasons as $reason) {
+                $exists = DB::table('hrm_offboarding_reasons')->where('code', $reason['code'])->exists();
+                if (!$exists) {
+                    $row = [
+                        'name' => $reason['name'],
+                        'code' => $reason['code'],
+                        'description' => $reason['description'],
+                        'is_active' => 1,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                    if (Schema::hasColumn('hrm_offboarding_reasons', 'initiated_by_employee')) {
+                        $row['initiated_by_employee'] = $reason['initiated_by_employee'];
+                    }
+                    DB::table('hrm_offboarding_reasons')->insert($row);
+                }
+            }
+        }
+
+        if (Schema::hasTable('hrm_offboarding_checklist_items')) {
+            $items = [
+                ['title' => 'Povrat opreme', 'description' => 'Laptop, telefon, kartica pristupa, uniforma', 'category' => 'equipment', 'due_days' => 0, 'is_required' => 1, 'sort_order' => 1],
+                ['title' => 'Deaktivacija pristupa', 'description' => 'Email, ERP, POS, VPN i ostali sistemi', 'category' => 'it_access', 'due_days' => 0, 'is_required' => 1, 'sort_order' => 2],
+                ['title' => 'Exit intervju', 'description' => 'Završni razgovor s HR-om', 'category' => 'exit_interview', 'due_days' => 0, 'is_required' => 0, 'sort_order' => 3],
+                ['title' => 'Predaja dokumentacije i ključeva', 'description' => 'Ključevi, dokumenti, pristupne kartice', 'category' => 'documents', 'due_days' => 0, 'is_required' => 1, 'sort_order' => 4],
+                ['title' => 'Obračun krajnje plate', 'description' => 'Završni obračun plate i beneficija', 'category' => 'payroll', 'due_days' => 7, 'is_required' => 1, 'sort_order' => 5],
+                ['title' => 'Arhiviranje dosijea', 'description' => 'Arhiviranje HR dokumentacije zaposlenika', 'category' => 'archive', 'due_days' => 14, 'is_required' => 0, 'sort_order' => 6],
+            ];
+
+            foreach ($items as $item) {
+                if (!DB::table('hrm_offboarding_checklist_items')->where('title', $item['title'])->exists()) {
+                    DB::table('hrm_offboarding_checklist_items')->insert(array_merge($item, [
+                        'is_active' => 1,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]));
+                }
+            }
+
+            // Reactivate if someone soft-disabled everything
+            $activeCount = DB::table('hrm_offboarding_checklist_items')
+                ->where(function ($q) {
+                    $q->where('is_active', 1)->orWhere('is_active', true);
+                })
+                ->count();
+            if ($activeCount === 0) {
+                DB::table('hrm_offboarding_checklist_items')->update(['is_active' => 1, 'updated_at' => $now]);
+            }
+        }
     }
 
     public function initiateOffboarding(Request $request)
@@ -2916,6 +3018,8 @@ class HRMController extends Controller
         if (!Schema::hasTable('hrm_offboarding_processes')) {
             return response()->json(['message' => 'Offboarding tabele nisu kreirane. Pokrenite migracije.'], 503);
         }
+
+        $this->ensureOffboardingDefaults();
 
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required|exists:hrm_employees,id',
