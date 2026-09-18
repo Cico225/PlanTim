@@ -13,7 +13,20 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks,
 import { apiService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
-import { formatDate } from '@/utils/dateFormat';
+import { combineDateTimeParts, formatDate } from '@/utils/dateFormat';
+import AppDatePicker from '@/components/AppDatePicker';
+
+/** Working-hours slots every 15 minutes, 24h display (08:00–16:30). */
+const MEETING_TIME_OPTIONS: string[] = (() => {
+  const opts: string[] = [];
+  for (let h = 8; h <= 16; h++) {
+    for (const m of [0, 15, 30, 45]) {
+      if (h === 16 && m > 30) break;
+      opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return opts;
+})();
 
 interface MeetingRoom {
   id: number;
@@ -51,15 +64,19 @@ export default function MeetingRoomCalendarCompact() {
     room_id: string;
     title: string;
     description: string;
-    start_time: string;
-    end_time: string;
+    start_date: string;
+    start_clock: string;
+    end_date: string;
+    end_clock: string;
     participants: number[];
   }>({
     room_id: '',
     title: '',
     description: '',
-    start_time: '',
-    end_time: '',
+    start_date: '',
+    start_clock: '',
+    end_date: '',
+    end_clock: '',
     participants: [],
   });
 
@@ -118,12 +135,15 @@ export default function MeetingRoomCalendarCompact() {
   };
 
   const handleCreateReservation = () => {
+    const today = format(new Date(), 'dd.MM.yyyy');
     setFormData({
       room_id: selectedRoomId?.toString() || '',
       title: '',
       description: '',
-      start_time: '',
-      end_time: '',
+      start_date: today,
+      start_clock: '',
+      end_date: today,
+      end_clock: '',
       participants: [],
     });
     setShowReservationModal(true);
@@ -132,13 +152,21 @@ export default function MeetingRoomCalendarCompact() {
   const handleSubmitReservation = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const start_time = combineDateTimeParts(formData.start_date, formData.start_clock);
+    const end_time = combineDateTimeParts(formData.end_date, formData.end_clock);
+
+    if (!start_time || !end_time) {
+      toast.error('Unesite datum u formatu dd.mm.yyyy i vrijeme');
+      return;
+    }
+
     try {
       const payload = {
         room_id: parseInt(formData.room_id),
         title: formData.title,
         description: formData.description || null,
-        start_time: formData.start_time,
-        end_time: formData.end_time,
+        start_time,
+        end_time,
         participants: formData.participants,
       };
 
@@ -238,18 +266,18 @@ export default function MeetingRoomCalendarCompact() {
         <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 px-2 py-1 dark:bg-dark-900/40">
           <button
             onClick={() => navigateWeek('prev')}
-            className="rounded-lg p-2 transition hover:bg-white dark:hover:bg-dark-700"
+            className="rounded-lg p-2 text-gray-700 transition hover:bg-white dark:text-gray-200 dark:hover:bg-dark-700"
           >
             <FiChevronLeft size={20} />
           </button>
           <div className="text-center">
             <div className="font-medium text-gray-900 dark:text-white">
-              {format(weekStart, 'dd.MM')} - {formatDate(endOfWeek(currentDate, { weekStartsOn: 1 }))}
+              {format(weekStart, 'dd.MM.yyyy')} - {formatDate(endOfWeek(currentDate, { weekStartsOn: 1 }))}
             </div>
           </div>
           <button
             onClick={() => navigateWeek('next')}
-            className="rounded-lg p-2 transition hover:bg-white dark:hover:bg-dark-700"
+            className="rounded-lg p-2 text-gray-700 transition hover:bg-white dark:text-gray-200 dark:hover:bg-dark-700"
           >
             <FiChevronRight size={20} />
           </button>
@@ -282,8 +310,8 @@ export default function MeetingRoomCalendarCompact() {
                       <span className="hidden sm:inline">{format(day, 'EEE')}</span>
                     </div>
                     <div className={`text-base font-semibold sm:mb-2 sm:text-sm ${isToday(day) ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white'}`}>
-                      <span className="sm:hidden">{format(day, 'd. MMM')}</span>
-                      <span className="hidden sm:inline">{format(day, 'd')}</span>
+                      <span className="sm:hidden">{formatDate(day)}</span>
+                      <span className="hidden sm:inline">{format(day, 'dd.MM')}</span>
                     </div>
                   </div>
                   <div className="space-y-2 sm:space-y-1">
@@ -325,13 +353,13 @@ export default function MeetingRoomCalendarCompact() {
         )}
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-4 border-t border-gray-200 pt-4 text-xs dark:border-gray-700">
+        <div className="mt-4 flex flex-wrap gap-4 border-t border-gray-200 pt-4 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-300">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-red-100 border border-red-300"></div>
+            <div className="w-3 h-3 rounded bg-red-100 border border-red-300 dark:bg-red-900/40 dark:border-red-600"></div>
             <span>Zauzeto</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></div>
+            <div className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300 dark:bg-yellow-900/40 dark:border-yellow-600"></div>
             <span>Moj sastanak</span>
           </div>
         </div>
@@ -348,13 +376,13 @@ export default function MeetingRoomCalendarCompact() {
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-gray-800 sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl"
+            className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-dark-800 sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl"
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
           >
-            <div className="shrink-0 border-b border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+            <div className="shrink-0 border-b border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white sm:text-xl">
                   Nova rezervacija
@@ -362,7 +390,7 @@ export default function MeetingRoomCalendarCompact() {
                 <button
                   type="button"
                   onClick={() => setShowReservationModal(false)}
-                  className="-mr-2 shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 touch-manipulation"
+                  className="-mr-2 shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700 dark:hover:text-gray-200 touch-manipulation"
                   aria-label="Zatvori"
                 >
                   <FiX size={24} />
@@ -413,20 +441,25 @@ export default function MeetingRoomCalendarCompact() {
                   <FiUser size={16} />
                   Učesnici sastanka
                 </label>
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-48 overflow-y-auto p-2 sm:p-3 space-y-1 bg-gray-50 dark:bg-gray-900/40">
+                <div
+                  className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-300 p-2 sm:p-3"
+                  style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                >
                   {users.length === 0 ? (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 px-1 py-1.5">
+                    <div className="px-1 py-1.5 text-xs" style={{ color: '#4b5563' }}>
                       Nema dostupnih korisnika ili nije moguće učitati listu korisnika.
                     </div>
                   ) : (
                     users.map(u => (
                       <label
                         key={u.id}
-                        className="flex items-center gap-3 rounded-md px-2 py-2.5 hover:bg-white/60 dark:hover:bg-gray-800 cursor-pointer text-sm touch-manipulation"
+                        className="flex cursor-pointer touch-manipulation items-center gap-3 rounded-md px-2 py-2.5 text-sm hover:bg-gray-100"
+                        style={{ color: '#111827' }}
                       >
                         <input
                           type="checkbox"
-                          className="h-5 w-5 shrink-0 text-primary-600 border-gray-300 rounded"
+                          className="h-5 w-5 shrink-0 rounded border-gray-400"
+                          style={{ backgroundColor: '#ffffff', accentColor: '#2563eb' }}
                           checked={formData.participants.includes(u.id)}
                           onChange={() => {
                             setFormData(prev => {
@@ -440,7 +473,7 @@ export default function MeetingRoomCalendarCompact() {
                             });
                           }}
                         />
-                        <span className="truncate">
+                        <span className="truncate" style={{ color: '#111827' }}>
                           {u.name || u.email}
                           {u.name && u.email ? ` (${u.email})` : ''}
                         </span>
@@ -450,37 +483,65 @@ export default function MeetingRoomCalendarCompact() {
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label mb-2 flex items-center gap-2 text-sm sm:text-base">
+                <div className="space-y-3">
+                  <label className="label mb-0 flex items-center gap-2 text-sm sm:text-base">
                     <FiClock size={16} />
                     Početak *
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.start_time}
-                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                    className="input w-full min-w-0 max-w-full text-base touch-manipulation"
-                    required
-                    step="900"
-                  />
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Datum (dd.mm.yyyy)</label>
+                    <AppDatePicker
+                      value={formData.start_date}
+                      onChange={(start_date) => setFormData({ ...formData, start_date })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Vrijeme (24h)</label>
+                    <select
+                      value={formData.start_clock}
+                      onChange={(e) => setFormData({ ...formData, start_clock: e.target.value })}
+                      className="input w-full min-w-0 max-w-full text-base touch-manipulation"
+                      required
+                    >
+                      <option value="">HH:mm</option>
+                      {MEETING_TIME_OPTIONS.map(t => (
+                        <option key={`start-${t}`} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="label mb-2 flex items-center gap-2 text-sm sm:text-base">
+                <div className="space-y-3">
+                  <label className="label mb-0 flex items-center gap-2 text-sm sm:text-base">
                     <FiClock size={16} />
                     Kraj *
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.end_time}
-                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                    className="input w-full min-w-0 max-w-full text-base touch-manipulation"
-                    required
-                    step="900"
-                  />
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Datum (dd.mm.yyyy)</label>
+                    <AppDatePicker
+                      value={formData.end_date}
+                      onChange={(end_date) => setFormData({ ...formData, end_date })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Vrijeme (24h)</label>
+                    <select
+                      value={formData.end_clock}
+                      onChange={(e) => setFormData({ ...formData, end_clock: e.target.value })}
+                      className="input w-full min-w-0 max-w-full text-base touch-manipulation"
+                      required
+                    >
+                      <option value="">HH:mm</option>
+                      {MEETING_TIME_OPTIONS.map(t => (
+                        <option key={`end-${t}`} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
               </div>
-              <div className="shrink-0 border-t border-gray-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+              <div className="shrink-0 border-t border-gray-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] dark:border-dark-700 dark:bg-dark-800 sm:p-6">
                 <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"

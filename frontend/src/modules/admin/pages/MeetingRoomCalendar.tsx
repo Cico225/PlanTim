@@ -14,7 +14,20 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInte
 import { apiService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
-import { formatDate, formatMonthYear } from '@/utils/dateFormat';
+import { combineDateTimeParts, formatDate, formatMonthYear, splitDateTimeParts } from '@/utils/dateFormat';
+import AppDatePicker from '@/components/AppDatePicker';
+
+/** Working-hours slots every 15 minutes, 24h display (08:00–16:30). */
+const MEETING_TIME_OPTIONS: string[] = (() => {
+  const opts: string[] = [];
+  for (let h = 8; h <= 16; h++) {
+    for (const m of [0, 15, 30, 45]) {
+      if (h === 16 && m > 30) break;
+      opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return opts;
+})();
 
 interface MeetingRoom {
   id: number;
@@ -66,15 +79,19 @@ export default function MeetingRoomCalendar() {
     room_id: string;
     title: string;
     description: string;
-    start_time: string;
-    end_time: string;
+    start_date: string;
+    start_clock: string;
+    end_date: string;
+    end_clock: string;
     participants: number[];
   }>({
     room_id: '',
     title: '',
     description: '',
-    start_time: '',
-    end_time: '',
+    start_date: '',
+    start_clock: '',
+    end_date: '',
+    end_clock: '',
     participants: [],
   });
 
@@ -165,48 +182,58 @@ export default function MeetingRoomCalendar() {
   const handleCreateReservation = (date?: Date, hour?: number) => {
     setEditingReservation(null);
     
-    let startTime = '';
-    let endTime = '';
+    let startDateStr = '';
+    let startClock = '';
+    let endDateStr = '';
+    let endClock = '';
     
-    if (date && hour !== undefined) {
-      // Validate hour is within working hours (08:00-16:30)
-      if (hour < 8 || hour > 16) {
-        toast.error('Rezervacije su moguće samo u radnom vremenu (08:00-16:30)');
-        return;
+    if (date) {
+      startDateStr = format(date, 'dd.MM.yyyy');
+      endDateStr = format(date, 'dd.MM.yyyy');
+
+      if (hour !== undefined) {
+        // Validate hour is within working hours (08:00-16:30)
+        if (hour < 8 || hour > 16) {
+          toast.error('Rezervacije su moguće samo u radnom vremenu (08:00-16:30)');
+          return;
+        }
+        
+        // Check if the selected date and time is in the past
+        const now = new Date();
+        const startDate = new Date(date);
+        startDate.setHours(hour, 0, 0, 0);
+        
+        // Allow reservations for today and future dates
+        // Only block if the time has already passed today
+        const isToday = isSameDay(startDate, now);
+        if (isToday && startDate < now) {
+          toast.error('Ne možete rezervisati termin u prošlosti');
+          return;
+        }
+        
+        startClock = format(startDate, 'HH:mm');
+        
+        // Set end time to 1 hour later, but not after 16:30
+        const endDate = new Date(startDate);
+        if (hour === 16) {
+          // If starting at 16:00, end at 16:30
+          endDate.setHours(16, 30, 0, 0);
+        } else {
+          endDate.setHours(hour + 1, 0, 0, 0);
+        }
+        endDateStr = format(endDate, 'dd.MM.yyyy');
+        endClock = format(endDate, 'HH:mm');
       }
-      
-      // Check if the selected date and time is in the past
-      const now = new Date();
-      const startDate = new Date(date);
-      startDate.setHours(hour, 0, 0, 0);
-      
-      // Allow reservations for today and future dates
-      // Only block if the time has already passed today
-      const isToday = isSameDay(startDate, now);
-      if (isToday && startDate < now) {
-        toast.error('Ne možete rezervisati termin u prošlosti');
-        return;
-      }
-      
-      startTime = format(startDate, "yyyy-MM-dd'T'HH:mm");
-      
-      // Set end time to 1 hour later, but not after 16:30
-      const endDate = new Date(startDate);
-      if (hour === 16) {
-        // If starting at 16:00, end at 16:30
-        endDate.setHours(16, 30, 0, 0);
-      } else {
-        endDate.setHours(hour + 1, 0, 0, 0);
-      }
-      endTime = format(endDate, "yyyy-MM-dd'T'HH:mm");
     }
     
     setFormData({
       room_id: selectedRoomId?.toString() || '',
       title: '',
       description: '',
-      start_time: startTime,
-      end_time: endTime,
+      start_date: startDateStr,
+      start_clock: startClock,
+      end_date: endDateStr,
+      end_clock: endClock,
       participants: [],
     });
     setShowReservationModal(true);
@@ -218,13 +245,18 @@ export default function MeetingRoomCalendar() {
       return;
     }
 
+    const startParts = splitDateTimeParts(reservation.start_time);
+    const endParts = splitDateTimeParts(reservation.end_time);
+
     setEditingReservation(reservation);
     setFormData({
       room_id: reservation.room_id.toString(),
       title: reservation.title,
       description: reservation.description || '',
-      start_time: format(parseISO(reservation.start_time), "yyyy-MM-dd'T'HH:mm"),
-      end_time: format(parseISO(reservation.end_time), "yyyy-MM-dd'T'HH:mm"),
+      start_date: startParts.date,
+      start_clock: startParts.time,
+      end_date: endParts.date,
+      end_clock: endParts.time,
       participants: reservation.participants || [],
     });
     setShowReservationModal(true);
@@ -254,25 +286,29 @@ export default function MeetingRoomCalendar() {
   const handleSubmitReservation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate working hours (08:00-16:30)
-    if (formData.start_time) {
-      const startDate = new Date(formData.start_time);
-      const startHour = startDate.getHours();
-      const startMinutes = startDate.getMinutes();
-      if (startHour < 8 || startHour > 16 || (startHour === 16 && startMinutes > 30)) {
-        toast.error('Rezervacije su moguće samo u radnom vremenu (08:00-16:30)');
-        return;
-      }
+    const start_time = combineDateTimeParts(formData.start_date, formData.start_clock);
+    const end_time = combineDateTimeParts(formData.end_date, formData.end_clock);
+
+    if (!start_time || !end_time) {
+      toast.error('Unesite datum u formatu dd.mm.yyyy i vrijeme');
+      return;
     }
 
-    if (formData.end_time) {
-      const endDate = new Date(formData.end_time);
-      const endHour = endDate.getHours();
-      const endMinutes = endDate.getMinutes();
-      if (endHour < 8 || endHour > 16 || (endHour === 16 && endMinutes > 30)) {
-        toast.error('Rezervacije su moguće samo u radnom vremenu (08:00-16:30)');
-        return;
-      }
+    // Validate working hours (08:00-16:30)
+    const startDate = new Date(start_time);
+    const startHour = startDate.getHours();
+    const startMinutes = startDate.getMinutes();
+    if (startHour < 8 || startHour > 16 || (startHour === 16 && startMinutes > 30)) {
+      toast.error('Rezervacije su moguće samo u radnom vremenu (08:00-16:30)');
+      return;
+    }
+
+    const endDate = new Date(end_time);
+    const endHour = endDate.getHours();
+    const endMinutes = endDate.getMinutes();
+    if (endHour < 8 || endHour > 16 || (endHour === 16 && endMinutes > 30)) {
+      toast.error('Rezervacije su moguće samo u radnom vremenu (08:00-16:30)');
+      return;
     }
 
     try {
@@ -280,8 +316,8 @@ export default function MeetingRoomCalendar() {
         room_id: parseInt(formData.room_id),
         title: formData.title,
         description: formData.description || null,
-        start_time: formData.start_time,
-        end_time: formData.end_time,
+        start_time,
+        end_time,
         participants: formData.participants,
       };
 
@@ -509,8 +545,8 @@ export default function MeetingRoomCalendar() {
               isToday(day) ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-white'
             }`}
           >
-            <span className="sm:hidden">{format(day, 'd. MMM')}</span>
-            <span className="hidden sm:inline">{format(day, 'd')}</span>
+            <span className="sm:hidden">{formatDate(day)}</span>
+            <span className="hidden sm:inline">{format(day, 'dd.MM')}</span>
           </div>
         </div>
 
@@ -629,7 +665,11 @@ export default function MeetingRoomCalendar() {
                 !isCurrentMonth ? 'bg-gray-50 dark:bg-gray-900/50' : ''
               } ${isToday(day) ? 'bg-primary-50 dark:bg-primary-900/20 ring-2 ring-green-500 dark:ring-green-400' : ''}`}
             >
-              <div className={`text-xs sm:text-sm font-medium mb-0.5 sm:mb-1 ${isCurrentMonth ? '' : 'text-gray-400'}`}>
+              <div className={`text-xs sm:text-sm font-medium mb-0.5 sm:mb-1 ${
+                isCurrentMonth
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-400 dark:text-gray-600'
+              }`}>
                 {format(day, 'd')}
               </div>
               <div className="space-y-0.5 sm:space-y-1">
@@ -739,7 +779,7 @@ export default function MeetingRoomCalendar() {
             <div className="flex items-center gap-2 flex-1 sm:flex-none">
               <button
                 onClick={() => navigateDate('prev')}
-                className="p-2.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 touch-manipulation flex-shrink-0 transition-colors"
+                className="p-2.5 sm:p-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 touch-manipulation flex-shrink-0 transition-colors"
                 aria-label="Prethodni"
               >
                 <FiChevronLeft size={20} />
@@ -749,20 +789,20 @@ export default function MeetingRoomCalendar() {
                   {viewMode === 'day'
                     ? formatDate(currentDate)
                     : viewMode === 'week'
-                    ? `${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'dd.MM')} - ${formatDate(endOfWeek(currentDate, { weekStartsOn: 1 }))}`
+                    ? `${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'dd.MM.yyyy')} - ${formatDate(endOfWeek(currentDate, { weekStartsOn: 1 }))}`
                     : formatMonthYear(currentDate)}
                 </div>
               </div>
               <button
                 onClick={() => navigateDate('next')}
-                className="p-2.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 touch-manipulation flex-shrink-0 transition-colors"
+                className="p-2.5 sm:p-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 touch-manipulation flex-shrink-0 transition-colors"
                 aria-label="Sledeći"
               >
                 <FiChevronRight size={20} />
               </button>
               <button
                 onClick={() => setCurrentDate(new Date())}
-                className="px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 touch-manipulation whitespace-nowrap transition-all"
+                className="px-3 sm:px-3 py-2.5 sm:py-2 text-xs sm:text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 touch-manipulation whitespace-nowrap transition-all"
               >
                 Danas
               </button>
@@ -813,8 +853,8 @@ export default function MeetingRoomCalendar() {
       {/* Reservation Modal */}
       {showReservationModal && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/50 sm:items-center sm:justify-center sm:p-4">
-          <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-gray-800 sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-lg">
-            <div className="shrink-0 border-b border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+          <div className="flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-dark-800 sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-lg">
+            <div className="shrink-0 border-b border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white sm:text-xl">
                   {editingReservation ? 'Izmijeni rezervaciju' : 'Nova rezervacija'}
@@ -822,7 +862,7 @@ export default function MeetingRoomCalendar() {
                 <button
                   type="button"
                   onClick={() => setShowReservationModal(false)}
-                  className="-mr-2 shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 touch-manipulation"
+                  className="-mr-2 shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700 dark:hover:text-gray-200 touch-manipulation"
                   aria-label="Zatvori"
                 >
                   <FiX size={24} />
@@ -876,20 +916,25 @@ export default function MeetingRoomCalendar() {
                   <FiUser size={16} />
                   Učesnici sastanka
                 </label>
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-48 overflow-y-auto p-2 sm:p-3 space-y-1 bg-gray-50 dark:bg-gray-900/40">
+                <div
+                  className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-300 p-2 sm:p-3"
+                  style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                >
                   {users.length === 0 ? (
-                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 px-1 py-1.5">
+                    <div className="px-1 py-1.5 text-xs sm:text-sm" style={{ color: '#4b5563' }}>
                       Nema dostupnih korisnika ili nije moguće učitati listu korisnika.
                     </div>
                   ) : (
                     users.map(u => (
                       <label
                         key={u.id}
-                        className="flex items-center gap-3 rounded-md px-2 py-2.5 hover:bg-white/60 dark:hover:bg-gray-800 cursor-pointer text-sm sm:text-sm touch-manipulation"
+                        className="flex cursor-pointer touch-manipulation items-center gap-3 rounded-md px-2 py-2.5 text-sm hover:bg-gray-100"
+                        style={{ color: '#111827' }}
                       >
                         <input
                           type="checkbox"
-                          className="h-5 w-5 shrink-0 text-primary-600 border-gray-300 rounded"
+                          className="h-5 w-5 shrink-0 rounded border-gray-400"
+                          style={{ backgroundColor: '#ffffff', accentColor: '#2563eb' }}
                           checked={formData.participants.includes(u.id)}
                           onChange={() => {
                             setFormData(prev => {
@@ -903,7 +948,7 @@ export default function MeetingRoomCalendar() {
                             });
                           }}
                         />
-                        <span className="truncate">
+                        <span className="truncate" style={{ color: '#111827' }}>
                           {u.name || u.email}
                           {u.name && u.email ? ` (${u.email})` : ''}
                         </span>
@@ -911,44 +956,66 @@ export default function MeetingRoomCalendar() {
                     ))
                   )}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Odaberite osobe koje će prisustvovati sastanku.
                 </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="label mb-2 flex items-center gap-2 text-sm sm:text-base">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-3">
+                  <label className="label mb-0 flex items-center gap-2 text-sm sm:text-base">
                     <FiClock size={16} />
                     Početak *
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.start_time}
-                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                    className="input w-full min-w-0 max-w-full text-base touch-manipulation sm:text-base"
-                    required
-                    step="900"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Vrijeme će biti zaokruženo na 15-minutne intervale
-                  </p>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Datum (dd.mm.yyyy)</label>
+                    <AppDatePicker
+                      value={formData.start_date}
+                      onChange={(start_date) => setFormData({ ...formData, start_date })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Vrijeme (24h)</label>
+                    <select
+                      value={formData.start_clock}
+                      onChange={(e) => setFormData({ ...formData, start_clock: e.target.value })}
+                      className="input w-full min-w-0 max-w-full text-base touch-manipulation sm:text-base"
+                      required
+                    >
+                      <option value="">HH:mm</option>
+                      {MEETING_TIME_OPTIONS.map(t => (
+                        <option key={`start-${t}`} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="label mb-2 flex items-center gap-2 text-sm sm:text-base">
+                <div className="space-y-3">
+                  <label className="label mb-0 flex items-center gap-2 text-sm sm:text-base">
                     <FiClock size={16} />
                     Kraj *
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.end_time}
-                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                    className="input w-full min-w-0 max-w-full text-base touch-manipulation sm:text-base"
-                    required
-                    step="900"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Vrijeme će biti zaokruženo na 15-minutne intervale
-                  </p>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Datum (dd.mm.yyyy)</label>
+                    <AppDatePicker
+                      value={formData.end_date}
+                      onChange={(end_date) => setFormData({ ...formData, end_date })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Vrijeme (24h)</label>
+                    <select
+                      value={formData.end_clock}
+                      onChange={(e) => setFormData({ ...formData, end_clock: e.target.value })}
+                      className="input w-full min-w-0 max-w-full text-base touch-manipulation sm:text-base"
+                      required
+                    >
+                      <option value="">HH:mm</option>
+                      {MEETING_TIME_OPTIONS.map(t => (
+                        <option key={`end-${t}`} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
               {editingReservation && (
@@ -959,7 +1026,7 @@ export default function MeetingRoomCalendar() {
                 </div>
               )}
               </div>
-              <div className="shrink-0 border-t border-gray-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+              <div className="shrink-0 border-t border-gray-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] dark:border-dark-700 dark:bg-dark-800 sm:p-6">
                 <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
