@@ -390,74 +390,119 @@ class HRMController extends Controller
 
     /**
      * Users from Administration for linking to HR employees.
-     * By default returns unlinked users; with include_linked=1 returns all (with is_linked flag).
+     * Returns all users by default (with is_linked flag). Pass include_linked=0 to hide already-linked.
      */
     public function getAvailableUsers(Request $request)
     {
-        $linkedQuery = DB::table('hrm_employees')->whereNotNull('user_id');
-        if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
-            $linkedQuery->whereNull('deleted_at');
-        }
-        $linkedIds = $linkedQuery->pluck('user_id')->all();
-        $linkedSet = array_flip($linkedIds);
-
-        $includeUserId = $request->filled('include_user_id')
-            ? (int) $request->input('include_user_id')
-            : null;
-        $includeLinked = $request->boolean('include_linked', false);
-
-        $select = ['id', 'name', 'email', 'created_at'];
-        foreach (['phone', 'position', 'department', 'avatar', 'is_active'] as $col) {
-            if (Schema::hasColumn('users', $col)) {
-                $select[] = $col;
+        try {
+            $linkedQuery = DB::table('hrm_employees')->whereNotNull('user_id');
+            if (Schema::hasColumn('hrm_employees', 'deleted_at')) {
+                $linkedQuery->whereNull('deleted_at');
             }
-        }
+            // Normalize to int keys so is_linked matching is reliable
+            $linkedIds = $linkedQuery->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $linkedSet = array_fill_keys($linkedIds, true);
 
-        $query = DB::table('users')->select($select)->orderBy('name');
+            $includeUserId = $request->filled('include_user_id')
+                ? (int) $request->input('include_user_id')
+                : null;
 
-        if (!$includeLinked) {
-            $query->where(function ($q) use ($linkedIds, $includeUserId) {
-                if (count($linkedIds) > 0) {
-                    $q->whereNotIn('id', $linkedIds);
+            // Default TRUE: always show Admin users in the picker (linked ones flagged).
+            // Only hide linked when client explicitly sends include_linked=0/false.
+            $includeLinked = true;
+            if ($request->exists('include_linked')) {
+                $raw = $request->input('include_linked');
+                $includeLinked = filter_var($raw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($includeLinked === null) {
+                    $includeLinked = !in_array((string) $raw, ['0', 'false', 'no', 'off', ''], true);
                 }
-                if ($includeUserId) {
-                    $q->orWhere('id', $includeUserId);
+            }
+
+            $select = ['users.id', 'users.name', 'users.email', 'users.created_at'];
+            foreach (['phone', 'position', 'department', 'avatar', 'is_active'] as $col) {
+                if (Schema::hasColumn('users', $col)) {
+                    $select[] = 'users.' . $col;
                 }
-            });
+            }
+
+            $query = DB::table('users')->select($select)->orderBy('users.name');
+
+            if (Schema::hasColumn('users', 'deleted_at')) {
+                $query->whereNull('users.deleted_at');
+            }
+
+            if (!$includeLinked) {
+                $query->where(function ($q) use ($linkedIds, $includeUserId) {
+                    if (count($linkedIds) > 0) {
+                        $q->whereNotIn('users.id', $linkedIds);
+                    }
+                    if ($includeUserId) {
+                        $q->orWhere('users.id', $includeUserId);
+                    }
+                });
+            }
+
+            if ($request->filled('search')) {
+                $search = trim((string) $request->input('search'));
+                if ($search !== '') {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('users.name', 'like', "%{$search}%")
+                            ->orWhere('users.email', 'like', "%{$search}%");
+                    });
+                }
+            }
+
+            // active_only defaults to false so picker matches Administration list.
+            // Only filter when client explicitly asks for active users.
+            $activeOnly = false;
+            if ($request->exists('active_only')) {
+                $rawActive = $request->input('active_only');
+                $parsed = filter_var($rawActive, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                $activeOnly = $parsed === null
+                    ? !in_array((string) $rawActive, ['0', 'false', 'no', 'off', ''], true)
+                    : $parsed;
+            }
+
+            if ($activeOnly && Schema::hasColumn('users', 'is_active')) {
+                $query->where(function ($q) {
+                    $q->where('users.is_active', 1)
+                        ->orWhere('users.is_active', true)
+                        ->orWhereNull('users.is_active');
+                });
+            }
+
+            $limit = min(max((int) $request->input('limit', 1000), 1), 2000);
+            $users = $query->limit($limit)->get()->map(function ($u) use ($linkedSet, $includeUserId) {
+                $id = (int) $u->id;
+                $isLinked = isset($linkedSet[$id]) && $id !== (int) $includeUserId;
+                return [
+                    'id' => $id,
+                    'name' => $u->name,
+                    'email' => $u->email,
+                    'phone' => $u->phone ?? null,
+                    'position' => $u->position ?? null,
+                    'department' => $u->department ?? null,
+                    'avatar' => $u->avatar ?? null,
+                    'is_active' => isset($u->is_active) ? (bool) $u->is_active : true,
+                    'is_linked' => $isLinked,
+                    'created_at' => $u->created_at,
+                ];
+            })->values();
+
+            return response()->json($users);
+        } catch (\Throwable $e) {
+            Log::error('getAvailableUsers failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Greška pri učitavanju korisnika iz Administracije.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
         }
-
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        if (Schema::hasColumn('users', 'is_active') && $request->boolean('active_only', true)) {
-            $query->where(function ($q) {
-                $q->where('is_active', 1)->orWhereNull('is_active');
-            });
-        }
-
-        $limit = min(max((int) $request->input('limit', 500), 1), 1000);
-        $users = $query->limit($limit)->get()->map(function ($u) use ($linkedSet, $includeUserId) {
-            $isLinked = isset($linkedSet[$u->id]);
-            return [
-                'id' => $u->id,
-                'name' => $u->name,
-                'email' => $u->email,
-                'phone' => $u->phone ?? null,
-                'position' => $u->position ?? null,
-                'department' => $u->department ?? null,
-                'avatar' => $u->avatar ?? null,
-                'is_active' => isset($u->is_active) ? (bool) $u->is_active : true,
-                'is_linked' => $isLinked && (int) $u->id !== (int) $includeUserId,
-                'created_at' => $u->created_at,
-            ];
-        });
-
-        return response()->json($users->values());
     }
 
     /**

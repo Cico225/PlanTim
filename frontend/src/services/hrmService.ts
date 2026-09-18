@@ -58,14 +58,23 @@ export const getHRDashboard = () =>
 export const getEmployees = (filters?: EmployeeFilters) =>
   apiService.get<PaginatedResponse<HREmployee>>('/hrm/employees', filters);
 
-export const getAvailableUsers = (params?: {
+export const getAvailableUsers = async (params?: {
   search?: string;
   include_user_id?: number;
   active_only?: boolean;
   include_linked?: boolean;
   limit?: number;
-}) =>
-  apiService.get<Array<{
+}) => {
+  const raw = await apiService.get<any>('/hrm/available-users', {
+    search: params?.search || undefined,
+    include_user_id: params?.include_user_id || undefined,
+    // Send as 1/0 so Laravel/query-string parsing is reliable on all servers
+    active_only: params?.active_only === undefined ? 0 : params.active_only ? 1 : 0,
+    include_linked: params?.include_linked === false ? 0 : 1,
+    limit: params?.limit ?? 1000,
+  });
+
+  const list: Array<{
     id: number;
     name: string;
     email: string;
@@ -75,7 +84,20 @@ export const getAvailableUsers = (params?: {
     avatar?: string;
     is_active?: boolean;
     is_linked?: boolean;
-  }>>('/hrm/available-users', params);
+  }> = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.data)
+      ? raw.data
+      : [];
+
+  // Available (not linked) first, then alphabetically
+  return [...list].sort((a, b) => {
+    const la = a.is_linked ? 1 : 0;
+    const lb = b.is_linked ? 1 : 0;
+    if (la !== lb) return la - lb;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'bs');
+  });
+};
 
 export const getEmployee = (id: number) =>
   apiService.get<HREmployee>(`/hrm/employees/${id}`);
