@@ -118,6 +118,14 @@ body {
   }
 }
 
+/* Native date/time controls follow theme so values stay readable */
+.dark,
+.dark .input,
+.theme-black,
+.theme-black .input {
+  color-scheme: dark;
+}
+
 /* Black mode (OLED) specific styles */
 .theme-black {
   @apply bg-black text-white;
@@ -129,6 +137,14 @@ body {
 
 .theme-black .glass-effect {
   @apply bg-black-light/90;
+}
+
+.theme-black .input {
+  @apply border-black-border bg-black-card text-white;
+}
+
+.theme-black .label {
+  @apply text-gray-300;
 }
 
 /* Print: samo odabrani A4 dokument (zahtjev ili dopis) */

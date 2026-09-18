@@ -85,3 +85,33 @@ export function toApiDate(value: DateInput, fallback = ''): string {
   if (!d) return fallback;
   return format(d, 'yyyy-MM-dd');
 }
+
+/** Split datetime into display date (dd.MM.yyyy) and time (HH:mm). */
+export function splitDateTimeParts(value: DateInput): { date: string; time: string } {
+  const d = parseAppDate(value);
+  if (!d) return { date: '', time: '' };
+  return {
+    date: format(d, 'dd.MM.yyyy'),
+    time: format(d, 'HH:mm'),
+  };
+}
+
+/**
+ * Combine dd.MM.yyyy + HH:mm into API/local datetime string (yyyy-MM-dd'T'HH:mm).
+ * Returns empty string when the date part is incomplete or invalid.
+ */
+export function combineDateTimeParts(dateStr: string, timeStr: string): string {
+  const date = (dateStr || '').trim();
+  let time = (timeStr || '').trim() || '00:00';
+  if (!date) return '';
+
+  // Normalize 9:00 → 09:00
+  const timeMatch = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (timeMatch) {
+    time = `${String(Number(timeMatch[1])).padStart(2, '0')}:${timeMatch[2]}`;
+  }
+
+  const d = parseAppDate(`${date} ${time}`);
+  if (!d) return '';
+  return format(d, "yyyy-MM-dd'T'HH:mm");
+}
