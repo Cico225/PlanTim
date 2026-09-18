@@ -298,7 +298,7 @@ function StartOffboardingModal({
     queryFn: () => getOffboardingReasons(),
   });
 
-  const { data: checklist = [], isLoading: loadingChecklist } = useQuery({
+  const { data: checklist = [], isLoading: loadingChecklist, isError: checklistError, refetch: refetchChecklist } = useQuery({
     queryKey: ['hrm-offboarding-checklist'],
     queryFn: () => getOffboardingChecklistItems(),
   });
@@ -434,6 +434,21 @@ function StartOffboardingModal({
             {loadingChecklist ? (
               <div className="flex justify-center py-6">
                 <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+              </div>
+            ) : checklistError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                Greška pri učitavanju checkliste.{' '}
+                <button type="button" onClick={() => refetchChecklist()} className="underline font-medium">
+                  Pokušaj ponovo
+                </button>
+              </div>
+            ) : checklist.length === 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                Nema checklist zadataka. Pokrenite migracije na serveru ili kliknite{' '}
+                <button type="button" onClick={() => refetchChecklist()} className="underline font-medium">
+                  osvježi
+                </button>
+                .
               </div>
             ) : (
               <ul className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2">

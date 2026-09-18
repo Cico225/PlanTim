@@ -1,8 +1,9 @@
 {
-    "version": "1.2.28",
+    "version": "1.2.29",
     "version_name": "Release 2026-09-18",
-    "release_notes": "Korekcije zaposleni",
+    "release_notes": "Offboarding",
     "changelog": [
+        "Offboarding",
         "Korekcije zaposleni",
         "Korekcija dio zaposlenici",
         "Dorada modul HR",
@@ -21,7 +22,6 @@
         "Dodana nova funkcionalnost - skeniranje zabrana i automatsko OCR prepoznavanje",
         "DOrada modula HR",
         "Dorada modula Reklamacije",
-        "Razvoj i dorada modula LMS",
-        "DOrada modula sistem učenja"
+        "Razvoj i dorada modula LMS"
     ]
 }
