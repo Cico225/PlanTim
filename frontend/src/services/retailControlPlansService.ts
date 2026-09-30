@@ -126,7 +126,7 @@ export const getControlPlans = (filters?: ControlPlanFilters) =>
 export const getControlPlan = (id: number) =>
   apiService.get<ControlPlan>(`/retail/control-plans/${id}`);
 
-export const createControlPlan = (data: Partial<ControlPlan>) =>
+export const createControlPlan = (data: Partial<ControlPlan> & { created_date?: string; items?: Partial<ControlPlanItem>[] }) =>
   apiService.post<ControlPlan>('/retail/control-plans', data);
 
 export const updateControlPlan = (id: number, data: Partial<ControlPlan>) =>

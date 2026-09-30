@@ -1,8 +1,9 @@
 {
-    "version": "1.2.30",
-    "version_name": "Release 2026-09-18",
-    "release_notes": "DOrada modula Rezervacije",
+    "version": "1.2.31",
+    "version_name": "Release 2026-09-30",
+    "release_notes": "Dorada modula maloprodaja",
     "changelog": [
+        "Dorada modula maloprodaja",
         "DOrada modula Rezervacije",
         "Offboarding",
         "Korekcije zaposleni",
@@ -21,7 +22,6 @@
         "popravak sigurnosti",
         "Novi backup baze podataka",
         "Dodana nova funkcionalnost - skeniranje zabrana i automatsko OCR prepoznavanje",
-        "DOrada modula HR",
-        "Dorada modula Reklamacije"
+        "DOrada modula HR"
     ]
 }

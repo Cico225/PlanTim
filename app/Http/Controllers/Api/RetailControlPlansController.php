@@ -324,7 +324,7 @@ class RetailControlPlansController extends Controller
     }
 
     /**
-     * Create control plan
+     * Create control plan (optionally with activities in one request)
      */
     public function store(Request $request)
     {
@@ -332,13 +332,19 @@ class RetailControlPlansController extends Controller
             'type' => 'required|in:inventory_required,inventory_extraordinary,store_visit',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'year' => 'required|integer|min:2020|max:2100',
+            'year' => 'nullable|integer|min:2020|max:2100',
+            'created_date' => 'nullable|date',
             'regional_manager_id' => 'nullable|exists:users,id',
             'status' => 'nullable|in:draft,active,completed,cancelled',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-            'deadline' => 'nullable|date',
             'notes' => 'nullable|string',
+            'items' => 'nullable|array',
+            'items.*.store_id' => 'required_with:items|exists:hrm_stores,id',
+            'items.*.planned_date' => 'required_with:items|date',
+            'items.*.assigned_to' => 'nullable|exists:users,id',
+            'items.*.priority' => 'nullable|integer|min:0|max:2',
+            'items.*.notes' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -351,15 +357,44 @@ class RetailControlPlansController extends Controller
 
         try {
             $data = $validator->validated();
-            $data['status'] = $data['status'] ?? 'draft';
-            $data['total_stores'] = 0;
+            $items = $data['items'] ?? [];
+            unset($data['items']);
+
+            // Datum kreiranja plana → start_date; year izveden iz datuma
+            $createdDate = $data['created_date'] ?? $data['start_date'] ?? now()->toDateString();
+            unset($data['created_date']);
+            $data['start_date'] = $createdDate;
+            $data['year'] = $data['year'] ?? (int) date('Y', strtotime($createdDate));
+            $data['status'] = $data['status'] ?? 'active';
+            $data['deadline'] = null;
+            $data['total_stores'] = count($items);
             $data['completed_stores'] = 0;
 
-            $id = DB::table('retail_control_plans')->insertGetId($data);
+            $id = DB::transaction(function () use ($data, $items) {
+                $planId = DB::table('retail_control_plans')->insertGetId($data);
+
+                foreach ($items as $item) {
+                    DB::table('retail_control_plan_items')->insert([
+                        'plan_id' => $planId,
+                        'store_id' => $item['store_id'],
+                        'planned_date' => $item['planned_date'],
+                        'assigned_to' => $item['assigned_to'] ?? null,
+                        'priority' => $item['priority'] ?? 0,
+                        'notes' => $item['notes'] ?? null,
+                        'status' => 'pending',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                return $planId;
+            });
 
             $plan = DB::table('retail_control_plans')
                 ->select('retail_control_plans.*')
                 ->selectRaw('(SELECT name FROM users WHERE users.id = retail_control_plans.regional_manager_id) as regional_manager_name')
+                ->selectRaw('(SELECT COUNT(*) FROM retail_control_plan_items WHERE retail_control_plan_items.plan_id = retail_control_plans.id) as items_count')
+                ->selectRaw('(SELECT COUNT(*) FROM retail_control_plan_items WHERE retail_control_plan_items.plan_id = retail_control_plans.id AND retail_control_plan_items.status = "completed") as completed_items_count')
                 ->where('retail_control_plans.id', $id)
                 ->first();
 
@@ -380,11 +415,11 @@ class RetailControlPlansController extends Controller
             'title' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
             'year' => 'sometimes|integer|min:2020|max:2100',
+            'created_date' => 'nullable|date',
             'regional_manager_id' => 'nullable|exists:users,id',
             'status' => 'sometimes|in:draft,active,completed,cancelled',
             'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'deadline' => 'nullable|date',
+            'end_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
 
@@ -403,6 +438,20 @@ class RetailControlPlansController extends Controller
             }
 
             $data = $validator->validated();
+
+            if (isset($data['created_date'])) {
+                $data['start_date'] = $data['created_date'];
+                $data['year'] = (int) date('Y', strtotime($data['created_date']));
+                unset($data['created_date']);
+            } elseif (!empty($data['start_date'])) {
+                $data['year'] = $data['year'] ?? (int) date('Y', strtotime($data['start_date']));
+            }
+
+            // When marking plan completed, ensure end_date is set
+            if (($data['status'] ?? null) === 'completed' && empty($data['end_date'])) {
+                $data['end_date'] = now()->toDateString();
+            }
+
             DB::table('retail_control_plans')->where('id', $id)->update($data);
 
             // Update total_stores and completed_stores counts
@@ -425,6 +474,8 @@ class RetailControlPlansController extends Controller
             $updatedPlan = DB::table('retail_control_plans')
                 ->select('retail_control_plans.*')
                 ->selectRaw('(SELECT name FROM users WHERE users.id = retail_control_plans.regional_manager_id) as regional_manager_name')
+                ->selectRaw('(SELECT COUNT(*) FROM retail_control_plan_items WHERE retail_control_plan_items.plan_id = retail_control_plans.id) as items_count')
+                ->selectRaw('(SELECT COUNT(*) FROM retail_control_plan_items WHERE retail_control_plan_items.plan_id = retail_control_plans.id AND retail_control_plan_items.status = "completed") as completed_items_count')
                 ->where('retail_control_plans.id', $id)
                 ->first();
 
