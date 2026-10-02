@@ -117,6 +117,60 @@ export interface RetailReportsResponse {
 export const getRetailReports = (filters?: { start_date?: string; end_date?: string; type?: 'all' | 'plans' | 'activities' }) =>
   apiService.get<RetailReportsResponse>('/retail/reports', filters);
 
+type ChartSlice = { key?: string; name: string; value: number; color?: string };
+type MonthPoint = { month: string; ym: string };
+
+export interface RetailReportsOverview {
+  kpis: {
+    active_plans: number;
+    total_plans: number;
+    activities_total: number;
+    activities_completed: number;
+    activities_open: number;
+    activities_overdue: number;
+    completion_rate: number;
+    controls_period: number;
+    controls_this_month: number;
+    controls_locked: number;
+    avg_store_rating: number;
+    inventory_difference: number;
+    inventory_shortages: number;
+    open_measures: number;
+    overdue_measures: number;
+    educations_period: number;
+    educations_this_month: number;
+    educations_completed: number;
+    stores_visited: number;
+  };
+  activity_status: ChartSlice[];
+  plans_by_type: ChartSlice[];
+  activity_trend: (MonthPoint & { planned: number; completed: number })[];
+  upcoming_activities: {
+    id: number;
+    plan_id: number;
+    planned_date: string;
+    status: string;
+    overdue: boolean;
+    plan_title: string | null;
+    store_name: string;
+    store_code: string | null;
+    assigned_to_name: string | null;
+  }[];
+  manager_performance: { name: string; total: number; completed: number; open: number }[];
+  controls_trend: (MonthPoint & { inspection: number; inventory: number })[];
+  observations_by_category: { name: string; ok: number; not_ok: number }[];
+  inventory_status: ChartSlice[];
+  store_ratings: { name: string; rating: number; value: number }[];
+  top_stores: { name: string; controls: number; avg_rating: number | null }[];
+  measures_status: ChartSlice[];
+  education_trend: (MonthPoint & { planned: number; completed: number })[];
+  education_by_type: ChartSlice[];
+  generated_at: string;
+}
+
+export const getRetailReportsOverview = (params?: { months?: number }) =>
+  apiService.get<RetailReportsOverview>('/retail/reports/overview', params);
+
 // ============================================
 // CONTROL PLANS
 // ============================================
@@ -141,10 +195,15 @@ export const deleteControlPlan = (id: number) =>
 export const getPlanItems = (planId: number, filters?: PlanItemFilters) =>
   apiService.get<ControlPlanItem[]>(`/retail/control-plans/${planId}/items`, filters);
 
-export const createPlanItem = (planId: number, data: Partial<ControlPlanItem>) =>
+export type ControlPlanItemInput = Partial<Omit<ControlPlanItem, 'assigned_to' | 'notes'>> & {
+  assigned_to?: number | null;
+  notes?: string | null;
+};
+
+export const createPlanItem = (planId: number, data: ControlPlanItemInput) =>
   apiService.post<ControlPlanItem>(`/retail/control-plans/${planId}/items`, data);
 
-export const updatePlanItem = (planId: number, itemId: number, data: Partial<ControlPlanItem>) =>
+export const updatePlanItem = (planId: number, itemId: number, data: ControlPlanItemInput) =>
   apiService.put<ControlPlanItem>(`/retail/control-plans/${planId}/items/${itemId}`, data);
 
 export const deletePlanItem = (planId: number, itemId: number) =>

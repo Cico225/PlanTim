@@ -34,6 +34,7 @@ import {
   updatePlanItem,
   type ControlPlan,
   type ControlPlanItem,
+  type ControlPlanItemInput,
   type ControlPlanStatus,
   type ControlPlanType,
 } from '@/services/retailControlPlansService';
@@ -93,6 +94,9 @@ export default function ControlPlansTab() {
   const [editingPlan, setEditingPlan] = useState<ControlPlan | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [completeItemId, setCompleteItemId] = useState<number | null>(null);
+  const [activityModal, setActivityModal] = useState<
+    { mode: 'add' } | { mode: 'edit'; item: ControlPlanItem } | null
+  >(null);
   const [completePlanOpen, setCompletePlanOpen] = useState(false);
   const [completeDate, setCompleteDate] = useState(todayApi());
 
@@ -148,6 +152,8 @@ export default function ControlPlansTab() {
     await queryClient.invalidateQueries({ queryKey: ['retail-control-plans'] });
     await queryClient.invalidateQueries({ queryKey: ['retail-control-plan'] });
     await queryClient.invalidateQueries({ queryKey: ['retail-control-plan-items'] });
+    queryClient.invalidateQueries({ queryKey: ['retail-reports-overview'] });
+    queryClient.invalidateQueries({ queryKey: ['retail-reports'] });
   };
 
   const createPlanMutation = useMutation({
@@ -190,10 +196,11 @@ export default function ControlPlansTab() {
   });
 
   const createItemMutation = useMutation({
-    mutationFn: ({ planId, data }: { planId: number; data: Partial<ControlPlanItem> }) =>
+    mutationFn: ({ planId, data }: { planId: number; data: ControlPlanItemInput }) =>
       createPlanItem(planId, data),
     onSuccess: async () => {
       await invalidateAll();
+      setActivityModal(null);
       toast.success('Aktivnost je dodata');
     },
     onError: (error: any) => toast.error(error?.response?.data?.message || 'Greška pri dodavanju'),
@@ -207,11 +214,12 @@ export default function ControlPlansTab() {
     }: {
       planId: number;
       itemId: number;
-      data: Partial<ControlPlanItem>;
+      data: ControlPlanItemInput;
     }) => updatePlanItem(planId, itemId, data),
     onSuccess: async () => {
       await invalidateAll();
       setCompleteItemId(null);
+      setActivityModal(null);
       toast.success('Aktivnost je ažurirana');
     },
     onError: (error: any) => toast.error(error?.response?.data?.message || 'Greška pri ažuriranju'),
@@ -276,10 +284,7 @@ export default function ControlPlansTab() {
                     Uredi plan
                   </button>
                   <button
-                    onClick={() => {
-                      setEditingPlan(selectedPlan);
-                      setShowPlanModal(true);
-                    }}
+                    onClick={() => setActivityModal({ mode: 'add' })}
                     className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-700"
                   >
                     <Plus className="h-4 w-4" />
@@ -350,13 +355,10 @@ export default function ControlPlansTab() {
                 {(isAdmin || selectedPlan.regional_manager_id === user?.id) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditingPlan(selectedPlan);
-                      setShowPlanModal(true);
-                    }}
+                    onClick={() => setActivityModal({ mode: 'add' })}
                     className="text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
                   >
-                    + Uredi / dodaj
+                    + Dodaj aktivnost
                   </button>
                 )}
               </div>
@@ -442,20 +444,31 @@ export default function ControlPlansTab() {
                           </div>
                         </div>
                         {(isAdmin || selectedPlan.regional_manager_id === user?.id) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm('Obrisati ovu aktivnost?')) {
-                                deleteItemMutation.mutate({
-                                  planId: selectedPlan.id,
-                                  itemId: item.id,
-                                });
-                              }
-                            }}
-                            className="self-end rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 sm:self-center"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex shrink-0 items-center gap-1 self-end sm:self-center">
+                            <button
+                              type="button"
+                              onClick={() => setActivityModal({ mode: 'edit', item })}
+                              className="rounded-lg p-2 text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-900/20"
+                              title="Uredi aktivnost"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm('Obrisati ovu aktivnost?')) {
+                                  deleteItemMutation.mutate({
+                                    planId: selectedPlan.id,
+                                    itemId: item.id,
+                                  });
+                                }
+                              }}
+                              className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Obriši aktivnost"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         )}
                       </li>
                     );
@@ -499,27 +512,39 @@ export default function ControlPlansTab() {
           />
         )}
 
+        {activityModal && selectedPlan && (
+          <ActivityFormModal
+            item={activityModal.mode === 'edit' ? activityModal.item : null}
+            stores={Array.isArray(stores) ? stores : (stores as any)?.data || []}
+            users={Array.isArray(users) ? users : []}
+            onClose={() => setActivityModal(null)}
+            onSubmit={(data) => {
+              if (activityModal.mode === 'edit') {
+                updateItemMutation.mutate({
+                  planId: selectedPlan.id,
+                  itemId: activityModal.item.id,
+                  data,
+                });
+              } else {
+                createItemMutation.mutate({ planId: selectedPlan.id, data: { ...data, priority: 0 } });
+              }
+            }}
+            isLoading={createItemMutation.isPending || updateItemMutation.isPending}
+          />
+        )}
+
         {showPlanModal && (
           <PlanFormModal
             plan={editingPlan}
             stores={Array.isArray(stores) ? stores : (stores as any)?.data || []}
             users={Array.isArray(users) ? users : []}
-            existingItems={editingPlan ? planItems : []}
             onClose={() => {
               setShowPlanModal(false);
               setEditingPlan(null);
             }}
             onCreate={(data) => createPlanMutation.mutate(data)}
             onUpdate={(id, data) => updatePlanMutation.mutate({ id, data })}
-            onAddItem={(data) => {
-              if (!editingPlan) return;
-              createItemMutation.mutate({ planId: editingPlan.id, data });
-            }}
-            isLoading={
-              createPlanMutation.isPending ||
-              updatePlanMutation.isPending ||
-              createItemMutation.isPending
-            }
+            isLoading={createPlanMutation.isPending || updatePlanMutation.isPending}
           />
         )}
       </div>
@@ -698,14 +723,12 @@ export default function ControlPlansTab() {
           plan={editingPlan}
           stores={Array.isArray(stores) ? stores : (stores as any)?.data || []}
           users={Array.isArray(users) ? users : []}
-          existingItems={[]}
           onClose={() => {
             setShowPlanModal(false);
             setEditingPlan(null);
           }}
           onCreate={(data) => createPlanMutation.mutate(data)}
           onUpdate={(id, data) => updatePlanMutation.mutate({ id, data })}
-          onAddItem={() => undefined}
           isLoading={createPlanMutation.isPending || updatePlanMutation.isPending}
         />
       )}
@@ -838,21 +861,17 @@ function PlanFormModal({
   plan,
   stores,
   users,
-  existingItems,
   onClose,
   onCreate,
   onUpdate,
-  onAddItem,
   isLoading,
 }: {
   plan: ControlPlan | null;
   stores: any[];
   users: any[];
-  existingItems: ControlPlanItem[];
   onClose: () => void;
   onCreate: (data: any) => void;
   onUpdate: (id: number, data: any) => void;
-  onAddItem: (data: Partial<ControlPlanItem>) => void;
   isLoading: boolean;
 }) {
   const isEdit = !!plan;
@@ -879,13 +898,6 @@ function PlanFormModal({
           },
         ]
   );
-
-  const [newItem, setNewItem] = useState({
-    store_id: '',
-    planned_date: todayApi(),
-    assigned_to: '',
-    notes: '',
-  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1165,76 +1177,6 @@ function PlanFormModal({
                 </div>
               </section>
             )}
-
-            {isEdit && (
-              <section className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-400">
-                  2. Dodaj novu aktivnost
-                </h3>
-                {existingItems.length > 0 && (
-                  <p className="text-xs text-gray-500">
-                    Postojeće aktivnosti ({existingItems.length}) uređujete u checklisti plana.
-                  </p>
-                )}
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <select
-                    value={newItem.store_id}
-                    onChange={(e) => setNewItem({ ...newItem, store_id: e.target.value })}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="">Prodavnica</option>
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} {s.code ? `(${s.code})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    value={newItem.planned_date}
-                    onChange={(e) => setNewItem({ ...newItem, planned_date: e.target.value })}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                  <select
-                    value={newItem.assigned_to}
-                    onChange={(e) => setNewItem({ ...newItem, assigned_to: e.target.value })}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:col-span-2"
-                  >
-                    <option value="">Izvršilac</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  disabled={!newItem.store_id || !newItem.planned_date || isLoading}
-                  onClick={() => {
-                    onAddItem({
-                      store_id: parseInt(newItem.store_id, 10),
-                      planned_date: newItem.planned_date,
-                      assigned_to: newItem.assigned_to
-                        ? parseInt(newItem.assigned_to, 10)
-                        : undefined,
-                      notes: newItem.notes || undefined,
-                      priority: 0,
-                    });
-                    setNewItem({
-                      store_id: '',
-                      planned_date: todayApi(),
-                      assigned_to: '',
-                      notes: '',
-                    });
-                  }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-teal-600 px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50 dark:text-teal-400 dark:hover:bg-teal-900/20"
-                >
-                  <Plus className="h-4 w-4" />
-                  Dodaj aktivnost u plan
-                </button>
-              </section>
-            )}
           </div>
 
           <div className="flex shrink-0 justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-700">
@@ -1251,6 +1193,141 @@ function PlanFormModal({
               className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
             >
               {isLoading ? 'Čuvanje...' : isEdit ? 'Sačuvaj izmjene' : 'Kreiraj plan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ActivityFormModal({
+  item,
+  stores,
+  users,
+  onClose,
+  onSubmit,
+  isLoading,
+}: {
+  item: ControlPlanItem | null;
+  stores: any[];
+  users: any[];
+  onClose: () => void;
+  onSubmit: (data: ControlPlanItemInput) => void;
+  isLoading: boolean;
+}) {
+  const isEdit = !!item;
+  const [formData, setFormData] = useState({
+    store_id: item?.store_id ? String(item.store_id) : '',
+    planned_date: toApiDate(item?.planned_date) || todayApi(),
+    assigned_to: item?.assigned_to ? String(item.assigned_to) : '',
+    notes: item?.notes || '',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      store_id: parseInt(formData.store_id, 10),
+      planned_date: formData.planned_date,
+      assigned_to: formData.assigned_to ? parseInt(formData.assigned_to, 10) : null,
+      notes: formData.notes.trim() || null,
+    });
+  };
+
+  const inputClass =
+    'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl dark:bg-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            {isEdit ? 'Uredi aktivnost' : 'Dodaj aktivnost'}
+          </h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 p-5">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Prodavnica *
+              </label>
+              <select
+                required
+                value={formData.store_id}
+                onChange={(e) => setFormData({ ...formData, store_id: e.target.value })}
+                className={inputClass}
+              >
+                <option value="">Odaberi prodavnicu</option>
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.code ? `(${s.code})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Planirani datum *
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.planned_date}
+                onChange={(e) => setFormData({ ...formData, planned_date: e.target.value })}
+                className={inputClass}
+              />
+              {formData.planned_date && (
+                <p className="mt-1 text-xs text-gray-500">{formatDate(formData.planned_date)}</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Izvršilac
+              </label>
+              <select
+                value={formData.assigned_to}
+                onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                className={inputClass}
+              >
+                <option value="">Bez izvršioca</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Napomena
+              </label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+            >
+              Otkaži
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading || !formData.store_id || !formData.planned_date}
+              className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Čuvanje...' : isEdit ? 'Sačuvaj izmjene' : 'Dodaj aktivnost'}
             </button>
           </div>
         </form>

@@ -492,6 +492,7 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
         Route::get('/overview-stats', [RetailControlPlansController::class, 'getOverviewStats']);
         
         // Reports
+        Route::get('/reports/overview', [RetailControlPlansController::class, 'getReportsOverview']);
         Route::get('/reports', [RetailControlPlansController::class, 'getReports']);
         
         // Education plans
