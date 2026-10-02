@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import ControlPlansSection from '../components/ControlPlansTab';
+import RetailReports from '../components/RetailReports';
 
 import { useLocation } from 'react-router-dom';
 
@@ -52,13 +53,9 @@ import {
 
   List,
 
-  Grid,
-
   ChevronLeft,
 
   ChevronRight,
-
-  Upload,
 
   Check,
 
@@ -68,7 +65,12 @@ import {
 
   Lock,
 
-  PenTool
+  PenTool,
+  Circle,
+  XCircle,
+  Sparkles,
+  ListTodo,
+  Loader2,
 
 } from 'lucide-react';
 
@@ -106,16 +108,7 @@ import {
 } from '../../../services/retailEducationPlansService';
 
 import { getStores, getEmployees, getDepartments } from '../../../services/hrmService';
-import * as hrmService from '../../../services/hrmService';
-import * as salesService from '../../../services/salesService';
-
 import { apiService } from '../../../services/api';
-
-import {
-  SalesResultsUploadModal,
-  SalesDashboardTab,
-  SalesPlansUploadModal,
-} from '../components/SalesComponents';
 
 import ManagerEvaluationInfo from '../components/ManagerEvaluationInfo';
 import ManagerBenefits from '../components/ManagerBenefits';
@@ -476,6 +469,10 @@ function OverviewTab() {
 
 // Reports Tab
 function ReportsTab() {
+  return <RetailReports listView={<ReportsListView />} />;
+}
+
+function ReportsListView() {
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [reportType, setReportType] = useState<'all' | 'plans' | 'activities' | 'educations'>('all');
@@ -493,6 +490,10 @@ function ReportsTab() {
   const { data: reportsData, isLoading } = useQuery({
     queryKey: ['retail-reports', startDate, endDate, reportType],
     queryFn: () => getRetailReports({ start_date: startDate, end_date: endDate, type: reportType }),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
   });
 
   const reports = reportsData?.reports || [];
@@ -580,15 +581,6 @@ function ReportsTab() {
 
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-xs sm:text-sm lg:text-xl font-semibold text-gray-900 dark:text-white mb-1 sm:mb-1.5 lg:mb-4">Izvještaji</h2>
-          <p className="text-[8px] sm:text-[9px] lg:text-sm text-gray-500 dark:text-gray-400">
-            Analitika i izvještaji za maloprodaju
-          </p>
-        </div>
-      </div>
-
       {/* Filters and View Toggle - Mobile Responsive */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-2 sm:p-3 lg:p-4">
         <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 lg:gap-4">
@@ -818,14 +810,86 @@ function ReportsTab() {
     </div>
   );
 }
+const EDUCATION_STATUS_CONFIG: Record<
+  EducationPlanStatus,
+  { label: string; color: string; icon: typeof Clock }
+> = {
+  planned: {
+    label: 'Planirano',
+    color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+    icon: Circle,
+  },
+  in_progress: {
+    label: 'U toku',
+    color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
+    icon: Clock,
+  },
+  completed: {
+    label: 'Završeno',
+    color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    icon: CheckCircle2,
+  },
+  cancelled: {
+    label: 'Otkazano',
+    color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    icon: XCircle,
+  },
+};
+
+function EducationKpiCard({
+  icon,
+  iconBg,
+  value,
+  label,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  value: string | number;
+  label: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex items-center gap-3">
+        <div className={`rounded-lg p-2 ${iconBg}`}>{icon}</div>
+        <div className="min-w-0">
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EducationFilterPill({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+        active
+          ? 'bg-teal-600 text-white'
+          : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 // Education Plans Tab
 function EducationPlansTab() {
   const queryClient = useQueryClient();
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<EducationPlan | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'table' | 'calendar'>('grid');
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [filters, setFilters] = useState({
     store_id: undefined as number | undefined,
     status: 'all' as EducationPlanStatus | 'all',
@@ -835,11 +899,24 @@ function EducationPlansTab() {
 
   const { data: plansData, isLoading, error: plansError } = useQuery({
     queryKey: ['retail-education-plans', filters],
-    queryFn: () => getEducationPlans(filters),
+    queryFn: () => getEducationPlans({ ...filters, search: filters.search.trim() || undefined, per_page: 200 }),
     retry: 1,
   });
 
   const plans = plansData?.data || [];
+
+  const { data: kpiData } = useQuery({
+    queryKey: ['retail-education-plans', 'kpi'],
+    queryFn: () => getEducationPlans({ per_page: 1000 }),
+  });
+
+  const kpiPlans: EducationPlan[] = kpiData?.data || [];
+
+  const isThisMonth = (date?: string) => {
+    if (!date) return false;
+    const now = new Date();
+    return date.slice(0, 7) === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  };
 
   const { data: storesResponse } = useQuery({
     queryKey: ['hrm-stores-education'],
@@ -899,6 +976,7 @@ function EducationPlansTab() {
     mutationFn: createEducationPlan,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['retail-education-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['retail-reports-overview'] });
       setShowPlanModal(false);
       setSelectedStoreId(null);
       toast.success('Plan edukacije je uspješno kreiran');
@@ -912,6 +990,7 @@ function EducationPlansTab() {
     mutationFn: ({ id, data }: { id: number; data: Partial<EducationPlan> }) => updateEducationPlan(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['retail-education-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['retail-reports-overview'] });
       setShowPlanModal(false);
       setSelectedPlan(null);
       toast.success('Plan edukacije je uspješno ažuriran');
@@ -925,6 +1004,7 @@ function EducationPlansTab() {
     mutationFn: deleteEducationPlan,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['retail-education-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['retail-reports-overview'] });
       toast.success('Plan edukacije je uspješno obrisan');
     },
     onError: (error: any) => {
@@ -947,141 +1027,113 @@ function EducationPlansTab() {
   const getTypeLabel = (type: EducationType) => {
     const labels = {
       internal: 'Interna',
-      external: 'Externa',
+      external: 'Eksterna',
       online: 'Online',
       workshop: 'Radionica',
     };
     return labels[type];
   };
 
-  const getStatusBadge = (status: EducationPlanStatus) => {
-    const badges = {
-      planned: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-      in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-      cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    };
-    return badges[status];
-  };
+  const selectClass =
+    'rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white';
 
   return (
-    <div className="space-y-3 sm:space-y-4 lg:space-y-6">
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-4">Plan Edukacija</h2>
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Planiranje edukacija za zaposlene u maloprodaji
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+            <GraduationCap className="h-7 w-7 text-teal-500" />
+            Plan edukacija
+          </h2>
+          <p className="mt-1 text-gray-500 dark:text-gray-400">
+            Menadžer planira edukacije za zaposlene; izvršene edukacije označavaju se kao završene
           </p>
         </div>
         <button
           onClick={handleCreatePlan}
-          className="px-3 sm:px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center justify-center gap-2 text-sm sm:text-base w-full sm:w-auto"
+          className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-teal-700"
         >
-          <Plus className="w-4 h-4" />
-          Novi plan
+          <Sparkles className="h-5 w-5" />
+          Nova edukacija
         </button>
       </div>
 
-      {/* View Mode Switcher */}
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-1">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'grid'
-                ? 'bg-teal-600 text-white'
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-            title="Grid prikaz"
-          >
-            <Grid className="w-4 h-4" />
-            <span className="hidden sm:inline">Grid</span>
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'table'
-                ? 'bg-teal-600 text-white'
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-            title="Tabelarni prikaz"
-          >
-            <List className="w-4 h-4" />
-            <span className="hidden sm:inline">Tabela</span>
-          </button>
-          <button
-            onClick={() => setViewMode('calendar')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'calendar'
-                ? 'bg-teal-600 text-white'
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-            title="Kalendarski prikaz"
-          >
-            <CalendarIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Kalendar</span>
-          </button>
-        </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <EducationKpiCard
+          icon={<ListTodo className="h-5 w-5 text-gray-600 dark:text-gray-400" />}
+          iconBg="bg-gray-100 dark:bg-gray-700"
+          value={kpiPlans.length}
+          label="Ukupno edukacija"
+        />
+        <EducationKpiCard
+          icon={<Clock className="h-5 w-5 text-teal-600 dark:text-teal-400" />}
+          iconBg="bg-teal-100 dark:bg-teal-900/30"
+          value={kpiPlans.filter((p) => p.status === 'planned' || p.status === 'in_progress').length}
+          label="Planirane / u toku"
+        />
+        <EducationKpiCard
+          icon={<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
+          iconBg="bg-green-100 dark:bg-green-900/30"
+          value={kpiPlans.filter((p) => p.status === 'completed').length}
+          label="Završene"
+        />
+        <EducationKpiCard
+          icon={<CalendarIcon className="h-5 w-5 text-sky-600 dark:text-sky-400" />}
+          iconBg="bg-sky-100 dark:bg-sky-900/30"
+          value={kpiPlans.filter((p) => isThisMonth(p.education_date)).length}
+          label="Ovaj mjesec"
+        />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-2 sm:p-3 lg:p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prodavnica</label>
-            <select
-              value={filters.store_id || ''}
-              onChange={(e) => setFilters({ ...filters, store_id: e.target.value ? parseInt(e.target.value) : undefined })}
-              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm"
-            >
-              <option value="">Sve prodavnice</option>
-              {stores?.map((store) => (
-                <option key={store.id} value={store.id}>
-                  {store.name} {store.code ? `(${store.code})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] sm:text-xs lg:text-sm font-medium text-gray-700 dark:text-gray-300 mb-0.5 sm:mb-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value as EducationPlanStatus | 'all' })}
-              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm"
-            >
-              <option value="all">Svi statusi</option>
-              <option value="planned">Planirano</option>
-              <option value="in_progress">U toku</option>
-              <option value="completed">Završeno</option>
-              <option value="cancelled">Otkazano</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tip edukacije</label>
-            <select
-              value={filters.education_type}
-              onChange={(e) => setFilters({ ...filters, education_type: e.target.value as EducationType | 'all' })}
-              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm"
-            >
-              <option value="all">Svi tipovi</option>
-              <option value="internal">Interna</option>
-              <option value="external">Externa</option>
-              <option value="online">Online</option>
-              <option value="workshop">Radionica</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pretraga</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                placeholder="Pretraži planove..."
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <EducationFilterPill
+            active={filters.status === 'all'}
+            onClick={() => setFilters({ ...filters, status: 'all' })}
+            label="Sve"
+          />
+          {(Object.keys(EDUCATION_STATUS_CONFIG) as EducationPlanStatus[]).map((s) => (
+            <EducationFilterPill
+              key={s}
+              active={filters.status === s}
+              onClick={() => setFilters({ ...filters, status: s })}
+              label={EDUCATION_STATUS_CONFIG[s].label}
+            />
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filters.store_id || ''}
+            onChange={(e) => setFilters({ ...filters, store_id: e.target.value ? parseInt(e.target.value) : undefined })}
+            className={selectClass}
+          >
+            <option value="">Sve prodavnice</option>
+            {stores?.map((store: any) => (
+              <option key={store.id} value={store.id}>
+                {store.name} {store.code ? `(${store.code})` : ''}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filters.education_type}
+            onChange={(e) => setFilters({ ...filters, education_type: e.target.value as EducationType | 'all' })}
+            className={selectClass}
+          >
+            <option value="all">Svi tipovi</option>
+            <option value="internal">Interna</option>
+            <option value="external">Eksterna</option>
+            <option value="online">Online</option>
+            <option value="workshop">Radionica</option>
+          </select>
+          <div className="relative w-full sm:w-56">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="Pretraži edukacije..."
+              className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
           </div>
         </div>
       </div>
@@ -1096,165 +1148,137 @@ function EducationPlansTab() {
           </p>
         </div>
       ) : isLoading ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-          <p className="mt-2 text-gray-500 dark:text-gray-400">Učitavanje planova...</p>
+        <div className="flex items-center justify-center gap-2 py-16 text-gray-500">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          Učitavanje edukacija...
         </div>
       ) : plans.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
-          <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">Nema planova edukacija. Kliknite "Novi plan" da kreirate prvi plan.</p>
-        </div>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {plans.map((plan: EducationPlan) => (
-            <div
-              key={plan.id}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{plan.title}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{getTypeLabel(plan.education_type)}</p>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(plan.status)}`}>
-                  {plan.status === 'planned' ? 'Planirano' : 
-                   plan.status === 'in_progress' ? 'U toku' :
-                   plan.status === 'completed' ? 'Završeno' : 'Otkazano'}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">{plan.description || plan.topic}</p>
-              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                <div className="flex items-center gap-2">
-                  <Store className="w-4 h-4" />
-                  <span>{plan.store_name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  <span>{plan.employee_name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4" />
-                  <span>{formatDate(plan.education_date)}</span>
-                  {plan.start_time && (
-                    <span className="text-xs">({plan.start_time} - {plan.end_time || 'TBA'})</span>
-                  )}
-                </div>
-                {plan.instructor_name && (
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    <span>Instruktor: {plan.instructor_name}</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditPlan(plan)}
-                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                >
-                  Uredi
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm('Da li ste sigurni da želite obrisati ovaj plan edukacije?')) {
-                      deletePlanMutation.mutate(plan.id);
-                    }
-                  }}
-                  className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : viewMode === 'table' ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="overflow-x-auto -mx-2 sm:-mx-3 lg:mx-0 px-2 sm:px-3 lg:px-0">
-            <table className="w-full min-w-[350px] sm:min-w-[450px] lg:min-w-[600px]">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <th className="px-1 sm:px-1.5 lg:px-6 py-1 sm:py-1.5 lg:py-3 text-left text-[8px] sm:text-[9px] lg:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Naziv edukacije</th>
-                  <th className="px-1 sm:px-1.5 lg:px-6 py-1 sm:py-1.5 lg:py-3 text-left text-[8px] sm:text-[9px] lg:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Tip</th>
-                  <th className="px-1 sm:px-1.5 lg:px-6 py-1 sm:py-1.5 lg:py-3 text-left text-[8px] sm:text-[9px] lg:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Prodavnica</th>
-                  <th className="px-1 sm:px-1.5 lg:px-6 py-1 sm:py-1.5 lg:py-3 text-left text-[8px] sm:text-[9px] lg:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Zaposleni</th>
-                  <th className="px-1 sm:px-1.5 lg:px-6 py-1 sm:py-1.5 lg:py-3 text-left text-[8px] sm:text-[9px] lg:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Datum</th>
-                  <th className="px-1 sm:px-1.5 lg:px-6 py-1 sm:py-1.5 lg:py-3 text-left text-[8px] sm:text-[9px] lg:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                  <th className="px-1 sm:px-1.5 lg:px-6 py-1 sm:py-1.5 lg:py-3 text-left text-[8px] sm:text-[9px] lg:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Akcije</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {plans.map((plan: EducationPlan) => (
-                  <tr key={plan.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4">
-                      <div>
-                        <div className="text-[8px] sm:text-[9px] lg:text-sm font-medium text-gray-900 dark:text-white">{plan.title}</div>
-                        {(plan.description || plan.topic) && (
-                          <div className="text-[7px] sm:text-[8px] lg:text-sm text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{plan.description || plan.topic}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap hidden sm:table-cell">
-                      <span className="text-[8px] sm:text-[9px] lg:text-sm text-gray-900 dark:text-white">{getTypeLabel(plan.education_type)}</span>
-                    </td>
-                    <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap text-[8px] sm:text-[9px] lg:text-sm text-gray-900 dark:text-white">
-                      {plan.store_name || '-'}
-                    </td>
-                    <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap text-[8px] sm:text-[9px] lg:text-sm text-gray-900 dark:text-white hidden md:table-cell">
-                      {plan.employee_name || '-'}
-                    </td>
-                    <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap text-[8px] sm:text-[9px] lg:text-sm text-gray-900 dark:text-white">
-                      {formatDate(plan.education_date)}
-                      {plan.start_time && (
-                        <div className="text-[7px] sm:text-[8px] lg:text-xs text-gray-500 dark:text-gray-400">
-                          {plan.start_time} - {plan.end_time || 'TBA'}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap">
-                      <span className={`px-0.5 sm:px-1 lg:px-2 py-0.5 rounded-full text-[7px] sm:text-[8px] lg:text-xs font-medium ${getStatusBadge(plan.status)}`}>
-                        {plan.status === 'planned' ? 'Planirano' : 
-                         plan.status === 'in_progress' ? 'U toku' :
-                         plan.status === 'completed' ? 'Završeno' : 'Otkazano'}
-                      </span>
-                    </td>
-                    <td className="px-1 sm:px-1.5 lg:px-6 py-1.5 sm:py-2 lg:py-4 whitespace-nowrap text-[8px] sm:text-[9px] lg:text-sm font-medium">
-                      <div className="flex gap-0.5 sm:gap-1">
-                        <button
-                          onClick={() => handleEditPlan(plan)}
-                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                          title="Uredi"
-                        >
-                          <Edit className="w-2.5 h-2.5 sm:w-3 sm:h-3 lg:w-4 lg:h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm('Da li ste sigurni da želite obrisati ovaj plan edukacije?')) {
-                              deletePlanMutation.mutate(plan.id);
-                            }
-                          }}
-                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                          title="Obriši"
-                        >
-                          <Trash2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 lg:w-4 lg:h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center dark:border-gray-700 dark:bg-gray-800">
+          <AlertCircle className="mx-auto mb-3 h-12 w-12 text-gray-300" />
+          <p className="mb-4 text-gray-500 dark:text-gray-400">Nema edukacija. Kreirajte prvu edukaciju.</p>
+          <button
+            onClick={handleCreatePlan}
+            className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 font-medium text-white hover:bg-teal-700"
+          >
+            <Plus className="h-4 w-4" />
+            Nova edukacija
+          </button>
         </div>
       ) : (
-        <EducationCalendarView
-          plans={plans}
-          currentDate={currentDate}
-          setCurrentDate={setCurrentDate}
-          onPlanClick={handleEditPlan}
-          getTypeLabel={getTypeLabel}
-          getStatusBadge={getStatusBadge}
-        />
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+            {plans.map((plan: EducationPlan) => {
+              const statusCfg = EDUCATION_STATUS_CONFIG[plan.status] || EDUCATION_STATUS_CONFIG.planned;
+              const StatusIcon = statusCfg.icon;
+              const done = plan.status === 'completed';
+              const cancelled = plan.status === 'cancelled';
+              return (
+                <li
+                  key={plan.id}
+                  className={`flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${
+                    done ? 'bg-green-50/50 dark:bg-green-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-700/40'
+                  }`}
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <button
+                      type="button"
+                      disabled={cancelled || updatePlanMutation.isPending}
+                      onClick={() =>
+                        updatePlanMutation.mutate({
+                          id: plan.id,
+                          data: done
+                            ? { status: 'planned', completed_date: null as unknown as undefined }
+                            : { status: 'completed', completed_date: new Date().toISOString().slice(0, 10) },
+                        })
+                      }
+                      className="mt-0.5 shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
+                      title={done ? 'Vrati na planirano' : 'Označi kao završeno'}
+                    >
+                      {done ? (
+                        <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <Circle className="h-6 w-6 text-gray-400 hover:text-teal-500" />
+                      )}
+                    </button>
+                    <button type="button" onClick={() => handleEditPlan(plan)} className="min-w-0 text-left">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p
+                          className={`truncate font-semibold text-gray-900 dark:text-white ${
+                            done ? 'line-through opacity-70' : ''
+                          }`}
+                        >
+                          {plan.title}
+                        </p>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.color}`}
+                        >
+                          <StatusIcon className="h-3 w-3" />
+                          {statusCfg.label}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        {getTypeLabel(plan.education_type)}
+                        {plan.topic ? ` · ${plan.topic}` : ''}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarIcon className="h-3.5 w-3.5" />
+                          {formatDate(plan.education_date)}
+                          {plan.start_time ? ` · ${plan.start_time.slice(0, 5)}${plan.end_time ? `–${plan.end_time.slice(0, 5)}` : ''}` : ''}
+                        </span>
+                        {plan.store_name && (
+                          <span className="inline-flex items-center gap-1">
+                            <Store className="h-3.5 w-3.5" />
+                            {plan.store_name}
+                          </span>
+                        )}
+                        {plan.employee_name && (
+                          <span className="inline-flex items-center gap-1">
+                            <User className="h-3.5 w-3.5" />
+                            {plan.employee_name}
+                          </span>
+                        )}
+                        {plan.instructor_name && (
+                          <span className="inline-flex items-center gap-1">
+                            <Users className="h-3.5 w-3.5" />
+                            Instruktor: {plan.instructor_name}
+                          </span>
+                        )}
+                        {done && plan.completed_date && (
+                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
+                            Završeno: {formatDate(plan.completed_date)}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 self-end sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => handleEditPlan(plan)}
+                      className="rounded-lg p-2 text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-900/20"
+                      title="Uredi edukaciju"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Da li ste sigurni da želite obrisati ovu edukaciju?')) {
+                          deletePlanMutation.mutate(plan.id);
+                        }
+                      }}
+                      className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      title="Obriši edukaciju"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       {showPlanModal && (
@@ -1282,199 +1306,6 @@ function EducationPlansTab() {
           isLoading={createPlanMutation.isPending || updatePlanMutation.isPending}
         />
       )}
-    </div>
-  );
-}
-
-// Education Calendar View Component
-function EducationCalendarView({
-  plans,
-  currentDate,
-  setCurrentDate,
-  onPlanClick,
-  getTypeLabel,
-  getStatusBadge,
-}: {
-  plans: EducationPlan[];
-  currentDate: Date;
-  setCurrentDate: (date: Date) => void;
-  onPlanClick: (plan: EducationPlan) => void;
-  getTypeLabel: (type: EducationType) => string;
-  getStatusBadge: (status: EducationPlanStatus) => string;
-}) {
-  const weekDays = ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned'];
-  const monthNames = [
-    'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun',
-    'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'
-  ];
-
-  const getDaysInMonth = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
-
-    const days: (Date | null)[] = [];
-    
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-    
-    // Add all days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(new Date(year, month, day));
-    }
-    
-    return days;
-  };
-
-  const getPlansForDate = (date: Date | null) => {
-    if (!date) return [];
-    
-    const dateStr = date.toISOString().split('T')[0];
-    return plans.filter(plan => {
-      if (!plan.education_date) return false;
-      const planDate = new Date(plan.education_date).toISOString().split('T')[0];
-      return planDate === dateStr;
-    });
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-    if (direction === 'prev') {
-      newDate.setMonth(newDate.getMonth() - 1);
-    } else {
-      newDate.setMonth(newDate.getMonth() + 1);
-    }
-    setCurrentDate(newDate);
-  };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
-  };
-
-  const days = getDaysInMonth();
-  const today = new Date();
-
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-      {/* Calendar Header */}
-      <div className="p-2 sm:p-3 lg:p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigateMonth('prev')}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </h3>
-            <button
-              onClick={() => navigateMonth('next')}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-          <button
-            onClick={goToToday}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm"
-          >
-            Danas
-          </button>
-        </div>
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-teal-400 bg-teal-50 dark:bg-teal-900/20 rounded"></div>
-            <span className="text-gray-700 dark:text-gray-300">Planirana edukacija</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border border-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded"></div>
-            <span className="text-gray-700 dark:text-gray-300">Današnji dan</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Calendar Grid */}
-      <div className="p-2 sm:p-3 lg:p-4">
-        <div className="grid grid-cols-7 gap-2 mb-2">
-          {weekDays.map((day) => (
-            <div
-              key={day}
-              className="p-2 text-center text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-2">
-          {days.map((day, index) => {
-            const isToday = day && day.toDateString() === today.toDateString();
-            const isCurrentMonth = day && day.getMonth() === currentDate.getMonth();
-            const dayPlans = getPlansForDate(day);
-
-            // Determine border style
-            let borderClass = 'border-gray-200 dark:border-gray-700';
-            if (dayPlans.length > 0 && !isToday) {
-              borderClass = 'border-teal-400 dark:border-teal-500 border-2';
-            } else if (isToday) {
-              borderClass = 'border-blue-400 dark:border-blue-500';
-            }
-
-            return (
-              <div
-                key={index}
-                className={`min-h-[100px] p-2 border rounded-lg relative ${
-                  isToday && dayPlans.length === 0 ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                } ${dayPlans.length > 0 && !isToday ? 'bg-teal-50 dark:bg-teal-900/20' : ''} ${
-                  !isCurrentMonth ? 'opacity-40' : ''
-                } ${day ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50' : ''} ${borderClass}`}
-              >
-                {day && (
-                  <>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className={`text-sm font-medium ${isToday ? 'text-blue-600 dark:text-blue-400' : dayPlans.length > 0 ? 'text-teal-600 dark:text-teal-400 font-semibold' : 'text-gray-700 dark:text-gray-300'}`}>
-                        {day.getDate()}
-                      </div>
-                      {dayPlans.length > 0 && (
-                        <span className="text-xs bg-teal-500 text-white rounded-full px-1.5 py-0.5 font-semibold" title="Planirana edukacija">
-                          {dayPlans.length}
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      {dayPlans.slice(0, 2).map((plan) => (
-                        <div
-                          key={plan.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onPlanClick(plan);
-                          }}
-                          className="text-xs p-1 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 rounded truncate hover:bg-teal-200 dark:hover:bg-teal-900/50 cursor-pointer"
-                          title={`${plan.title} - ${plan.employee_name}`}
-                        >
-                          {plan.title}
-                        </div>
-                      ))}
-                      {dayPlans.length > 2 && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          +{dayPlans.length - 2} više
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -5590,257 +5421,18 @@ function ControlRecordSigningTab({
 }
 
 function ResultsTab() {
-  const queryClient = useQueryClient();
-  const { user } = useAuthStore();
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard'>('dashboard');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>();
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | undefined>();
-  const [showUploadPlansModal, setShowUploadPlansModal] = useState(false);
-  const [showUploadResultsModal, setShowUploadResultsModal] = useState(false);
-
-  // Check if user is admin
-  const userRoleString = user?.role?.toLowerCase() || '';
-  const userRolesArray = (user as any)?.roles || [];
-  const isAdmin = userRoleString === 'admin' || 
-                  userRoleString === 'super-admin' ||
-                  userRolesArray.some((r: string) => r?.toLowerCase() === 'admin' || r?.toLowerCase() === 'super-admin');
-
-  // Fetch stores and employees
-  const { data: storesData } = useQuery({
-    queryKey: ['hrm-stores'],
-    queryFn: () => hrmService.getStores({ is_active: true }),
-  });
-
-  const stores = storesData?.data || storesData || [];
-
-  const { data: employeesData } = useQuery({
-    queryKey: ['hrm-employees-all'],
-    queryFn: () => hrmService.getEmployees({ status: 'active', per_page: 1000 }),
-  });
-
-  const employees = employeesData?.data || employeesData || [];
-
-  // Fetch plans, results, performance
-  const { data: plansData } = useQuery({
-    queryKey: ['sales-plans', selectedYear, selectedMonth, selectedStoreId, selectedEmployeeId],
-    queryFn: async () => {
-      const response = await salesService.getSalesPlans({
-        year: selectedYear,
-        month: selectedMonth,
-        store_id: selectedStoreId,
-        employee_id: selectedEmployeeId,
-      });
-      return response.data || response || [];
-    },
-  });
-
-  const plans = plansData || [];
-
-  const { data: resultsData } = useQuery({
-    queryKey: ['sales-results', selectedYear, selectedMonth, selectedStoreId, selectedEmployeeId],
-    queryFn: async () => {
-      const response = await salesService.getSalesResults({
-        year: selectedYear,
-        month: selectedMonth,
-        store_id: selectedStoreId,
-        employee_id: selectedEmployeeId,
-      });
-      return response.data || response || [];
-    },
-  });
-
-  const results = resultsData || [];
-
-  const { data: performanceData } = useQuery({
-    queryKey: ['sales-performance', selectedYear, selectedMonth, selectedStoreId, selectedEmployeeId],
-    queryFn: async () => {
-      const response = await salesService.getSalesPerformance({
-        year: selectedYear,
-        month: selectedMonth,
-        store_id: selectedStoreId,
-        employee_id: selectedEmployeeId,
-      });
-      return response.data || response || [];
-    },
-  });
-
-  const performance = performanceData || [];
-
-  // Note: Plan mutations are no longer used since plans are uploaded via Excel
-  // Keeping them for potential future use, but they're not referenced in the UI
-
-  const uploadPlansMutation = useMutation({
-    mutationFn: ({ file, overwrite }: { file: File; overwrite?: boolean }) =>
-      salesService.uploadSalesPlans(file, overwrite),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['sales-plans'] });
-      queryClient.invalidateQueries({ queryKey: ['sales-performance'] });
-      if (data.error_count > 0) {
-        toast.error(`Upload završen sa greškama. Uspješno: ${data.success_count}, Greške: ${data.error_count}`);
-      } else {
-        toast.success(`Uspješno učitano ${data.success_count} planova`);
-      }
-      setShowUploadPlansModal(false);
-    },
-    onError: (error: any) => {
-      console.error('Upload plans error:', error);
-      const errorMessage = error?.response?.data?.message || 
-                          error?.response?.data?.error || 
-                          error?.message || 
-                          'Greška pri učitavanju planova';
-      toast.error(errorMessage);
-    },
-  });
-
-  const uploadResultsMutation = useMutation({
-    mutationFn: ({ file, storeId, overwrite }: { file: File; storeId?: number; overwrite?: boolean }) =>
-      salesService.uploadSalesResults(file, storeId, overwrite),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['sales-results'] });
-      queryClient.invalidateQueries({ queryKey: ['sales-performance'] });
-      if (data.error_count > 0) {
-        toast.error(`Upload završen sa greškama. Uspješno: ${data.success_count}, Greške: ${data.error_count}`);
-      } else {
-        toast.success(`Uspješno učitano ${data.success_count} rezultata`);
-      }
-      setShowUploadResultsModal(false);
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.error || 'Greška pri učitavanju rezultata');
-    },
-  });
-
-  const months = [
-    'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun',
-    'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar'
-  ];
-
   return (
-    <div className="space-y-2 sm:space-y-3 lg:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
-        <h2 className="text-xs sm:text-sm lg:text-xl font-semibold text-gray-900 dark:text-white break-words">
-          Ostvareni Rezultati
+    <div className="space-y-6">
+      <div>
+        <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+          <Award className="h-7 w-7 text-teal-500" />
+          Ostvareni rezultati
         </h2>
-        {isAdmin && (
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setShowUploadPlansModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Učitaj Planove
-            </button>
-            <button
-              onClick={() => setShowUploadResultsModal(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Učitaj Rezultate
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Godina
-          </label>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Mjesec
-          </label>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            {months.map((month, index) => (
-              <option key={index + 1} value={index + 1}>{month}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Prodavnica
-          </label>
-          <select
-            value={selectedStoreId || ''}
-            onChange={(e) => setSelectedStoreId(e.target.value ? Number(e.target.value) : undefined)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="">Sve prodavnice</option>
-            {stores?.map((store: any) => (
-              <option key={store.id} value={store.id}>{store.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Zaposlenik
-          </label>
-          <select
-            value={selectedEmployeeId || ''}
-            onChange={(e) => setSelectedEmployeeId(e.target.value ? Number(e.target.value) : undefined)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="">Svi zaposlenici</option>
-            {employees.map((emp: any) => (
-              <option key={emp.id} value={emp.id}>{emp.name}</option>
-            ))}
-          </select>
-        </div>
+      <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center dark:border-gray-600 dark:bg-gray-800">
+        <Award className="mx-auto mb-3 h-12 w-12 text-gray-300" />
+        <p className="text-gray-500 dark:text-gray-400">Ovaj dio je u pripremi.</p>
       </div>
-
-      {/* Dashboard Content */}
-      <SalesDashboardTab
-        plans={plans || []}
-        results={results || []}
-        performance={performance || []}
-        selectedYear={selectedYear}
-        selectedMonth={selectedMonth}
-      />
-
-      {/* Upload Plans Modal */}
-      {showUploadPlansModal && (
-        <SalesPlansUploadModal
-          onClose={() => setShowUploadPlansModal(false)}
-          onUpload={(file, overwrite) => {
-            uploadPlansMutation.mutate({ file, overwrite });
-          }}
-          isLoading={uploadPlansMutation.isPending}
-          uploadResult={uploadPlansMutation.data}
-        />
-      )}
-
-      {/* Upload Results Modal */}
-      {showUploadResultsModal && (
-        <SalesResultsUploadModal
-          stores={stores || []}
-          onClose={() => setShowUploadResultsModal(false)}
-          onUpload={(file, storeId, overwrite) => {
-            uploadResultsMutation.mutate({ file, storeId, overwrite });
-          }}
-          isLoading={uploadResultsMutation.isPending}
-          uploadResult={uploadResultsMutation.data}
-        />
-      )}
     </div>
   );
 }
- 
-
