@@ -29,6 +29,22 @@ export interface Course {
   user_enrollment?: Enrollment;
 }
 
+export interface LessonQuestionOption {
+  text: string;
+  is_correct: boolean;
+}
+
+export type LessonContentBlock =
+  | { id: string; type: 'text'; html: string }
+  | { id: string; type: 'image' | 'video'; url: string; caption?: string }
+  | {
+      id: string;
+      type: 'question';
+      question: string;
+      options: LessonQuestionOption[];
+      explanation?: string;
+    };
+
 export interface Lesson {
   id: number;
   course_id: number;
@@ -41,6 +57,7 @@ export interface Lesson {
   order: number;
   is_published: boolean;
   additional_files?: string[];
+  content_blocks?: LessonContentBlock[];
   user_progress?: {
     completed_at: string;
     is_completed: boolean;

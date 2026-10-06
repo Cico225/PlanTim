@@ -1604,6 +1604,8 @@ class LMSController extends Controller
                 }
             }
 
+            $lessonData['content_blocks'] = $this->decodeLessonContentBlocks($lessonData['content_blocks'] ?? null);
+
             // Decode JSON fields
             if (isset($lessonData['additional_files'])) {
                 if (is_string($lessonData['additional_files'])) {
@@ -1769,6 +1771,7 @@ class LMSController extends Controller
                 'is_preview' => 'boolean',
                 'type' => 'nullable|string|max:50',
                 'additional_files' => 'nullable|array',
+                'content_blocks' => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
@@ -1801,6 +1804,11 @@ class LMSController extends Controller
                 $actualColumn = $columnMappings[$key] ?? $key;
                 
                 if (in_array($actualColumn, $existingColumns)) {
+                    if ($key === 'content_blocks') {
+                        $insertData['content_blocks'] = json_encode($this->sanitizeLessonContentBlocks($value));
+                        continue;
+                    }
+
                     // Handle additional_files specially - it's an array
                     if ($key === 'additional_files') {
                         if (is_array($value) && count($value) > 0) {
@@ -1896,6 +1904,7 @@ class LMSController extends Controller
                 if (isset($lessonData['additional_files']) && $lessonData['additional_files']) {
                     $lessonData['additional_files'] = json_decode($lessonData['additional_files'], true);
                 }
+                $lessonData['content_blocks'] = $this->decodeLessonContentBlocks($lessonData['content_blocks'] ?? null);
                 
             // Map database columns to frontend expected names
             if (isset($lessonData['duration_minutes'])) {
@@ -2021,6 +2030,7 @@ class LMSController extends Controller
                 'is_preview' => 'boolean',
                 'type' => 'nullable|string|max:50',
                 'additional_files' => 'nullable|array',
+                'content_blocks' => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
@@ -2043,6 +2053,13 @@ class LMSController extends Controller
                     }
                     if (in_array('is_preview', $existingColumns)) {
                         $updateData['is_preview'] = !(bool) $value;
+                    }
+                    continue;
+                }
+
+                if ($key === 'content_blocks') {
+                    if (in_array('content_blocks', $existingColumns)) {
+                        $updateData['content_blocks'] = json_encode($this->sanitizeLessonContentBlocks($value));
                     }
                     continue;
                 }
@@ -2082,6 +2099,7 @@ class LMSController extends Controller
             if (isset($lessonData['additional_files']) && is_string($lessonData['additional_files'])) {
                 $lessonData['additional_files'] = json_decode($lessonData['additional_files'], true) ?? [];
             }
+            $lessonData['content_blocks'] = $this->decodeLessonContentBlocks($lessonData['content_blocks'] ?? null);
             if (isset($lessonData['duration_minutes'])) {
                 $lessonData['duration'] = $lessonData['duration_minutes'];
             }
@@ -2103,6 +2121,74 @@ class LMSController extends Controller
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
+    }
+
+    private function decodeLessonContentBlocks($value): array
+    {
+        if (is_string($value)) {
+            $value = json_decode($value, true);
+        }
+
+        return is_array($value) ? array_values($value) : [];
+    }
+
+    private function sanitizeLessonContentBlocks($blocks): array
+    {
+        if (!is_array($blocks)) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($blocks as $block) {
+            if (!is_array($block) || empty($block['type'])) {
+                continue;
+            }
+
+            $id = isset($block['id']) && is_string($block['id']) ? substr($block['id'], 0, 64) : uniqid('b', true);
+
+            switch ($block['type']) {
+                case 'text':
+                    $clean[] = ['id' => $id, 'type' => 'text', 'html' => (string) ($block['html'] ?? '')];
+                    break;
+                case 'image':
+                case 'video':
+                    if (trim((string) ($block['url'] ?? '')) === '') {
+                        break;
+                    }
+                    $clean[] = [
+                        'id' => $id,
+                        'type' => $block['type'],
+                        'url' => substr((string) $block['url'], 0, 1000),
+                        'caption' => (string) ($block['caption'] ?? ''),
+                    ];
+                    break;
+                case 'question':
+                    $options = [];
+                    foreach ((array) ($block['options'] ?? []) as $option) {
+                        $text = trim((string) (is_array($option) ? ($option['text'] ?? '') : $option));
+                        if ($text === '') {
+                            continue;
+                        }
+                        $options[] = [
+                            'text' => $text,
+                            'is_correct' => is_array($option) && !empty($option['is_correct']),
+                        ];
+                    }
+                    if (trim((string) ($block['question'] ?? '')) === '' || count($options) < 2) {
+                        break;
+                    }
+                    $clean[] = [
+                        'id' => $id,
+                        'type' => 'question',
+                        'question' => (string) $block['question'],
+                        'options' => $options,
+                        'explanation' => (string) ($block['explanation'] ?? ''),
+                    ];
+                    break;
+            }
+        }
+
+        return $clean;
     }
 
     /**
@@ -2225,7 +2311,28 @@ class LMSController extends Controller
                 ->first();
 
             if (!$enrollment) {
-                return response()->json(['message' => 'You must enroll in this course first'], 403);
+                // Lessons are viewable without explicit enrollment (e.g. admins/managers), so enroll on first completion.
+                $enrollmentData = [
+                    'course_id' => $courseId,
+                    'user_id' => $userId,
+                    'enrolled_at' => now(),
+                    'progress' => 0,
+                ];
+                if (Schema::hasColumn('lms_enrollments', 'min_passing_score')) {
+                    $enrollmentData['min_passing_score'] = 70;
+                }
+                if (Schema::hasColumn('lms_enrollments', 'created_at')) {
+                    $enrollmentData['created_at'] = now();
+                }
+                if (Schema::hasColumn('lms_enrollments', 'updated_at')) {
+                    $enrollmentData['updated_at'] = now();
+                }
+                DB::table('lms_enrollments')->insert($enrollmentData);
+
+                $enrollment = DB::table('lms_enrollments')
+                    ->where('course_id', $courseId)
+                    ->where('user_id', $userId)
+                    ->first();
             }
 
             // Mark lesson as completed
