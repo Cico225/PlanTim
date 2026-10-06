@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiCheckCircle, FiPlay, FiFile } from 'react-icons/fi';
+import { FiArrowLeft, FiCheckCircle, FiFile, FiLock } from 'react-icons/fi';
 import { lmsService, Lesson } from '@/services/lmsService';
 import VideoPlayer from './VideoPlayer';
+import LessonStepPlayer from './LessonStepPlayer';
 import toast from 'react-hot-toast';
 
 export default function LessonView() {
@@ -11,6 +12,7 @@ export default function LessonView() {
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
+  const [stepsFinished, setStepsFinished] = useState(true);
 
   // Check if video is from YouTube or Vimeo (requires iframe)
   const isExternalVideo = (url: string): boolean => {
@@ -100,6 +102,8 @@ export default function LessonView() {
   }
 
   const isCompleted = lesson.user_progress?.is_completed;
+  const contentBlocks = Array.isArray(lesson.content_blocks) ? lesson.content_blocks : [];
+  const canComplete = stepsFinished || contentBlocks.length === 0;
 
   return (
     <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
@@ -172,6 +176,17 @@ export default function LessonView() {
             style={{ maxWidth: '100%', wordWrap: 'break-word', overflowWrap: 'break-word' }}
             dangerouslySetInnerHTML={{ __html: lesson.content }}
           />
+        )}
+
+        {contentBlocks.length > 0 && (
+          <div className="mb-6">
+            <LessonStepPlayer
+              lessonId={lesson.id}
+              blocks={contentBlocks}
+              unlockAll={!!isCompleted}
+              onFinished={setStepsFinished}
+            />
+          </div>
         )}
 
         {/* Attachments - show only if attachments exist and additional_files don't, or if both exist, prefer attachments */}
@@ -359,11 +374,12 @@ export default function LessonView() {
           {!isCompleted && (
             <button
               onClick={handleComplete}
-              disabled={completing}
-              className="btn-primary flex items-center gap-2"
+              disabled={completing || !canComplete}
+              title={canComplete ? undefined : 'Odgovorite tačno na sva pitanja u lekciji'}
+              className="btn-primary flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <FiCheckCircle className="w-4 h-4" />
-              {completing ? 'Završavanje...' : 'Završi lekciju'}
+              {canComplete ? <FiCheckCircle className="w-4 h-4" /> : <FiLock className="w-4 h-4" />}
+              {completing ? 'Završavanje...' : canComplete ? 'Završi lekciju' : 'Odgovorite na sva pitanja'}
             </button>
           )}
         </div>

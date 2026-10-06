@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiUpload, FiX, FiImage, FiFile } from 'react-icons/fi';
-import { lmsService, Lesson } from '@/services/lmsService';
+import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiUpload, FiX, FiFile, FiLayers, FiChevronDown } from 'react-icons/fi';
+import { lmsService, LessonContentBlock } from '@/services/lmsService';
 import { apiService } from '@/services/api';
 import toast from 'react-hot-toast';
+import LessonContentBuilder, { validateContentBlocks } from './LessonContentBuilder';
 
 export default function LessonForm() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
@@ -28,6 +29,7 @@ export default function LessonForm() {
     is_published: true, // Default to published so lessons are visible
     additional_files: [] as string[],
   });
+  const [contentBlocks, setContentBlocks] = useState<LessonContentBlock[]>([]);
 
   useEffect(() => {
     if (isEdit && courseId && lessonId) {
@@ -53,6 +55,7 @@ export default function LessonForm() {
         is_published: lesson.is_published || false,
         additional_files: lesson.additional_files || [],
       });
+      setContentBlocks(Array.isArray(lesson.content_blocks) ? lesson.content_blocks : []);
       
       // Set image preview if image_url exists
       if (lesson.image_url) {
@@ -99,6 +102,12 @@ export default function LessonForm() {
       return;
     }
 
+    const blocksError = validateContentBlocks(contentBlocks);
+    if (blocksError) {
+      toast.error(blocksError);
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -108,6 +117,11 @@ export default function LessonForm() {
       const submitData = {
         ...formData,
         additional_files: filteredAdditionalFiles.length > 0 ? filteredAdditionalFiles : undefined,
+        content_blocks: contentBlocks.map((block) =>
+          block.type === 'question'
+            ? { ...block, options: block.options.filter((o) => o.text.trim()) }
+            : block
+        ),
         duration: formData.duration ? parseInt(formData.duration) : undefined,
         order: parseInt(formData.order),
       };
@@ -291,8 +305,8 @@ export default function LessonForm() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
-      <div className="max-w-4xl mx-auto">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 max-w-full overflow-x-clip">
+      <div className="max-w-5xl mx-auto space-y-4">
       <button
         onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}`)}
         className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
@@ -363,12 +377,41 @@ export default function LessonForm() {
             </div>
           </div>
 
-          {/* Content */}
+          {/* Step-by-step content */}
           <div className="space-y-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Sadržaj
-            </h2>
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+                <FiLayers className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sadržaj lekcije po koracima</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Složite tekst, slike, video i pitanja sa više izbora. Polaznik ide dalje tek kada potvrdi tačan
+                  odgovor.
+                </p>
+              </div>
+            </div>
 
+            <LessonContentBuilder blocks={contentBlocks} onChange={setContentBlocks} />
+          </div>
+
+          {/* Classic content */}
+          <details
+            className="group rounded-2xl border border-gray-200 dark:border-gray-700"
+            open={!!(formData.video_url || formData.image_url || formData.content)}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-4">
+              <span>
+                <span className="block font-semibold text-gray-900 dark:text-white">
+                  Klasični sadržaj (video, slika, HTML)
+                </span>
+                <span className="block text-sm text-gray-500 dark:text-gray-400">
+                  Prikazuje se iznad koraka lekcije
+                </span>
+              </span>
+              <FiChevronDown className="h-5 w-5 text-gray-500 transition group-open:rotate-180" />
+            </summary>
+          <div className="space-y-4 border-t border-gray-200 p-4 dark:border-gray-700">
             <div>
               <label className="label">Video URL</label>
               <input
@@ -456,6 +499,7 @@ export default function LessonForm() {
               />
             </div>
           </div>
+          </details>
 
           {/* Additional Files */}
           <div className="space-y-4 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -571,7 +615,7 @@ export default function LessonForm() {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex items-center justify-end gap-3 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6 dark:border-gray-700 dark:bg-gray-900/95">
             <button
               type="button"
               onClick={() => navigate(`/lms/maloprodaja/courses/${courseId}`)}

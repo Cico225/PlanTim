@@ -1,8 +1,9 @@
 {
-    "version": "1.2.32",
-    "version_name": "Release 2026-10-02",
-    "release_notes": "DOrada modula maloprodaja",
+    "version": "1.2.33",
+    "version_name": "Release 2026-10-06",
+    "release_notes": "dorada modula LMS",
     "changelog": [
+        "dorada modula LMS",
         "DOrada modula maloprodaja",
         "Dorada modula maloprodaja",
         "DOrada modula Rezervacije",
@@ -21,7 +22,6 @@
         "SSL dorada C",
         "ssl certifikat",
         "popravak sigurnosti",
-        "Novi backup baze podataka",
-        "Dodana nova funkcionalnost - skeniranje zabrana i automatsko OCR prepoznavanje"
+        "Novi backup baze podataka"
     ]
 }

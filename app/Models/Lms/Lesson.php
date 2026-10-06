@@ -22,6 +22,7 @@ class Lesson extends Model
         'order',
         'is_published',
         'additional_files',
+        'content_blocks',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Lesson extends Model
         'duration' => 'integer',
         'order' => 'integer',
         'additional_files' => 'array',
+        'content_blocks' => 'array',
     ];
 
     // Relationships
