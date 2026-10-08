@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiSearch, FiDownload, FiRotateCcw, FiCheck, FiTrash2, FiFile } from 'react-icons/fi';
+import { FiRefreshCw, FiSearch, FiDownload, FiRotateCcw, FiCheck, FiTrash2, FiFile, FiEdit2, FiX, FiArchive } from 'react-icons/fi';
 import { kreditiService } from '@/services/kreditiService';
 import type { FinanceCredit } from '@/types/planika-finance';
 
@@ -21,7 +21,14 @@ type FilterParams = {
 type SelectedMeta = {
   amount: number;
   isPaired: boolean;
+  registrar: string | null;
 };
+
+const toMeta = (c: FinanceCredit): SelectedMeta => ({
+  amount: Number(c.amount) || 0,
+  isPaired: c.is_paired,
+  registrar: c.registrar_number ?? null,
+});
 
 function computeSelectionStats(meta: Map<number, SelectedMeta>, currency = 'BAM') {
   let pairedCount = 0;
@@ -73,6 +80,11 @@ export default function KreditiListPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkUnpairing, setBulkUnpairing] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [editRegistrar, setEditRegistrar] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [registrarSaving, setRegistrarSaving] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState<{ id: number; value: string } | null>(null);
+  const [inlineSaving, setInlineSaving] = useState(false);
 
   const filterParams = useMemo<FilterParams>(() => ({
     search: search || undefined,
@@ -118,6 +130,19 @@ export default function KreditiListPage() {
     return computeSelectionStats(selectedMeta, currency);
   }, [selectedMeta, items]);
 
+  // Prefill the registrar field when all selected paired credits share the same registrar.
+  const commonPairedRegistrar = useMemo(() => {
+    const values = new Set<string>();
+    selectedMeta.forEach((m) => {
+      if (m.isPaired) values.add(m.registrar ?? '');
+    });
+    return values.size === 1 ? [...values][0] : '';
+  }, [selectedMeta]);
+
+  useEffect(() => {
+    setEditRegistrar(commonPairedRegistrar);
+  }, [commonPairedRegistrar]);
+
   const allPageSelected = items.length > 0 && items.every((c) => selectedMeta.has(c.id));
 
   const isSelected = useCallback((id: number) => selectedMeta.has(id), [selectedMeta]);
@@ -126,7 +151,7 @@ export default function KreditiListPage() {
     setSelectedMeta((prev) => {
       const next = new Map(prev);
       if (next.has(c.id)) next.delete(c.id);
-      else next.set(c.id, { amount: Number(c.amount) || 0, isPaired: c.is_paired });
+      else next.set(c.id, toMeta(c));
       return next;
     });
   };
@@ -143,7 +168,7 @@ export default function KreditiListPage() {
 
     setSelectedMeta((prev) => {
       const next = new Map(prev);
-      items.forEach((c) => next.set(c.id, { amount: Number(c.amount) || 0, isPaired: c.is_paired }));
+      items.forEach((c) => next.set(c.id, toMeta(c)));
       return next;
     });
   };
@@ -183,6 +208,69 @@ export default function KreditiListPage() {
       toast.error('Greška pri grupnom uparivanju');
     } finally {
       setBulkSaving(false);
+    }
+  };
+
+  const applyRegistrarLocally = (ids: number[], registrar: string) => {
+    const idSet = new Set(ids);
+    setItems((prev) => prev.map((c) => (idSet.has(c.id) && c.is_paired ? { ...c, registrar_number: registrar } : c)));
+    setSelectedMeta((prev) => {
+      const next = new Map(prev);
+      ids.forEach((id) => {
+        const m = next.get(id);
+        if (m?.isPaired) next.set(id, { ...m, registrar });
+      });
+      return next;
+    });
+  };
+
+  const handleBulkUpdateRegistrar = async () => {
+    const ids = getIdsByPaired(true);
+    const registrar = editRegistrar.trim();
+    if (!ids.length) return;
+    if (!registrar) {
+      toast.error('Broj registratora je obavezan');
+      return;
+    }
+    if (!window.confirm(`Promijeniti broj registratora na „${registrar}” za ${ids.length} uparenih kredita?`)) {
+      return;
+    }
+
+    setRegistrarSaving(true);
+    try {
+      const res = await kreditiService.bulkUpdateRegistrar({
+        credit_ids: ids,
+        registrar_number: registrar,
+        notes: editNotes.trim() || undefined,
+        update_notes: editNotes.trim() !== '',
+      });
+      toast.success(`Registrator ažuriran za ${res.updated_count} kredita`);
+      applyRegistrarLocally(ids, registrar);
+      setEditNotes('');
+    } catch {
+      toast.error('Greška pri izmjeni registratora');
+    } finally {
+      setRegistrarSaving(false);
+    }
+  };
+
+  const saveInlineRegistrar = async () => {
+    if (!inlineEdit) return;
+    const registrar = inlineEdit.value.trim();
+    if (!registrar) {
+      toast.error('Broj registratora je obavezan');
+      return;
+    }
+    setInlineSaving(true);
+    try {
+      await kreditiService.bulkUpdateRegistrar({ credit_ids: [inlineEdit.id], registrar_number: registrar });
+      applyRegistrarLocally([inlineEdit.id], registrar);
+      toast.success('Registrator ažuriran');
+      setInlineEdit(null);
+    } catch {
+      toast.error('Greška pri izmjeni registratora');
+    } finally {
+      setInlineSaving(false);
     }
   };
 
@@ -280,7 +368,7 @@ export default function KreditiListPage() {
   const formatMoney = (amount: number, currency: string) =>
     `${amount.toLocaleString('bs-BA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 
-  const busy = bulkSaving || bulkUnpairing || bulkDeleting;
+  const busy = bulkSaving || bulkUnpairing || bulkDeleting || registrarSaving;
 
   return (
     <div className="space-y-4">
@@ -406,6 +494,42 @@ export default function KreditiListPage() {
             )}
 
             {selectionStats.pairedCount > 0 && (
+              <div className="border-t border-primary-200/80 pt-3 dark:border-primary-800">
+                <p className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <FiArchive size={16} />
+                  Izmjena registratora za uparene ({selectionStats.pairedCount})
+                  {!commonPairedRegistrar && selectionStats.pairedCount > 1 && (
+                    <span className="text-xs font-normal text-gray-500">— odabrani imaju različite registratore</span>
+                  )}
+                </p>
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    className="input flex-1"
+                    placeholder="Novi broj registratora *"
+                    value={editRegistrar}
+                    onChange={(e) => setEditRegistrar(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && editRegistrar.trim() && void handleBulkUpdateRegistrar()}
+                  />
+                  <input
+                    className="input flex-1"
+                    placeholder="Nova napomena (prazno = bez izmjene)"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-primary flex shrink-0 items-center justify-center gap-2 px-4"
+                    disabled={busy || !editRegistrar.trim()}
+                    onClick={() => void handleBulkUpdateRegistrar()}
+                  >
+                    <FiEdit2 size={16} />
+                    {registrarSaving ? 'Spremanje…' : `Sačuvaj (${selectionStats.pairedCount})`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {selectionStats.pairedCount > 0 && (
               <div className="flex flex-wrap items-center gap-2 border-t border-primary-200/80 pt-3 dark:border-primary-800">
                 <button
                   type="button"
@@ -491,7 +615,55 @@ export default function KreditiListPage() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       {c.amount != null ? `${Number(c.amount).toLocaleString('bs-BA')} ${c.currency}` : '—'}
                     </td>
-                    <td className="px-4 py-3">{c.registrar_number ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      {inlineEdit?.id === c.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            className="input w-28 py-1 text-sm"
+                            value={inlineEdit.value}
+                            autoFocus
+                            disabled={inlineSaving}
+                            onChange={(e) => setInlineEdit({ id: c.id, value: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') void saveInlineRegistrar();
+                              if (e.key === 'Escape') setInlineEdit(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="rounded p-1 text-green-700 hover:bg-green-50 disabled:opacity-40 dark:text-green-400 dark:hover:bg-green-900/20"
+                            disabled={inlineSaving || !inlineEdit.value.trim()}
+                            onClick={() => void saveInlineRegistrar()}
+                            title="Sačuvaj"
+                          >
+                            <FiCheck size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-700"
+                            disabled={inlineSaving}
+                            onClick={() => setInlineEdit(null)}
+                            title="Odustani"
+                          >
+                            <FiX size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="group flex items-center gap-1">
+                          <span>{c.registrar_number ?? '—'}</span>
+                          {c.is_paired && (
+                            <button
+                              type="button"
+                              className="rounded p-1 text-gray-400 opacity-60 hover:bg-gray-100 hover:text-primary-600 group-hover:opacity-100 dark:hover:bg-dark-700"
+                              onClick={() => setInlineEdit({ id: c.id, value: c.registrar_number ?? '' })}
+                              title="Izmijeni broj registratora"
+                            >
+                              <FiEdit2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${

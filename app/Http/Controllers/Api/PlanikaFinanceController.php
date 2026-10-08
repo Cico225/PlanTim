@@ -119,14 +119,34 @@ class PlanikaFinanceController extends Controller
             );
             Excel::import($import, $file);
 
+            if (! $import->hasRecognizedSheet()) {
+                return response()->json([
+                    'message' => 'Zaglavlje nije prepoznato',
+                    'error' => 'Zaglavlje nije prepoznato ni na jednom listu. Očekivane kolone: Broj dokumenta, Datum, WhsName, Naziv kupca/dobavljača, Ukupno.',
+                ], 422);
+            }
+
+            $rows = $import->getImportedRows();
+            $errors = $import->getErrors();
+            $limit = 5000;
+
             return response()->json([
                 'message' => 'Uvoz kredita završen',
+                'file_name' => $file->getClientOriginalName(),
+                'imported_at' => now()->toIso8601String(),
                 'import_year' => $year,
                 'import_month' => $month,
+                'overwrite' => $request->boolean('overwrite', false),
                 'success_count' => $import->getSuccessCount(),
                 'error_count' => $import->getErrorCount(),
-                'errors' => array_slice($import->getErrors(), 0, 50),
-                'errors_truncated' => count($import->getErrors()) > 50,
+                'created_count' => count(array_filter($rows, fn ($r) => $r['action'] === 'created')),
+                'updated_count' => count(array_filter($rows, fn ($r) => $r['action'] !== 'created')),
+                'total_amount' => round(array_sum(array_column($rows, 'amount')), 2),
+                'skipped_sheets' => $import->getSkippedSheets(),
+                'rows' => array_slice($rows, 0, $limit),
+                'rows_truncated' => count($rows) > $limit,
+                'errors' => array_slice($errors, 0, $limit),
+                'errors_truncated' => count($errors) > $limit,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -241,6 +261,57 @@ class PlanikaFinanceController extends Controller
             'skipped_count' => $skipped,
             'paired_amount' => $pairedAmount,
             'currency' => $toPair->first()->currency ?? 'BAM',
+        ]);
+    }
+
+    /**
+     * Izmjena broja registratora (i opcionalno napomene) za već uparene zabrane.
+     */
+    public function bulkUpdateRegistrar(Request $request)
+    {
+        if (! $this->kreditiTableExists()) {
+            return response()->json(['message' => 'Modul kredita nije inicijalizovan.'], 503);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'credit_ids' => 'required|array|min:1',
+            'credit_ids.*' => 'integer',
+            'registrar_number' => 'required|string|max:100',
+            'notes' => 'nullable|string|max:2000',
+            'update_notes' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $ids = collect($request->input('credit_ids', []))->map(fn ($id) => (int) $id)->unique()->values();
+        $credits = FinanceCredit::query()->whereIn('id', $ids)->get();
+        $toUpdate = $credits->filter(fn (FinanceCredit $c) => $c->isPaired());
+
+        if ($toUpdate->isEmpty()) {
+            return response()->json(['message' => 'Nijedan odabrani kredit nije uparen.'], 422);
+        }
+
+        $registrar = trim((string) $request->input('registrar_number'));
+        $userId = (int) $request->user()->id;
+        $payload = ['registrar_number' => $registrar, 'updated_by' => $userId];
+        if ($request->boolean('update_notes')) {
+            $notes = trim((string) $request->input('notes', ''));
+            $payload['notes'] = $notes !== '' ? $notes : null;
+        }
+
+        DB::transaction(function () use ($toUpdate, $payload) {
+            foreach ($toUpdate as $credit) {
+                $credit->update($payload);
+            }
+        });
+
+        return response()->json([
+            'message' => 'Podaci registratora su ažurirani.',
+            'updated_count' => $toUpdate->count(),
+            'skipped_count' => $credits->count() - $toUpdate->count(),
+            'registrar_number' => $registrar,
         ]);
     }
 

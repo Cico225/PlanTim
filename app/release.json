@@ -1,8 +1,9 @@
 {
-    "version": "1.2.33",
-    "version_name": "Release 2026-10-06",
-    "release_notes": "dorada modula LMS",
+    "version": "1.2.34",
+    "version_name": "Release 2026-10-08",
+    "release_notes": "Dorada modula ZAbrane",
     "changelog": [
+        "Dorada modula ZAbrane",
         "dorada modula LMS",
         "DOrada modula maloprodaja",
         "Dorada modula maloprodaja",
@@ -21,7 +22,6 @@
         "ukidanje porta",
         "SSL dorada C",
         "ssl certifikat",
-        "popravak sigurnosti",
-        "Novi backup baze podataka"
+        "popravak sigurnosti"
     ]
 }

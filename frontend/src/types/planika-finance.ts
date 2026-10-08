@@ -24,11 +24,41 @@ export interface FinanceCredit {
   updated_at: string | null;
 }
 
+export interface KreditiImportedRow {
+  row_number: number;
+  credit_number: string;
+  issue_date: string | null;
+  amount: number | null;
+  store_name: string | null;
+  company_name: string | null;
+  customer_name: string | null;
+  action: 'created' | 'updated' | 'updated_verified';
+}
+
+export interface KreditiImportError {
+  row_number: number;
+  error: string;
+  type?: 'duplicate' | 'missing_data' | 'empty_number' | 'other';
+  credit_number?: string | null;
+  customer_name?: string | null;
+  raw_date?: string | null;
+  raw_amount?: string | null;
+}
+
 export interface KreditiUploadResult {
   message: string;
+  file_name?: string;
+  imported_at?: string;
+  overwrite?: boolean;
   success_count: number;
   error_count: number;
-  errors: Array<{ row_number: number; error: string }>;
+  created_count?: number;
+  updated_count?: number;
+  total_amount?: number;
+  skipped_sheets?: number;
+  rows?: KreditiImportedRow[];
+  rows_truncated?: boolean;
+  errors: KreditiImportError[];
   import_year?: number;
   import_month?: number;
   errors_truncated?: boolean;
