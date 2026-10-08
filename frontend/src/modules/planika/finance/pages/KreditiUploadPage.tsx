@@ -1,7 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { FiUpload } from 'react-icons/fi';
 import { kreditiService } from '@/services/kreditiService';
+import type { KreditiUploadResult } from '@/types/planika-finance';
+import KreditiImportResultPanel from '../components/KreditiImportResultPanel';
+
+const LAST_RESULT_KEY = 'planika_krediti_last_import';
+
+function loadLastResult(): KreditiUploadResult | null {
+  try {
+    const raw = localStorage.getItem(LAST_RESULT_KEY);
+    return raw ? (JSON.parse(raw) as KreditiUploadResult) : null;
+  } catch {
+    return null;
+  }
+}
 
 const MONTHS = [
   'Januar', 'Februar', 'Mart', 'April', 'Maj', 'Juni',
@@ -15,7 +28,16 @@ export default function KreditiUploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [errors, setErrors] = useState<Array<{ row_number: number; error: string }>>([]);
+  const [result, setResult] = useState<KreditiUploadResult | null>(loadLastResult);
+
+  useEffect(() => {
+    try {
+      if (result) localStorage.setItem(LAST_RESULT_KEY, JSON.stringify(result));
+      else localStorage.removeItem(LAST_RESULT_KEY);
+    } catch {
+      // Result too large for localStorage — keep it in memory only.
+    }
+  }, [result]);
 
   const applyFilenamePeriod = (name: string) => {
     const base = name.replace(/\.[^.]+$/, '');
@@ -32,12 +54,14 @@ export default function KreditiUploadPage() {
       return;
     }
     setUploading(true);
-    setErrors([]);
+    setResult(null);
     setProgress(0);
     try {
       const res = await kreditiService.upload(file, year, month, overwrite, setProgress);
-      toast.success(`Uvezeno: ${res.success_count}, grešaka: ${res.error_count}${res.import_year ? ` (${res.import_month}/${res.import_year})` : ''}`);
-      setErrors(res.errors ?? []);
+      const summary = `Uvezeno: ${res.success_count}, grešaka: ${res.error_count}${res.import_year ? ` (${res.import_month}/${res.import_year})` : ''}`;
+      if (res.error_count > 0) toast(summary, { icon: '⚠️' });
+      else toast.success(summary);
+      setResult({ ...res, file_name: res.file_name ?? file.name });
       if (res.success_count > 0 && res.error_count === 0) {
         setFile(null);
       }
@@ -53,8 +77,8 @@ export default function KreditiUploadPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="card p-6">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="card mx-auto max-w-2xl p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Mjesečni uvoz kredita iz Excel-a</h2>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           Prilagođeno Planika exportu (npr. <strong>2026_05.xlsx</strong>). Zaglavlje u prvom redu:
@@ -126,17 +150,8 @@ export default function KreditiUploadPage() {
         </button>
       </div>
 
-      {errors.length > 0 && (
-        <div className="card max-h-64 overflow-y-auto p-4">
-          <h3 className="font-medium text-red-700 dark:text-red-400">Greške pri uvozu ({errors.length})</h3>
-          <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
-            {errors.map((e, i) => (
-              <li key={i}>
-                Red {e.row_number}: {e.error}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {result && (
+        <KreditiImportResultPanel key={result.imported_at ?? 'last'} result={result} onClose={() => setResult(null)} />
       )}
     </div>
   );

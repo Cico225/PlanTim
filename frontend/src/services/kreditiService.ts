@@ -110,6 +110,15 @@ export const kreditiService = {
     return apiService.post('/planika/finance/krediti/bulk-unpair-zabrana', data);
   },
 
+  bulkUpdateRegistrar(data: {
+    credit_ids: number[];
+    registrar_number: string;
+    notes?: string;
+    update_notes?: boolean;
+  }): Promise<{ message: string; updated_count: number; skipped_count: number; registrar_number: string }> {
+    return apiService.post('/planika/finance/krediti/bulk-update-registrar', data);
+  },
+
   delete(id: number): Promise<{ message: string; credit_number: string; deleted_amount: number; currency: string }> {
     return apiService.delete(`/planika/finance/krediti/${id}`);
   },
