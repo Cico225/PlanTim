@@ -7,6 +7,7 @@ use App\Services\RetailPayrollService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class RetailPayrollController extends Controller
@@ -62,6 +63,12 @@ class RetailPayrollController extends Controller
 
     public function meta(Request $request)
     {
+        if (!Schema::hasTable('retail_salary_categories') || !Schema::hasTable('retail_payroll_rows')) {
+            return response()->json([
+                'message' => 'Tabele za obračun plata nisu kreirane. Na serveru pokrenite: php artisan migrate --force',
+            ], 503);
+        }
+
         $user = $request->user();
         $canManage = $this->canManage($user);
 

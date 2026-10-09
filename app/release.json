@@ -1,8 +1,9 @@
 {
-    "version": "1.2.35",
+    "version": "1.2.36",
     "version_name": "Release 2026-10-09",
-    "release_notes": "Dorada modula ostvareni rezultati",
+    "release_notes": "modul rezultati",
     "changelog": [
+        "modul rezultati",
         "Dorada modula ostvareni rezultati",
         "Dorada modula ZAbrane",
         "dorada modula LMS",
@@ -21,7 +22,6 @@
         "korekcija porta",
         "podesavanje porta",
         "ukidanje porta",
-        "SSL dorada C",
-        "ssl certifikat"
+        "SSL dorada C"
     ]
 }
