@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import ControlPlansSection from '../components/ControlPlansTab';
 import RetailReports from '../components/RetailReports';
+import RetailPayrollResults from '../components/RetailPayrollResults';
 
 import { useLocation } from 'react-router-dom';
 
@@ -5421,18 +5422,5 @@ function ControlRecordSigningTab({
 }
 
 function ResultsTab() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
-          <Award className="h-7 w-7 text-teal-500" />
-          Ostvareni rezultati
-        </h2>
-      </div>
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center dark:border-gray-600 dark:bg-gray-800">
-        <Award className="mx-auto mb-3 h-12 w-12 text-gray-300" />
-        <p className="text-gray-500 dark:text-gray-400">Ovaj dio je u pripremi.</p>
-      </div>
-    </div>
-  );
+  return <RetailPayrollResults />;
 }

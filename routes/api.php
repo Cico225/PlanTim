@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\RetailControlPlansController;
 use App\Http\Controllers\Api\RetailEducationPlansController;
 use App\Http\Controllers\Api\RetailControlRecordsController;
 use App\Http\Controllers\Api\RetailComplaintsController;
+use App\Http\Controllers\Api\RetailPayrollController;
 use App\Http\Controllers\Api\MeetingRoomController;
 
 /*
@@ -534,6 +535,19 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
             Route::post('/{planId}/items', [RetailControlPlansController::class, 'createItem']);
             Route::put('/{planId}/items/{itemId}', [RetailControlPlansController::class, 'updateItem']);
             Route::delete('/{planId}/items/{itemId}', [RetailControlPlansController::class, 'deleteItem']);
+        });
+
+        // Ostvareni rezultati - obračun plata
+        Route::prefix('payroll')->group(function () {
+            Route::get('/meta', [RetailPayrollController::class, 'meta']);
+            Route::get('/my', [RetailPayrollController::class, 'my']);
+            Route::get('/summary', [RetailPayrollController::class, 'summary']);
+            Route::post('/upload', [RetailPayrollController::class, 'upload']);
+            Route::post('/delete-period', [RetailPayrollController::class, 'deletePeriod']);
+            Route::put('/categories', [RetailPayrollController::class, 'updateCategories']);
+            Route::get('/worker-links', [RetailPayrollController::class, 'workerLinks']);
+            Route::put('/worker-links/{id}', [RetailPayrollController::class, 'updateWorkerLink']);
+            Route::get('/users', [RetailPayrollController::class, 'searchUsers']);
         });
     });
 
