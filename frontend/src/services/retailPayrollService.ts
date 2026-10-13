@@ -40,10 +40,17 @@ export interface PayrollStoreBreakdown {
   category: string | null;
   category_label: string | null;
   category_salary: number;
+  contract_salary_monthly: number;
   working_days: number;
+  regular_days: number;
+  sick_leave_days: number;
+  annual_leave_days: number;
   share: number;
   share_basis: 'days' | 'turnover' | 'equal';
+  contract_salary: number;
+  /** Category allowance (pro-rated). */
   base_salary: number;
+  guaranteed_salary: number;
   turnover_worker_ly: number;
   net_salary_worker_ly: number;
   turnover_worker_cy: number;
@@ -62,21 +69,31 @@ export interface PayrollStoreBreakdown {
   worker_share: number;
   stimulation: number;
   total: number;
+  meal_allowance_daily: number;
+  meal_allowance: number;
   transport: number;
+  total_payout: number;
 }
 
 export interface PayrollTotals {
+  contract_salary: number;
   base_salary: number;
+  guaranteed_salary: number;
   turnover_salary: number;
   turnover_difference: number;
   salary: number;
   stimulation: number;
   total: number;
+  meal_allowance: number;
   transport: number;
   total_with_transport: number;
+  total_payout: number;
   turnover_worker_cy: number;
   turnover_worker_ly: number;
   working_days: number;
+  regular_days: number;
+  sick_leave_days: number;
+  annual_leave_days: number;
 }
 
 export interface PayrollWorkerResult {
@@ -95,7 +112,19 @@ export interface PayrollWorkerResult {
 
 export interface PayrollSummary {
   data: PayrollWorkerResult[];
-  totals: Pick<PayrollTotals, 'base_salary' | 'turnover_difference' | 'salary' | 'stimulation' | 'total' | 'transport' | 'total_with_transport'>;
+  totals: Pick<
+    PayrollTotals,
+    | 'contract_salary'
+    | 'base_salary'
+    | 'turnover_difference'
+    | 'salary'
+    | 'stimulation'
+    | 'total'
+    | 'meal_allowance'
+    | 'transport'
+    | 'total_with_transport'
+    | 'total_payout'
+  >;
   workers_count: number;
   unlinked_count: number;
 }
