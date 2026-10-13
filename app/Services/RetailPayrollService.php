@@ -4,7 +4,9 @@ namespace App\Services;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class RetailPayrollService
@@ -54,9 +56,16 @@ class RetailPayrollService
         'ruc' => [['ruc na nivou prodavnice', 'ruc'], 20],
         'purchase_value' => [['nabavna vrijednost prodate robe', 'nabavna vrijednost'], 21],
         'rent' => [['zakupnine', 'zakupnina'], 22],
+        // Columns added to the template later; matched by header only.
+        'contract_salary' => [['ugovorna plata', 'osnovna plata', 'ugovorna neto plata', 'osnovna ugovorna plata', 'ugovorna'], null],
+        'meal_allowance' => [['topli obrok', 'iznos toplog obroka', 'topli obrok iznos', 'topli obrok dnevno', 'topli obrok po danu', 'dnevni topli obrok', 'topli obrok km'], null],
+        'regular_days' => [['redovan rad dana', 'redovan rad', 'redovni rad', 'redovni rad dana', 'dani redovnog rada'], null],
+        'sick_leave_days' => [['bolovanje', 'bolovanje dana', 'dani bolovanja', 'bolovanje dani'], null],
+        'annual_leave_days' => [['godisnji odmor', 'godisnji', 'godisnji odmor dana', 'dani godisnjeg odmora', 'godisnji dani'], null],
     ];
 
     private const AMOUNT_FIELDS = [
+        'contract_salary', 'meal_allowance', 'regular_days', 'sick_leave_days', 'annual_leave_days',
         'plan_worker_ly', 'turnover_worker_ly', 'plan_worker_cy', 'turnover_worker_cy',
         'plan_store', 'turnover_store_ly', 'turnover_store_cy', 'transport_amount', 'working_days',
         'net_salary_store_cy', 'net_salary_store_ly', 'net_salary_worker_cy', 'net_salary_worker_ly',
@@ -104,8 +113,7 @@ class RetailPayrollService
         $months = [];
 
         foreach ($spreadsheet->getAllSheets() as $sheet) {
-            $highestRow = $sheet->getHighestDataRow();
-            $highestCol = $sheet->getHighestDataColumn();
+            [$highestRow, $highestCol] = $this->realDataBounds($sheet);
             if ($highestRow < 2) {
                 continue;
             }
@@ -164,6 +172,11 @@ class RetailPayrollService
                     $row[$field] = $parsed;
                 }
 
+                $attendance = array_filter([$row['regular_days'], $row['sick_leave_days'], $row['annual_leave_days']], fn ($v) => $v !== null);
+                if ($row['working_days'] === null && $attendance) {
+                    $row['working_days'] = array_sum($attendance);
+                }
+
                 $rows[] = $row;
                 $months[$month] = true;
             }
@@ -173,6 +186,43 @@ class RetailPayrollService
         sort($monthList);
 
         return ['rows' => $rows, 'errors' => $errors, 'months' => $monthList];
+    }
+
+    /**
+     * Sheets often report a dimension up to row 1048576 (empty or stray cells far below the table).
+     * The data block ends at the first gap of more than 50 empty rows, which keeps the range small.
+     *
+     * @return array{0: int, 1: string}
+     */
+    private function realDataBounds(Worksheet $sheet): array
+    {
+        $rows = [];
+        $maxCol = 1;
+        $cells = $sheet->getCellCollection();
+        foreach ($cells->getCoordinates() as $coordinate) {
+            $value = $cells->get($coordinate)?->getValue();
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                continue;
+            }
+            [$col, $row] = Coordinate::coordinateFromString($coordinate);
+            $rows[(int) $row] = true;
+            $maxCol = max($maxCol, Coordinate::columnIndexFromString($col));
+        }
+        if (!$rows) {
+            return [0, 'A'];
+        }
+
+        $rowNumbers = array_keys($rows);
+        sort($rowNumbers);
+        $maxRow = $rowNumbers[0];
+        foreach ($rowNumbers as $row) {
+            if ($row - $maxRow > 50) {
+                break;
+            }
+            $maxRow = $row;
+        }
+
+        return [$maxRow, Coordinate::stringFromColumnIndex(min($maxCol, 100))];
     }
 
     private function mapHeader(array $header): ?array
@@ -195,13 +245,30 @@ class RetailPayrollService
         // Unrecognized columns fall back to the standard template position only if that header cell is empty or unknown.
         $used = array_flip($map);
         foreach (self::COLUMNS as $field => [$aliases, $fallback]) {
-            if (!isset($map[$field]) && array_key_exists($fallback, $normalized) && !isset($used[$fallback])) {
+            if ($fallback === null || isset($map[$field])) {
+                continue;
+            }
+            if (array_key_exists($fallback, $normalized) && !isset($used[$fallback]) && !$this->isKnownHeader($normalized[$fallback])) {
                 $map[$field] = $fallback;
                 $used[$fallback] = $field;
             }
         }
 
         return $map;
+    }
+
+    private function isKnownHeader(string $normalizedHeader): bool
+    {
+        if ($normalizedHeader === '') {
+            return false;
+        }
+        foreach (self::COLUMNS as [$aliases]) {
+            if (in_array($normalizedHeader, $aliases, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function parseMonth($value): ?int
@@ -267,6 +334,9 @@ class RetailPayrollService
     /**
      * Calculate the salary breakdown for all rows of a period, grouped by worker.
      *
+     * Salary budget = KP × turnover; it covers contract salary + category allowance + meal allowance,
+     * the remainder is paid as the difference by turnover. Plan stimulation and transport are paid on top.
+     *
      * @param Collection $rows retail_payroll_rows records (may include user_id from links)
      */
     public function calculate(Collection $rows): array
@@ -280,20 +350,28 @@ class RetailPayrollService
             $totalCy = (float) $group->sum(fn ($r) => max(0, (float) $r->turnover_worker_cy));
             $count = $group->count();
             $first = $group->first();
+            // The monthly contract salary may be repeated on every store row, so the highest value is used once.
+            $monthlyContract = (float) $group->max(fn ($r) => (float) ($r->contract_salary ?? 0));
 
             $stores = [];
             $totals = [
-                'base_salary' => 0.0, 'turnover_salary' => 0.0, 'turnover_difference' => 0.0, 'salary' => 0.0,
-                'stimulation' => 0.0, 'total' => 0.0, 'transport' => 0.0, 'total_with_transport' => 0.0,
+                'contract_salary' => 0.0, 'base_salary' => 0.0, 'guaranteed_salary' => 0.0,
+                'turnover_salary' => 0.0, 'turnover_difference' => 0.0, 'salary' => 0.0,
+                'stimulation' => 0.0, 'total' => 0.0, 'meal_allowance' => 0.0, 'transport' => 0.0,
+                'total_with_transport' => 0.0, 'total_payout' => 0.0,
                 'turnover_worker_cy' => 0.0, 'turnover_worker_ly' => 0.0, 'working_days' => $totalDays,
+                'regular_days' => 0.0, 'sick_leave_days' => 0.0, 'annual_leave_days' => 0.0,
             ];
             $warnings = [];
+            if ($monthlyContract <= 0) {
+                $warnings[] = 'Ugovorna plata nije unesena u Excelu.';
+            }
 
             foreach ($group as $r) {
                 $category = $categories->get($r->position_type.'|'.strtoupper((string) $r->category));
-                $fullBase = $category ? (float) $category->base_salary : 0.0;
+                $fullCategory = $category ? (float) $category->base_salary : 0.0;
                 if (!$category) {
-                    $warnings[] = 'Nepoznata kategorija "'.($r->category ?? '').'" za '.$r->store_name.' - osnovna plata nije obračunata.';
+                    $warnings[] = 'Nepoznata kategorija "'.($r->category ?? '').'" za '.$r->store_name.' - dodatak kategorije nije obračunat.';
                 }
 
                 if ($totalDays > 0) {
@@ -306,7 +384,9 @@ class RetailPayrollService
                     $share = 1 / $count;
                     $shareBasis = 'equal';
                 }
-                $base = $fullBase * $share;
+                $contract = $monthlyContract * $share;
+                $categoryAddon = $fullCategory * $share;
+                $guaranteed = $contract + $categoryAddon;
 
                 $workerLy = (float) $r->turnover_worker_ly;
                 $netWorkerLy = (float) $r->net_salary_worker_ly;
@@ -322,13 +402,20 @@ class RetailPayrollService
                 } else {
                     $kp = 0.0;
                     $kpSource = 'none';
-                    $warnings[] = $r->store_name.': nema LY prometa/neto plate - KP se ne može izračunati, obračunata je samo osnovna plata.';
+                    $warnings[] = $r->store_name.': nema LY prometa/neto plate - KP se ne može izračunati, dio prema prometu nije obračunat.';
                 }
 
+                $mealDaily = max(0, (float) ($r->meal_allowance ?? 0));
+                $meal = $mealDaily * max(0, (float) $r->working_days);
+                if ($mealDaily > 0 && (float) $r->working_days <= 0) {
+                    $warnings[] = $r->store_name.': topli obrok nije obračunat jer nisu uneseni radni dani.';
+                }
+
+                // The percentage budget (KP × turnover) also covers the meal allowance.
                 $workerCy = max(0, (float) $r->turnover_worker_cy);
                 $turnoverSalary = $kp * $workerCy;
-                $difference = max(0, $turnoverSalary - $base);
-                $salary = $base + $difference;
+                $difference = max(0, $turnoverSalary - $guaranteed - $meal);
+                $salary = $guaranteed + $difference;
 
                 $plan = (float) $r->plan_store;
                 $storeCy = (float) $r->turnover_store_cy;
@@ -347,11 +434,17 @@ class RetailPayrollService
                     'position_type' => $r->position_type,
                     'category' => $r->category,
                     'category_label' => $category->label ?? null,
-                    'category_salary' => round($fullBase, 2),
+                    'category_salary' => round($fullCategory, 2),
+                    'contract_salary_monthly' => round($monthlyContract, 2),
                     'working_days' => (float) $r->working_days,
+                    'regular_days' => (float) ($r->regular_days ?? 0),
+                    'sick_leave_days' => (float) ($r->sick_leave_days ?? 0),
+                    'annual_leave_days' => (float) ($r->annual_leave_days ?? 0),
                     'share' => round($share, 6),
                     'share_basis' => $shareBasis,
-                    'base_salary' => round($base, 2),
+                    'contract_salary' => round($contract, 2),
+                    'base_salary' => round($categoryAddon, 2),
+                    'guaranteed_salary' => round($guaranteed, 2),
                     'turnover_worker_ly' => $workerLy,
                     'net_salary_worker_ly' => $netWorkerLy,
                     'turnover_worker_cy' => $workerCy,
@@ -370,20 +463,30 @@ class RetailPayrollService
                     'worker_share' => round($workerShare, 6),
                     'stimulation' => round($stimulation, 2),
                     'total' => round($storeTotal, 2),
+                    'meal_allowance_daily' => round($mealDaily, 2),
+                    'meal_allowance' => round($meal, 2),
                     'transport' => round($transport, 2),
+                    'total_payout' => round($storeTotal + $meal + $transport, 2),
                 ];
 
-                $totals['base_salary'] += $base;
+                $totals['contract_salary'] += $contract;
+                $totals['base_salary'] += $categoryAddon;
+                $totals['guaranteed_salary'] += $guaranteed;
                 $totals['turnover_salary'] += $turnoverSalary;
                 $totals['turnover_difference'] += $difference;
                 $totals['salary'] += $salary;
                 $totals['stimulation'] += $stimulation;
                 $totals['total'] += $storeTotal;
+                $totals['meal_allowance'] += $meal;
                 $totals['transport'] += $transport;
                 $totals['turnover_worker_cy'] += $workerCy;
                 $totals['turnover_worker_ly'] += $workerLy;
+                $totals['regular_days'] += (float) ($r->regular_days ?? 0);
+                $totals['sick_leave_days'] += (float) ($r->sick_leave_days ?? 0);
+                $totals['annual_leave_days'] += (float) ($r->annual_leave_days ?? 0);
             }
             $totals['total_with_transport'] = $totals['total'] + $totals['transport'];
+            $totals['total_payout'] = $totals['total'] + $totals['meal_allowance'] + $totals['transport'];
             foreach ($totals as $k => $v) {
                 $totals[$k] = round($v, 2);
             }

@@ -225,6 +225,24 @@ function SummaryCard({
   );
 }
 
+const CATEGORY_CHIP_TONES: Record<string, string> = {
+  A: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800',
+  B: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:ring-sky-800',
+  C: 'bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:ring-teal-800',
+};
+
+function CategoryChip({ store }: { store: PayrollStoreBreakdown }) {
+  const letter = (store.category ?? '?').toUpperCase();
+  return (
+    <span
+      title={`${store.category_label ?? ''} · dodatak ${km(store.category_salary)}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${CATEGORY_CHIP_TONES[letter] ?? 'bg-gray-50 text-gray-600 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600'}`}
+    >
+      {store.position_type === 'manager' ? 'Šef' : 'Prodavač'} {letter}
+    </span>
+  );
+}
+
 function StoreBreakdownCard({ s, showStoreData = true }: { s: PayrollStoreBreakdown; showStoreData?: boolean }) {
   const kpSourceLabel =
     s.kp_source === 'worker'
@@ -232,9 +250,16 @@ function StoreBreakdownCard({ s, showStoreData = true }: { s: PayrollStoreBreakd
       : s.kp_source === 'store'
         ? 'Nema LY podataka radnika - uzet KP prodavnice (Neto plata LY prodavnice / Bruto promet LY prodavnice)'
         : 'Nema LY podataka - KP nije moguće izračunati';
+  const attendance = [
+    s.regular_days > 0 ? `redovan rad ${num(s.regular_days, 0)}` : '',
+    s.sick_leave_days > 0 ? `bolovanje ${num(s.sick_leave_days, 0)}` : '',
+    s.annual_leave_days > 0 ? `godišnji ${num(s.annual_leave_days, 0)}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
   const shareLabel =
     s.share_basis === 'days'
-      ? `${num(s.working_days, 0)} radnih dana (${pct(s.share)} mjeseca)`
+      ? `${num(s.working_days, 0)} radnih dana${attendance ? ` (${attendance})` : ''} · ${pct(s.share)} mjeseca`
       : s.share_basis === 'turnover'
         ? `${pct(s.share)} prema prometu`
         : `${pct(s.share)} (jednako)`;
@@ -264,8 +289,8 @@ function StoreBreakdownCard({ s, showStoreData = true }: { s: PayrollStoreBreakd
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Ukupno za prodavnicu</p>
-          <p className="text-lg font-bold text-teal-700 dark:text-teal-300">{km(s.total)}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Za isplatu (prodavnica)</p>
+          <p className="text-lg font-bold text-teal-700 dark:text-teal-300">{km(s.total_payout)}</p>
         </div>
       </div>
 
@@ -276,19 +301,30 @@ function StoreBreakdownCard({ s, showStoreData = true }: { s: PayrollStoreBreakd
           </p>
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
             <Line
-              label="Osnovna plata iz kategorije"
+              label="Ugovorna plata (Excel)"
+              formula={s.share < 1 ? `${km(s.contract_salary_monthly)} × ${pct(s.share)}` : undefined}
+              value={km(s.contract_salary)}
+            />
+            <Line
+              label="Dodatak kategorije"
               formula={s.share < 1 ? `${km(s.category_salary)} × ${pct(s.share)}` : undefined}
               value={km(s.base_salary)}
             />
+            <Line label="Zagarantovano" formula="Ugovorna plata + dodatak kategorije" value={km(s.guaranteed_salary)} />
+            <Line
+              label="Topli obrok"
+              formula={s.meal_allowance_daily > 0 ? `${km(s.meal_allowance_daily)} × ${num(s.working_days, 0)} dana · pokriva se iz budžeta plate` : undefined}
+              value={km(s.meal_allowance)}
+            />
             <Line label="Koeficijent plate (KP)" formula={kpSourceLabel} value={`${num(s.kp * 100, 3)} %`} />
-            <Line label="Plata prema prometu" formula={`KP × bruto promet CY (${km(s.turnover_worker_cy)})`} value={km(s.turnover_salary)} />
+            <Line label="Budžet plate po procentu" formula={`KP × bruto promet CY (${km(s.turnover_worker_cy)})`} value={km(s.turnover_salary)} />
             <Line
               label="Dio razlike prema prometu"
-              formula="Plata prema prometu − osnovna plata (ako je pozitivno)"
+              formula="Budžet − zagarantovano − topli obrok (ako je pozitivno)"
               value={km(s.turnover_difference)}
               tone={s.turnover_difference > 0 ? 'text-emerald-600 dark:text-emerald-400' : undefined}
             />
-            <Line label="Plata" formula="Osnovna plata + dio razlike prema prometu" value={km(s.salary)} strong />
+            <Line label="Plata" formula="Zagarantovano + dio razlike prema prometu" value={km(s.salary)} strong />
           </div>
         </div>
 
@@ -345,8 +381,10 @@ function StoreBreakdownCard({ s, showStoreData = true }: { s: PayrollStoreBreakd
           )}
         </span>
         <span>
-          Plata {km(s.salary)} + stimulacija {km(s.stimulation)} = <b className="text-gray-900 dark:text-white">{km(s.total)}</b>
-          {s.transport > 0 && <> · Prevoz {km(s.transport)}</>}
+          Plata {km(s.salary)} + stimulacija {km(s.stimulation)} + topli obrok{' '}
+          {s.meal_allowance_daily > 0 ? `(${km(s.meal_allowance_daily)} × ${num(s.working_days, 0)}) ` : ''}
+          {km(s.meal_allowance)} + prevoz {km(s.transport)} ={' '}
+          <b className="text-gray-900 dark:text-white">{km(s.total_payout)}</b>
         </span>
       </div>
     </div>
@@ -358,12 +396,12 @@ function WorkerResultDetail({ result }: { result: PayrollWorkerResult }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <SummaryCard label="Osnovna plata" value={km(t.base_salary)} hint="Iz kategorije" icon={Wallet} tone="slate" />
-        <SummaryCard label="Razlika prema prometu" value={km(t.turnover_difference)} hint={`Plata prema prometu: ${km(t.turnover_salary)}`} icon={TrendingUp} tone="blue" />
+        <SummaryCard label="Ugovorna + kategorija" value={km(t.guaranteed_salary)} hint={`Ugovorna ${km(t.contract_salary)} + dodatak ${km(t.base_salary)}`} icon={Wallet} tone="slate" />
+        <SummaryCard label="Razlika prema prometu" value={km(t.turnover_difference)} hint={`Budžet po procentu: ${km(t.turnover_salary)}`} icon={TrendingUp} tone="blue" />
         <SummaryCard label="Stimulacija za plan" value={km(t.stimulation)} icon={Target} tone="amber" />
-        <SummaryCard label="Prevoz" value={km(t.transport)} icon={Bus} tone="violet" />
-        <SummaryCard label="Ukupna plata" value={km(t.total)} hint="Osnovna + razlika + stimulacija" icon={Calculator} tone="teal" />
-        <SummaryCard label="Ukupno sa prevozom" value={km(t.total_with_transport)} hint={`${result.stores_count} ${result.stores_count === 1 ? 'prodavnica' : 'prodavnice'} · ${num(t.working_days, 0)} dana`} icon={Award} tone="teal" highlight />
+        <SummaryCard label="Topli obrok + prevoz" value={km(t.meal_allowance + t.transport)} hint={`Obrok ${km(t.meal_allowance)} · prevoz ${km(t.transport)}`} icon={Bus} tone="violet" />
+        <SummaryCard label="Ukupna plata" value={km(t.total)} hint="Zagarantovano + razlika + stimulacija" icon={Calculator} tone="teal" />
+        <SummaryCard label="Za isplatu" value={km(t.total_payout)} hint={`${result.stores_count} ${result.stores_count === 1 ? 'prodavnica' : 'prodavnice'} · ${num(t.working_days, 0)} dana`} icon={Award} tone="teal" highlight />
       </div>
 
       {result.warnings.length > 0 && (
@@ -389,28 +427,34 @@ function WorkerResultDetail({ result }: { result: PayrollWorkerResult }) {
             <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900/40 dark:text-gray-400">
               <tr>
                 <th className="px-4 py-2 text-left">Prodavnica</th>
-                <th className="px-4 py-2 text-right">Osnovna</th>
+                <th className="px-4 py-2 text-right">Ugovorna</th>
+                <th className="px-4 py-2 text-right">Dodatak kat.</th>
                 <th className="px-4 py-2 text-right">Razlika</th>
                 <th className="px-4 py-2 text-right">Stimulacija</th>
-                <th className="px-4 py-2 text-right">Ukupno</th>
+                <th className="px-4 py-2 text-right">Obrok + prevoz</th>
+                <th className="px-4 py-2 text-right">Za isplatu</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {result.stores.map((s) => (
                 <tr key={s.row_id} className="text-gray-800 dark:text-gray-100">
                   <td className="px-4 py-2">{s.store_name}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{km(s.contract_salary)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{km(s.base_salary)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{km(s.turnover_difference)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{km(s.stimulation)}</td>
-                  <td className="px-4 py-2 text-right font-semibold tabular-nums">{km(s.total)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{km(s.meal_allowance + s.transport)}</td>
+                  <td className="px-4 py-2 text-right font-semibold tabular-nums">{km(s.total_payout)}</td>
                 </tr>
               ))}
               <tr className="bg-teal-50 font-bold text-teal-800 dark:bg-teal-900/20 dark:text-teal-200">
                 <td className="px-4 py-2">Ukupno</td>
+                <td className="px-4 py-2 text-right tabular-nums">{km(t.contract_salary)}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{km(t.base_salary)}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{km(t.turnover_difference)}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{km(t.stimulation)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{km(t.total)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{km(t.meal_allowance + t.transport)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{km(t.total_payout)}</td>
               </tr>
             </tbody>
           </table>
@@ -459,13 +503,13 @@ function SummaryView({ periods, onChanged, onGoUpload }: { periods: PayrollPerio
 
   const exportCsv = () => {
     if (!summary) return;
-    const header = ['Radnik', 'Korisnik', 'Prodavnica', 'Kategorija', 'Radni dani', 'Promet LY', 'Promet CY', 'KP %', 'Osnovna plata', 'Plata prema prometu', 'Razlika prema prometu', 'Plata', 'Plan prodavnice', 'Promet prodavnice CY', 'Osnova stimulacije', 'Učešće %', 'Stimulacija', 'Ukupno', 'Prevoz'];
+    const header = ['Radnik', 'Korisnik', 'Prodavnica', 'Kategorija', 'Radni dani', 'Redovan rad', 'Bolovanje', 'Godišnji odmor', 'Promet LY', 'Promet CY', 'KP %', 'Ugovorna plata', 'Dodatak kategorije', 'Budžet plate (KP × promet)', 'Razlika prema prometu', 'Plata', 'Plan prodavnice', 'Promet prodavnice CY', 'Osnova stimulacije', 'Učešće %', 'Stimulacija', 'Ukupno plata', 'Topli obrok', 'Prevoz', 'Za isplatu'];
     const lines = [header.join(';')];
     const f = (v: number) => num(v).replace(/\./g, '');
     summary.data.forEach((w) =>
       w.stores.forEach((s) =>
         lines.push(
-          [w.worker_name, w.user_name ?? '', s.store_name, s.category ?? '', num(s.working_days, 0), f(s.turnover_worker_ly), f(s.turnover_worker_cy), num(s.kp * 100, 3), f(s.base_salary), f(s.turnover_salary), f(s.turnover_difference), f(s.salary), f(s.plan_store), f(s.turnover_store_cy), f(s.stimulation_base), num(s.worker_share * 100), f(s.stimulation), f(s.total), f(s.transport)]
+          [w.worker_name, w.user_name ?? '', s.store_name, s.category ?? '', num(s.working_days, 0), num(s.regular_days, 0), num(s.sick_leave_days, 0), num(s.annual_leave_days, 0), f(s.turnover_worker_ly), f(s.turnover_worker_cy), num(s.kp * 100, 3), f(s.contract_salary), f(s.base_salary), f(s.turnover_salary), f(s.turnover_difference), f(s.salary), f(s.plan_store), f(s.turnover_store_cy), f(s.stimulation_base), num(s.worker_share * 100), f(s.stimulation), f(s.total), f(s.meal_allowance), f(s.transport), f(s.total_payout)]
             .map((c) => `"${String(c).replace(/"/g, '""')}"`)
             .join(';'),
         ),
@@ -534,11 +578,11 @@ function SummaryView({ periods, onChanged, onGoUpload }: { periods: PayrollPerio
       {summary && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <SummaryCard label="Radnika" value={String(summary.workers_count)} hint={summary.unlinked_count ? `${summary.unlinked_count} nije povezano s korisnikom` : 'Svi povezani s korisnicima'} icon={Users} tone="slate" />
-          <SummaryCard label="Osnovne plate" value={km(summary.totals.base_salary)} icon={Wallet} tone="slate" />
+          <SummaryCard label="Ugovorne + kategorije" value={km(summary.totals.contract_salary + summary.totals.base_salary)} hint={`Dodaci kategorija: ${km(summary.totals.base_salary)}`} icon={Wallet} tone="slate" />
           <SummaryCard label="Razlike prema prometu" value={km(summary.totals.turnover_difference)} icon={TrendingUp} tone="blue" />
           <SummaryCard label="Stimulacije" value={km(summary.totals.stimulation)} icon={Target} tone="amber" />
-          <SummaryCard label="Prevoz" value={km(summary.totals.transport)} icon={Bus} tone="violet" />
-          <SummaryCard label="Ukupno plate" value={km(summary.totals.total)} hint={`Sa prevozom: ${km(summary.totals.total_with_transport)}`} icon={Calculator} tone="teal" highlight />
+          <SummaryCard label="Topli obrok + prevoz" value={km(summary.totals.meal_allowance + summary.totals.transport)} hint={`Obrok ${km(summary.totals.meal_allowance)} · prevoz ${km(summary.totals.transport)}`} icon={Bus} tone="violet" />
+          <SummaryCard label="Za isplatu" value={km(summary.totals.total_payout)} hint={`Plate: ${km(summary.totals.total)}`} icon={Calculator} tone="teal" highlight />
         </div>
       )}
 
@@ -554,13 +598,15 @@ function SummaryView({ periods, onChanged, onGoUpload }: { periods: PayrollPerio
                 <tr>
                   <th className="w-8 px-3 py-3" />
                   <th className="px-3 py-3 text-left">Radnik</th>
+                  <th className="px-3 py-3 text-left">Kategorija</th>
                   <th className="px-3 py-3 text-left">Prodavnice</th>
                   <th className="px-3 py-3 text-right">Promet CY</th>
-                  <th className="px-3 py-3 text-right">Osnovna</th>
+                  <th className="px-3 py-3 text-right">Ugovorna</th>
+                  <th className="px-3 py-3 text-right">Dodatak kat.</th>
                   <th className="px-3 py-3 text-right">Razlika</th>
                   <th className="px-3 py-3 text-right">Stimulacija</th>
-                  <th className="px-3 py-3 text-right">Ukupno</th>
-                  <th className="px-3 py-3 text-right">Prevoz</th>
+                  <th className="px-3 py-3 text-right">Obrok + prevoz</th>
+                  <th className="px-3 py-3 text-right">Za isplatu</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -588,17 +634,25 @@ function SummaryView({ periods, onChanged, onGoUpload }: { periods: PayrollPerio
                             )}
                           </p>
                         </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from(new Map(w.stores.map((s) => [`${s.position_type}|${s.category ?? ''}`, s])).values()).map((s) => (
+                              <CategoryChip key={`${s.position_type}-${s.category}`} store={s} />
+                            ))}
+                          </div>
+                        </td>
                         <td className="px-3 py-2.5 text-xs text-gray-600 dark:text-gray-300">{w.stores.map((s) => s.store_name).join(', ')}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{km(w.totals.turnover_worker_cy)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{km(w.totals.base_salary)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{km(w.totals.contract_salary)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300">{km(w.totals.base_salary)}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums text-blue-700 dark:text-blue-300">{km(w.totals.turnover_difference)}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums text-amber-700 dark:text-amber-300">{km(w.totals.stimulation)}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{km(w.totals.total)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums text-gray-500">{km(w.totals.transport)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-gray-500">{km(w.totals.meal_allowance + w.totals.transport)}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{km(w.totals.total_payout)}</td>
                       </tr>
                       {open && (
                         <tr>
-                          <td colSpan={9} className="bg-gray-50 px-4 py-4 dark:bg-gray-900/40">
+                          <td colSpan={11} className="bg-gray-50 px-4 py-4 dark:bg-gray-900/40">
                             <WorkerResultDetail result={w} />
                           </td>
                         </tr>
@@ -608,7 +662,7 @@ function SummaryView({ periods, onChanged, onGoUpload }: { periods: PayrollPerio
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={11} className="px-4 py-10 text-center text-gray-500">
                       Nema rezultata za zadanu pretragu.
                     </td>
                   </tr>
@@ -805,11 +859,19 @@ function UploadView({ meta, onUploaded, onGoLinks, onGoSummary }: { meta: Payrol
             <Calculator className="h-4 w-4 text-teal-600" /> Način obračuna
           </p>
           <ol className="list-decimal space-y-1.5 pl-5 text-gray-600 dark:text-gray-300">
-            <li>Osnovna plata prema poziciji i kategoriji (A/B/C). Ako je radnik radio u više prodavnica, dijeli se prema radnim danima.</li>
+            <li>
+              Ugovorna plata iz Excel kolone <b>„Ugovorna plata”</b> + dodatak kategorije (A/B/C) = zagarantovani dio. Ako je radnik radio u više prodavnica, dijeli se prema radnim
+              danima.
+            </li>
             <li>KP = Neto plata LY (radnik) / Bruto promet radnika LY.</li>
-            <li>Plata prema prometu = KP × Bruto promet radnika CY. Dio razlike prema prometu = iznos iznad osnovne plate.</li>
+            <li>
+              Budžet plate = KP × Bruto promet radnika CY. Iz budžeta se pokriva zagarantovani dio i topli obrok (<b>„Topli obrok”</b> dnevni iznos × radni dani); ostatak je
+              razlika prema prometu.
+            </li>
             <li>Ako je promet prodavnice CY ≥ plan prodavnice: stimulacija = (promet − plan) × KP × učešće radnika u prometu prodavnice.</li>
-            <li>Plata po prodavnicama se sabira u ukupnu platu. Prevoz se prikazuje zasebno.</li>
+            <li>
+              Za isplatu = plata + stimulacija + topli obrok (prikazan zasebno) + prevoz. Sve prodavnice se sabiraju u ukupan iznos.
+            </li>
           </ol>
         </div>
         {last && (
@@ -907,7 +969,10 @@ function CategoriesView({ categories, onSaved }: { categories: SalaryCategory[];
         ))}
       </div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-gray-500 dark:text-gray-400">Pozicija iz Excela koja sadrži „Šef” ili „Poslovođa” koristi kategorije šefova, ostale kategorije prodavača. Izmjena se odmah primjenjuje na sve obračune.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Iznos je mjesečni dodatak koji se dodaje na ugovornu platu iz Excela. Pozicija koja sadrži „Šef” ili „Poslovođa” koristi kategorije šefova, ostale kategorije prodavača. Izmjena se odmah
+          primjenjuje na sve obračune.
+        </p>
         <button
           type="button"
           disabled={!dirty || saving}

@@ -119,7 +119,10 @@ class RetailPayrollController extends Controller
             $this->rowsQuery()->where('r.year', (int) $request->year)->where('r.month', (int) $request->month)->get()
         );
 
-        $totals = ['base_salary' => 0, 'turnover_difference' => 0, 'salary' => 0, 'stimulation' => 0, 'total' => 0, 'transport' => 0, 'total_with_transport' => 0];
+        $totals = [
+            'contract_salary' => 0, 'base_salary' => 0, 'turnover_difference' => 0, 'salary' => 0, 'stimulation' => 0,
+            'total' => 0, 'meal_allowance' => 0, 'transport' => 0, 'total_with_transport' => 0, 'total_payout' => 0,
+        ];
         foreach ($workers as $w) {
             foreach ($totals as $k => $_) {
                 $totals[$k] += $w['totals'][$k];

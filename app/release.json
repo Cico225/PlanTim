@@ -1,8 +1,9 @@
 {
-    "version": "1.2.36",
-    "version_name": "Release 2026-10-09",
-    "release_notes": "modul rezultati",
+    "version": "1.2.37",
+    "version_name": "Release 2026-10-13",
+    "release_notes": "dodata reultata",
     "changelog": [
+        "dodata reultata",
         "modul rezultati",
         "Dorada modula ostvareni rezultati",
         "Dorada modula ZAbrane",
@@ -21,7 +22,6 @@
         "postavljanje recaptca",
         "korekcija porta",
         "podesavanje porta",
-        "ukidanje porta",
-        "SSL dorada C"
+        "ukidanje porta"
     ]
 }
