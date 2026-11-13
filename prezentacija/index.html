@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PlanTim — prezentacija</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --teal: #0d9488;
+    --cyan: #0891b2;
+    --sky: #0284c7;
+    --violet: #7c3aed;
+    --pink: #db2777;
+    --orange: #ea580c;
+    --amber: #d97706;
+    --green: #16a34a;
+    --planika: #c8102e;
+    --text: #0f172a;
+    --muted: #526079;
+    --card: rgba(255, 255, 255, 0.75);
+    --border: rgba(15, 23, 42, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; color: var(--text);
+    background: radial-gradient(1200px 800px at 10% 0%, #e6fffb 0%, transparent 60%), radial-gradient(1000px 700px at 100% 100%, #fdf2f8 0%, transparent 60%), var(--bg);
+    font-family: "Segoe UI Variable", "Segoe UI", Inter, system-ui, -apple-system, sans-serif; }
+
+  /* ---------- background ---------- */
+  #particles { position: fixed; inset: 0; z-index: 0; }
+  .whiteout { position: fixed; inset: 0; z-index: 0; background: radial-gradient(ellipse at 50% 45%, #eef2f7 0%, #dde4ee 100%);
+    opacity: 0; pointer-events: none; transition: opacity 1s ease; }
+  body.on-intro .whiteout { opacity: 1; }
+  /* intro order: empty screen → Edel → network from the centre → text (the page chrome comes with the text) */
+  .counter, .progress { transition: opacity .8s ease; }
+  body.quiet .counter, body.quiet .progress { opacity: 0; }
+  .blob { position: fixed; border-radius: 50%; filter: blur(90px); opacity: .5; z-index: 0; animation: drift 18s ease-in-out infinite alternate; }
+  .blob.b1 { width: 520px; height: 520px; background: #99f6e4; top: -160px; left: -120px; }
+  .blob.b2 { width: 460px; height: 460px; background: #ddd6fe; bottom: -180px; right: -100px; animation-delay: -6s; }
+  .blob.b3 { width: 380px; height: 380px; background: #fecdd3; top: 40%; left: 55%; opacity: .45; animation-delay: -12s; }
+  @keyframes drift { to { transform: translate(80px, 60px) scale(1.15); } }
+
+  /* ---------- slides ---------- */
+  .deck { position: relative; z-index: 1; height: 100%; }
+  .slide { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;
+    padding: 6vh 7vw 10vh; opacity: 0; pointer-events: none; transform: scale(1.04); filter: blur(6px);
+    transition: opacity .8s ease, transform .9s cubic-bezier(.2,.8,.2,1), filter .8s ease; }
+  .slide.active { opacity: 1; pointer-events: auto; transform: none; filter: none; }
+  .slide.road-slide { justify-content: flex-start; padding-top: 5.5vh; padding-bottom: 5vh; }
+  .slide.prev { transform: scale(.94); }
+
+  .kicker { font-size: clamp(12px, 1.1vw, 15px); letter-spacing: .3em; text-transform: uppercase; color: var(--teal); font-weight: 600; }
+  h1 { font-size: clamp(44px, 7.5vw, 110px); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  h2 { font-size: clamp(32px, 4.4vw, 64px); font-weight: 800; letter-spacing: -.02em; line-height: 1.05; text-align: center; }
+  .grad { background: linear-gradient(90deg, var(--teal), var(--sky), var(--violet), var(--pink), var(--teal)); background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 8s linear infinite; }
+  @keyframes shine { to { background-position: 300% 0; } }
+  .lead { font-size: clamp(16px, 1.6vw, 22px); color: var(--muted); max-width: 900px; text-align: center; line-height: 1.5; }
+
+  /* staggered reveal */
+  .r { opacity: 0; transform: translateY(28px); }
+  .slide.active .r { animation: rise .8s cubic-bezier(.2,.8,.2,1) forwards; animation-delay: calc(var(--d, 0) * 1s); }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .slide.active .pop { animation: pop .7s cubic-bezier(.3,1.6,.5,1) forwards; animation-delay: calc(var(--d, 0) * 1s); }
+  .pop { opacity: 0; transform: scale(.4); }
+  @keyframes pop { to { opacity: 1; transform: none; } }
+
+  /* ---------- slide 1: Edel ---------- */
+  .intro { display: grid; grid-template-columns: minmax(260px, 1fr) 1.3fr; align-items: center; gap: 4vw; width: 100%; max-width: 1400px; }
+  .edel-stage { position: relative; height: min(62vh, 560px); display: flex; align-items: flex-end; justify-content: flex-start; padding-left: 2vw; }
+  .edel { position: relative; width: min(24vw, 290px, calc(min(62vh, 560px) * .55)); transform: translateX(-130vw); perspective: 1200px; }
+  /* Edel is built from image layers: legs swing around the hips, the whole arm waves around the shoulder
+     (its root continues under the dress, and a dress patch is drawn over it), lids blink. */
+  .edel-turn { transform-style: preserve-3d; transform-origin: 50% 100%; }
+  .edel-bob { transform-origin: 50% 100%; }
+  .edel-fig { position: relative; width: 100%; aspect-ratio: 576 / 1024; transform-origin: 50% 100%; filter: drop-shadow(0 22px 26px rgba(200, 16, 46, .2)); }
+  .edel-fig img { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; pointer-events: none; -webkit-user-drag: none; }
+  /* each leg: thigh rotates at the hip, shin + boot bends at the knee (the thigh has a rounded bottom over the knee) */
+  .edel-fig .leg { position: absolute; inset: 0; }
+  .edel-fig .leg-l { transform-origin: 42.4% 73.7%; }
+  .edel-fig .leg-r { transform-origin: 58% 73.7%; }
+  .edel-fig .leg-l .thigh { clip-path: polygon(25% 74.6%, 50% 74.6%, 50% 78.6%, 46% 78.6%, 44.5% 79.8%, 41% 80.4%, 37.5% 79.8%, 36% 78.6%, 25% 78.6%); }
+  .edel-fig .leg-r .thigh { clip-path: polygon(50% 74.6%, 75% 74.6%, 75% 78.6%, 64.4% 78.6%, 63% 79.8%, 59.6% 80.4%, 56.2% 79.8%, 54.8% 78.6%, 50% 78.6%); }
+  .edel-fig .leg-l .shin { clip-path: polygon(0 78.2%, 50% 78.2%, 50% 100%, 0 100%); transform-origin: 41% 78.9%; }
+  .edel-fig .leg-r .shin { clip-path: polygon(50% 78.2%, 100% 78.2%, 100% 100%, 50% 100%); transform-origin: 59.6% 78.9%; }
+  .edel-fig .body { clip-path: inset(0 0 24.4% 0); z-index: 1; }
+  .edel-fig .arm { transform-origin: 39.06% 53.71%; z-index: 2; }
+  .edel-fig .mouth { z-index: 1; transform-origin: 52.3% 38.4%; }
+  .edel.talking .mouth { animation: talk .62s linear infinite; }
+  @keyframes talk {
+    0%, 100% { transform: scaleY(1); } 15% { transform: scaleY(.35); } 30% { transform: scaleY(.9); } 45% { transform: scaleY(.5); }
+    60% { transform: scaleY(1); } 75% { transform: scaleY(.3); } 90% { transform: scaleY(.75); }
+  }
+  .edel-fig .petal { z-index: 2; }
+  .edel-fig .patch { z-index: 3; }
+  .edel-fig .lid { position: absolute; z-index: 1; top: 30.4%; height: 7.2%; width: 15%; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+    background: radial-gradient(ellipse at 50% 35%, #fbf8f8, #f5f0f1); border-bottom: 3px solid #3a1f22;
+    box-shadow: 0 -2px 4px 3px #f8f4f5; transform: scaleY(0); transform-origin: 50% 0; }
+  .edel-fig .lid-l { left: 33.8%; }
+  .edel-fig .lid-r { left: 55.8%; }
+  .edel::after { content: ""; position: absolute; left: 14%; right: 14%; bottom: -2.5%; height: 6%; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(15,23,42,.28), transparent); z-index: -1; }
+
+  /* the intro slide stays calm for 5 s, then Edel walks in (keyframes walkX, walkLeg*, walkShin*, walkBob are generated in JS),
+     turns, waves and greets; the people network then grows from the centre of the screen (see the canvas code) */
+  .slide.active .edel { animation: walkX 4.75s linear 5.3s both, showUp 1ms 5.3s both; }
+  .slide.active .edel .edel-turn { animation: turnFace .9s cubic-bezier(.3,1.35,.5,1) 9.85s both, lean 2.8s ease-in-out 10.55s; }
+  .slide.active .edel .edel-bob { animation: walkBob 4.75s linear 5.3s, breathe 3.4s ease-in-out 10.35s infinite; }
+  .slide.active .edel .leg-l { animation: walkLegL 4.75s linear 5.3s both; }
+  .slide.active .edel .leg-r { animation: walkLegR 4.75s linear 5.3s both; }
+  .slide.active .edel .leg-l .shin { animation: walkShinL 4.75s linear 5.3s both; }
+  .slide.active .edel .leg-r .shin { animation: walkShinR 4.75s linear 5.3s both; }
+  .slide.active .edel .arm { animation: armSwing .95s ease-in-out 5.3s 5, wave .8s ease-in-out 10.55s 3, waveIdle 7s ease-in-out 14.2s infinite; }
+  @keyframes showUp { from { visibility: hidden; } to { visibility: visible; } }
+  .slide.active [data-edel] .lid { animation: blink 4.4s ease-in-out 1.4s infinite; }
+
+  @keyframes turnFace { 0% { transform: rotateY(24deg); } 100% { transform: rotateY(0); } }
+  @keyframes lean { 0%, 100% { transform: rotate(0); } 20%, 80% { transform: rotate(-3deg) translateY(-3px); } }
+  @keyframes breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, .992); } }
+  @keyframes armSwing { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(5deg); } 75% { transform: rotate(1deg); } }
+  @keyframes wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+  @keyframes waveIdle {
+    0%, 36%, 100% { transform: rotate(0); }
+    6%, 18%, 30% { transform: rotate(12deg); }
+    12%, 24% { transform: rotate(1deg); }
+  }
+  @keyframes blink { 0%, 90%, 100% { transform: scaleY(0); } 93% { transform: scaleY(1); } 96% { transform: scaleY(0); } }
+
+  /* the bubble sits right of Edel's head, never over him */
+  .bubble { position: absolute; left: 97%; top: 2%; width: max-content; max-width: min(270px, 21vw); background: #fff; color: #0f172a; padding: 14px 20px; border-radius: 22px 22px 22px 4px;
+    font-weight: 600; font-size: clamp(14px, 1.3vw, 19px); line-height: 1.4; box-shadow: 0 20px 50px rgba(200,16,46,.18); border: 1px solid rgba(200,16,46,.15);
+    opacity: 0; transform: scale(.3) translateY(20px); transform-origin: bottom left; z-index: 2; }
+  .slide.active .bubble { animation: pop .6s cubic-bezier(.3,1.6,.5,1) 10.65s forwards; }
+  .bubble .wave-emoji { display: inline-block; transform-origin: 70% 70%; }
+  .slide.active .bubble .wave-emoji { animation: handWave 1s ease-in-out 11.05s 3; }
+  @keyframes handWave { 0%,100% { transform: rotate(0); } 25% { transform: rotate(20deg); } 75% { transform: rotate(-12deg); } }
+
+  .intro-text { display: flex; flex-direction: column; gap: 22px; }
+  .slide.active .intro-text .r { animation-delay: calc(18.4s + var(--d, 0) * 1s); }
+  .intro-text .lead { text-align: left; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 14px; color: var(--text); backdrop-filter: blur(8px); }
+
+  /* ---------- generic cards ---------- */
+  .glass { background: linear-gradient(160deg, rgba(255,255,255,.92), rgba(255,255,255,.7)); border: 1px solid var(--border);
+    border-radius: 22px; backdrop-filter: blur(14px); box-shadow: 0 18px 50px rgba(15,23,42,.08), 0 2px 6px rgba(15,23,42,.04); }
+
+  /* slide 2: stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; width: 100%; max-width: 1200px; margin-top: 5vh; }
+  .stat { padding: 30px 24px; text-align: center; position: relative; overflow: hidden; }
+  .stat::after { content: ""; position: absolute; inset: auto -30% -60% -30%; height: 80%; background: radial-gradient(circle, var(--c, var(--teal)) 0%, transparent 65%); opacity: .12; }
+  .stat .num { font-size: clamp(40px, 4.6vw, 68px); font-weight: 800; color: var(--c, var(--teal)); }
+  .stat .lbl { color: var(--muted); margin-top: 6px; font-size: 15px; }
+  .pillars { display: flex; gap: 14px; margin-top: 4vh; flex-wrap: wrap; justify-content: center; }
+
+  /* slide 3: modules grid */
+  .mods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; max-width: 1300px; margin-top: 4vh; }
+  .mod { padding: 20px 20px 18px; display: flex; gap: 14px; align-items: flex-start; transition: transform .3s, border-color .3s; }
+  .mod:hover { transform: translateY(-6px); border-color: var(--c); }
+  .ico { width: 46px; height: 46px; flex-shrink: 0; border-radius: 14px; display: grid; place-items: center; font-size: 22px;
+    background: color-mix(in srgb, var(--c) 12%, white); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); }
+  .edel-ico { overflow: hidden; place-items: start center; }
+  .edel-ico img { width: 92%; height: auto; margin-top: 3px; filter: drop-shadow(0 2px 3px rgba(200, 16, 46, .25)); }
+  .mod h4 { font-size: 16px; font-weight: 700; }
+  .mod p { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+  /* slide 4: orbit */
+  .orbit-wrap { position: relative; width: min(78vh, 680px); aspect-ratio: 1; margin-top: 2vh; }
+  .orbit-ring { position: absolute; inset: 9%; border-radius: 50%; border: 1.5px dashed rgba(15,23,42,.18); animation: spin 60s linear infinite; }
+  .orbit-ring.r2 { inset: 22%; animation-duration: 40s; animation-direction: reverse; border-color: rgba(200,16,46,.3); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .core { position: absolute; left: 35%; top: 35%; width: 30%; aspect-ratio: 1; border-radius: 50%; z-index: 1; color: #fff;
+    display: grid; place-items: center; text-align: center; background: radial-gradient(circle at 30% 30%, #fb7185, #e11d48 50%, #9f1239);
+    box-shadow: 0 0 70px rgba(200,16,46,.45), inset 0 -10px 30px rgba(0,0,0,.2); }
+  .core b { font-size: clamp(20px, 2.6vw, 34px); display: block; }
+  .core span { font-size: 12px; opacity: .85; letter-spacing: .15em; text-transform: uppercase; }
+  .slide.active .core { animation: pop .7s cubic-bezier(.3,1.6,.5,1) .2s forwards, pulse 3s ease-in-out 1s infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 110px rgba(200,16,46,.7), inset 0 -10px 30px rgba(0,0,0,.2); } }
+  .node { position: absolute; width: 23%; left: calc(50% + 39% * cos(var(--a)) - 11.5%); top: calc(50% + 39% * sin(var(--a)) - 11.5%);
+    aspect-ratio: 1; border-radius: 26px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 8px; }
+  .node .ico { width: 52px; height: 52px; font-size: 26px; margin-bottom: 8px; }
+  .node b { font-size: clamp(13px, 1.25vw, 17px); }
+  .node small { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .links { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .links line { stroke: rgba(200,16,46,.3); stroke-width: .4; stroke-dasharray: 40; stroke-dashoffset: 40; }
+  .slide.active .links line { animation: drawLine 1.2s ease forwards; animation-delay: calc(var(--d) * 1s); }
+  @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+  /* split layouts */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; width: 100%; max-width: 1350px; margin-top: 4vh; align-items: stretch; }
+  .list { display: grid; gap: 12px; }
+  .row { display: flex; gap: 14px; align-items: center; padding: 14px 18px; }
+  .row b { font-size: 16px; }
+  .row p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .phone.compact { gap: 10px; padding: 22px 24px; }
+  .phone.compact .list { gap: 4px; }
+  .phone.compact .row { padding: 8px 14px; }
+  .tag { margin-left: auto; font-size: 11px; padding: 4px 10px; border-radius: 999px; background: rgba(13,148,136,.12); color: var(--teal); font-weight: 600; white-space: nowrap; }
+
+  /* payroll mock */
+  .phone { padding: 26px; display: flex; flex-direction: column; gap: 14px; }
+  .phone .top { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 14px; }
+  .phone .total { font-size: clamp(36px, 3.8vw, 54px); font-weight: 800; }
+  .stack { display: flex; height: 12px; border-radius: 999px; overflow: hidden; gap: 3px; background: rgba(15,23,42,.06); }
+  .stack i { display: block; height: 100%; width: 0; border-radius: 999px; }
+  .slide.active .stack i { animation: grow 1.2s cubic-bezier(.2,.8,.2,1) forwards; animation-delay: calc(var(--d) * 1s); }
+  @keyframes grow { to { width: var(--w); } }
+  .wf { display: grid; gap: 10px; }
+  .wf-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; font-size: 14px; }
+  .wf-row .ico { width: 34px; height: 34px; border-radius: 10px; font-size: 16px; }
+  .wf-group { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px;
+    background: color-mix(in srgb, var(--c) 7%, rgba(255,255,255,.6)); border: 1px solid color-mix(in srgb, var(--c) 24%, transparent); }
+  .wf-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+  .wf-head b { font-size: 15px; letter-spacing: 0; }
+  .wf-group .wf-row { grid-template-columns: 26px 1fr auto; gap: 10px; font-size: 13.5px; }
+  .wf-group .wf-row .ico { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
+  .track { grid-column: 2 / 4; height: 6px; border-radius: 99px; background: rgba(15,23,42,.07); position: relative; margin-top: -4px; }
+  .track i { position: absolute; top: 0; bottom: 0; left: var(--l); width: 0; border-radius: 99px; background: var(--c); }
+  .slide.active .track i { animation: grow 1s cubic-bezier(.2,.8,.2,1) forwards; animation-delay: calc(var(--d) * 1s); }
+  .badge-row { display: flex; gap: 10px; }
+  .cat { flex: 1; padding: 14px; border-radius: 16px; text-align: center; font-weight: 800; font-size: 28px; }
+  .cat small { display: block; font-size: 11px; font-weight: 500; opacity: .8; }
+
+  /* roadmap — calm, readable: two clear columns, minimal motion, muted colors */
+  body.on-roadmap #particles { opacity: .22; }
+  .road-head { width: 100%; max-width: 1100px; text-align: center; margin-top: 0; flex-shrink: 0; }
+  .road-head h2 { font-size: clamp(28px, 3.4vw, 40px); letter-spacing: -.03em; }
+  .road-msg { margin: 8px auto 0; max-width: 620px; font-size: clamp(13px, 1.2vw, 15px); color: var(--muted); line-height: 1.45; }
+  .road-pulse { display: inline-flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .road-pulse .live { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+  .road-pulse strong { color: var(--text); }
+  .road-meter { width: 88px; height: 4px; border-radius: 99px; background: rgba(15,23,42,.1); overflow: hidden; }
+  .road-meter i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--teal); }
+  .slide.active .road-meter i { animation: meterFill 1.2s ease .2s forwards; }
+  @keyframes meterFill { to { width: var(--p); } }
+
+  .road { display: grid; grid-template-columns: 1fr 1fr; gap: 5vw; width: 100%; max-width: 1100px; margin-top: 3.5vh; align-items: start; }
+  .road-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+  .road-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px;
+    border-bottom: 2px solid color-mix(in srgb, var(--c) 35%, transparent); }
+  .road-label h3 { font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--c); }
+  .road-label small { font-size: 11px; color: var(--muted); }
+
+  .done-flow { position: relative; height: auto; overflow: visible; mask-image: none; -webkit-mask-image: none; }
+  .done-flow::before { display: none; }
+  .done-track { position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+  .slide.active .done-track { animation: none; }
+  .done-tile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; width: auto; max-width: none;
+    border-radius: 14px; background: rgba(255,255,255,.55); border: 1px solid rgba(15,23,42,.06); backdrop-filter: blur(6px);
+    align-self: stretch; flex-direction: row; text-align: left; }
+  .done-tile:nth-child(odd), .done-tile:nth-child(even) { align-self: stretch; flex-direction: row; text-align: left; }
+  .done-tile::before { display: none; }
+  .done-tile .spin { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 17px; flex-shrink: 0;
+    background: color-mix(in srgb, var(--teal) 12%, #fff); border: 1px solid color-mix(in srgb, var(--teal) 28%, transparent);
+    box-shadow: none; overflow: hidden; color: var(--text); }
+  .done-tile .spin img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+  .slide.active .done-tile .spin { animation: none; }
+  .slide.active .done-tile .spin::after { display: none; }
+  .done-tile b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+  .done-tile em { display: block; margin-top: 1px; font-style: normal; font-size: 10px; font-weight: 700; color: var(--teal);
+    letter-spacing: .08em; text-transform: uppercase; }
+
+  .build { display: grid; gap: 8px; }
+  .build-card { display: grid; grid-template-columns: 48px 1fr; gap: 0 12px; align-items: center; padding: 8px 10px;
+    border-radius: 14px; background: rgba(255,255,255,.55); border: 1px solid rgba(15,23,42,.06); backdrop-filter: blur(6px); overflow: hidden; }
+  .build-ring { position: relative; width: 42px; height: 42px; z-index: 1; }
+  .build-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .build-ring circle { fill: none; stroke-width: 3; }
+  .build-ring .bg { stroke: rgba(15,23,42,.1); }
+  .build-ring .fg { stroke: var(--violet); stroke-linecap: round; stroke-dasharray: 130; stroke-dashoffset: 130; filter: none; }
+  .slide.active .build-ring .fg { animation: ringDraw 1.1s ease forwards; animation-delay: calc(var(--d, 0) * 1s); }
+  @keyframes ringDraw { to { stroke-dashoffset: var(--off); } }
+  .build-ring .pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 800; color: var(--violet); }
+  .build-body { position: relative; min-width: 0; padding: 2px 0; overflow: hidden; }
+  .build-body::after { display: none; }
+  .build-card h4 { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; letter-spacing: -.01em; color: var(--text); }
+  .build-card h4 .ico { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; margin: 0; overflow: hidden; flex-shrink: 0;
+    background: color-mix(in srgb, var(--violet) 10%, #fff); border: 1px solid color-mix(in srgb, var(--violet) 20%, transparent);
+    display: grid; place-items: center; }
+  .build-card h4 .ico img { width: 150%; max-width: none; height: auto; margin-top: 3px; }
+  .slide.active .build-card h4 .ico { animation: none; }
+  .build-morph { height: 15px; margin-top: 3px; position: relative; overflow: hidden; }
+  .build-morph span { position: absolute; inset: 0; font-size: 11.5px; color: var(--muted); opacity: 0; transform: translateY(6px); }
+  .slide.active .build-morph span { animation: morphSwap var(--morph, 9s) ease-in-out infinite; }
+  .build-morph span.is-solo { opacity: 1; transform: none; animation: none !important; }
+  @keyframes morphSwap {
+    0%, 10% { opacity: 0; transform: translateY(6px); }
+    16%, 28% { opacity: 1; transform: translateY(0); }
+    34%, 100% { opacity: 0; transform: translateY(-6px); }
+  }
+  .build-bar { height: 3px; border-radius: 99px; background: rgba(15,23,42,.08); overflow: hidden; margin-top: 7px; }
+  .build-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--violet); box-shadow: none; }
+  .slide.active .build-bar i { animation: buildFill 1.1s ease forwards; animation-delay: calc(var(--d, 0) * 1s + .1s); }
+  @keyframes buildFill { to { width: var(--p); } }
+
+  /* final */
+  .final-edel { width: min(16vw, 190px); }
+  .slide.active .final-edel .arm { animation: waveIdle 3.6s ease-in-out .7s infinite; }
+  .slide.active .final-edel .edel-bob { animation: breathe 3.4s ease-in-out .7s infinite; }
+
+  /* ---------- UI ---------- */
+  .progress { position: fixed; left: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--teal), var(--violet), var(--pink)); z-index: 5; transition: width .6s ease; }
+  .counter { position: fixed; right: 26px; bottom: 30px; font-size: 13px; color: var(--muted); z-index: 5; font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) {
+    .intro, .split { grid-template-columns: 1fr; }
+    .stats, .mods { grid-template-columns: repeat(2, 1fr); }
+    .road { grid-template-columns: 1fr; }
+    .edel-stage { height: 38vh; }
+    .bubble { max-width: 48vw; left: 80%; }
+    .slide { overflow-y: auto; justify-content: flex-start; padding-top: 10vh; }
+  }
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<div class="whiteout"></div>
+<canvas id="particles"></canvas>
+<div class="progress" id="progress"></div>
+<template id="edel-tpl">
+  <div class="edel-turn">
+    <div class="edel-bob">
+      <div class="edel-fig">
+        <div class="leg leg-l"><img class="shin" src="edel-hd.png" alt="" aria-hidden="true" /><img class="thigh" src="edel-hd.png" alt="" aria-hidden="true" /></div>
+        <div class="leg leg-r"><img class="shin" src="edel-hd.png" alt="" aria-hidden="true" /><img class="thigh" src="edel-hd.png" alt="" aria-hidden="true" /></div>
+        <img class="body" src="edel-body.png" alt="Edel" />
+        <img class="mouth" src="edel-mouth.png" alt="" aria-hidden="true" />
+        <span class="lid lid-l"></span><span class="lid lid-r"></span>
+        <img class="arm" src="edel-arm.png" alt="" aria-hidden="true" />
+        <img class="petal" src="edel-petal.png" alt="" aria-hidden="true" />
+        <img class="arm glove" src="edel-glove.png" alt="" aria-hidden="true" />
+        <img class="patch" src="edel-patch.png" alt="" aria-hidden="true" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<main class="deck" id="deck">
+
+  <!-- 1. Intro -->
+  <section class="slide">
+    <div class="intro">
+      <div class="edel-stage">
+        <div class="edel" data-edel>
+          <div class="bubble">Zdravo svima! <span class="wave-emoji">👋</span><br/>Ja sam <b style="color:var(--planika)">Edel</b> i vodim vas kroz PlanTim.</div>
+        </div>
+      </div>
+      <div class="intro-text">
+        <span class="kicker r" style="--d:.6">Digitalni radni prostor kompanije</span>
+        <h1 class="r" style="--d:.8"><span class="grad">PlanTim</span></h1>
+        <p class="lead r" style="--d:1.1">Jedna platforma za ljude, procese, dokumente i znanje — sa posebnim fokusom na poslovanje <b style="color:var(--planika)">Planike</b>.</p>
+        <div class="chips r" style="--d:1.4">
+          <span class="chip">🧩 Modularno</span><span class="chip">📱 Web i mobitel</span><span class="chip">🔐 Uloge i dozvole</span><span class="chip">🤖 AI podrška</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. What is PlanTim -->
+  <section class="slide">
+    <span class="kicker r">Šta je PlanTim</span>
+    <h2 class="r" style="--d:.15">Sve što tim treba, <span class="grad">na jednom mjestu</span></h2>
+    <p class="lead r" style="--d:.3" >Umjesto desetina tabela, mailova i odvojenih aplikacija — jedan sistem sa jednom prijavom, zajedničkim podacima i jasnim dozvolama za svakog korisnika.</p>
+    <div class="stats">
+      <div class="glass stat pop" style="--d:.5;--c:var(--teal)"><div class="num" data-count="18">0</div><div class="lbl">modula</div></div>
+      <div class="glass stat pop" style="--d:.65;--c:var(--sky)"><div class="num" data-count="6">0</div><div class="lbl">Planika podmodula</div></div>
+      <div class="glass stat pop" style="--d:.8;--c:var(--violet)"><div class="num" data-count="1">0</div><div class="lbl">prijava za sve</div></div>
+      <div class="glass stat pop" style="--d:.95;--c:var(--pink)"><div class="num" data-count="24" data-suffix="/7">0</div><div class="lbl">dostupno sa svakog uređaja</div></div>
+    </div>
+    <div class="pillars">
+      <span class="chip r" style="--d:1.2">⚡ Brži procesi</span>
+      <span class="chip r" style="--d:1.3">📊 Odluke na osnovu podataka</span>
+      <span class="chip r" style="--d:1.4">👁️ Transparentnost za zaposlene</span>
+      <span class="chip r" style="--d:1.5">🧾 Manje papira</span>
+    </div>
+  </section>
+
+  <!-- 3. Key modules -->
+  <section class="slide">
+    <h2 class="r" style="--d:.15">Glavni moduli</h2>
+    <div class="mods">
+      <div class="glass mod pop" style="--d:.3;--c:var(--teal)"><div class="ico">📊</div><div><h4>Dashboard</h4><p>Lični pregled zadataka, obavijesti i ključnih brojki.</p></div></div>
+      <div class="glass mod pop" style="--d:.38;--c:var(--sky)"><div class="ico">🗂️</div><div><h4>Projekti i zadaci</h4><p>Planiranje, rokovi, timovi i praćenje napretka.</p></div></div>
+      <div class="glass mod pop" style="--d:.46;--c:var(--violet)"><div class="ico">🤝</div><div><h4>CRM</h4><p>Klijenti, partneri, kontakti i prodajne prilike.</p></div></div>
+      <div class="glass mod pop" style="--d:.54;--c:var(--green)"><div class="ico">👥</div><div><h4>HRM</h4><p>Zaposleni, odsustva, evaluacije i razvoj.</p></div></div>
+      <div class="glass mod pop" style="--d:.62;--c:var(--amber)"><div class="ico">📁</div><div><h4>DMS</h4><p>Dokumenti, verzije, odobravanja i arhiva.</p></div></div>
+      <div class="glass mod pop" style="--d:.7;--c:var(--pink)"><div class="ico">🎓</div><div><h4>LMS edukacije</h4><p>Kursevi, lekcije, kvizovi i certifikati.</p></div></div>
+      <div class="glass mod pop" style="--d:.78;--c:var(--cyan)"><div class="ico">💬</div><div><h4>Inbox i komunikacija</h4><p>Poruke, obavijesti i aktivnosti tima.</p></div></div>
+      <div class="glass mod pop" style="--d:.86;--c:var(--orange)"><div class="ico">🏢</div><div><h4>Sale za sastanke</h4><p>Rezervacije prostora i termina.</p></div></div>
+      <div class="glass mod pop" style="--d:.94;--c:var(--violet)"><div class="ico edel-ico"><img src="edel-hd.png" alt="Edel" /></div><div><h4>AI asistent</h4><p>Pomoć pri radu, pretraga i analiza.</p></div></div>
+      <div class="glass mod pop" style="--d:1.02;--c:var(--sky)"><div class="ico">☁️</div><div><h4>Office 365</h4><p>Povezanost sa Microsoft alatima.</p></div></div>
+      <div class="glass mod pop" style="--d:1.1;--c:var(--green)"><div class="ico">🛡️</div><div><h4>GDPR</h4><p>Zaštita i upravljanje ličnim podacima.</p></div></div>
+      <div class="glass mod pop" style="--d:1.18;--c:var(--planika)"><div class="ico">🌸</div><div><h4>Planika</h4><p>Poslovni moduli kompanije — sljedeći slajd.</p></div></div>
+    </div>
+  </section>
+
+  <!-- 4. Planika overview -->
+  <section class="slide">
+    <h2 class="r" style="--d:.15">Modul <span style="color:var(--planika)">Planika</span></h2>
+    <div class="orbit-wrap">
+      <div class="orbit-ring"></div><div class="orbit-ring r2"></div>
+      <svg class="links" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <line x1="50" y1="50" x2="50" y2="11" style="--d:.4"/>
+        <line x1="50" y1="50" x2="83.8" y2="30.5" style="--d:.5"/>
+        <line x1="50" y1="50" x2="83.8" y2="69.5" style="--d:.6"/>
+        <line x1="50" y1="50" x2="50" y2="89" style="--d:.7"/>
+        <line x1="50" y1="50" x2="16.2" y2="69.5" style="--d:.8"/>
+        <line x1="50" y1="50" x2="16.2" y2="30.5" style="--d:.9"/>
+      </svg>
+      <div class="core pop" style="--d:.2"><div><b>Planika</b><span>poslovanje</span></div></div>
+      <div class="glass node pop" style="--a:-90deg;--d:.5;--c:var(--pink)"><div class="ico">🛍️</div><b>Maloprodaja</b><small>prodavnice i timovi</small></div>
+      <div class="glass node pop" style="--a:-30deg;--d:.6;--c:var(--teal)"><div class="ico">💶</div><b>Finansije</b><small>krediti i ugovori</small></div>
+      <div class="glass node pop" style="--a:30deg;--d:.7;--c:var(--green)"><div class="ico">🧑‍💼</div><b>HR</b><small>ljudski resursi</small></div>
+      <div class="glass node pop" style="--a:90deg;--d:.8;--c:var(--orange)"><div class="ico">📦</div><b>Nabavka</b><small>dobavljači i narudžbe</small></div>
+      <div class="glass node pop" style="--a:150deg;--d:.9;--c:var(--violet)"><div class="ico">📣</div><b>Marketing</b><small>kampanje i sadržaj</small></div>
+      <div class="glass node pop" style="--a:210deg;--d:1;--c:var(--amber)"><div class="ico">⭐</div><b>Planika Club</b><small>lojalnost kupaca</small></div>
+    </div>
+  </section>
+
+  <!-- 5. Maloprodaja -->
+  <section class="slide">
+    <span class="kicker r" style="color:var(--pink)">Planika · Maloprodaja</span>
+    <h2 class="r" style="--d:.15">Kontinuiran uvid u rezultate = <span class="grad">veća motivacija</span></h2>
+    <div class="split">
+      <div class="list">
+        <div class="glass row r" style="--d:.3;--c:var(--sky)"><div class="ico">🗓️</div><div><b>Plan kontrola i obilazaka</b><p>Kalendar posjeta prodavnicama i zadaci za menadžere.</p></div></div>
+        <div class="glass row r" style="--d:.4;--c:var(--teal)"><div class="ico">✅</div><div><b>Evidencija kontrola</b><p>Checkliste na terenu, fotografije i nalazi.</p></div></div>
+        <div class="glass row r" style="--d:.5;--c:var(--violet)"><div class="ico">🎓</div><div><b>Plan edukacija</b><p>Obuke prodajnog osoblja, povezano sa LMS-om.</p></div></div>
+        <div class="glass row r" style="--d:.6;--c:var(--amber)"><div class="ico">🏅</div><div><b>Evaluacije i kategorije A/B/C</b><p>Bodovanje rezultata, 7 koraka prodaje, KPI.</p></div></div>
+        <div class="glass row r" style="--d:.7;--c:var(--pink)"><div class="ico">📦</div><div><b>Reklamacije</b><p>Prijem, fotografije, statusi i dopisi kupcima.</p></div></div>
+        <div class="glass row r" style="--d:.8;--c:var(--green)"><div class="ico">💰</div><div><b>Ostvareni rezultati</b><p>Praćenje ostvarenih rezultata – ličnih primanja</p></div><span class="tag">novo</span></div>
+      </div>
+      <div class="glass phone pop" style="--d:.6">
+        <div class="top"><span>💸 Za isplatu · April</span><span style="color:var(--amber)">✨ Plan ispunjen</span></div>
+        <div class="total"><span class="grad">1.700,50</span> <small style="font-size:18px;color:var(--muted)">KM</small></div>
+        <div class="stack">
+          <i style="--w:84%;--d:.9;background:var(--teal)"></i><i style="--w:12%;--d:1.05;background:var(--amber)"></i>
+          <i style="--w:3%;--d:1.2;background:var(--violet)"></i>
+        </div>
+        <div class="wf">
+          <div class="wf-group r" style="--d:1;--c:var(--teal)">
+            <div class="wf-head"><span>1 · Ugovorna primanja</span><b>1.446,38</b></div>
+            <div class="wf-row"><div class="ico" style="--c:var(--teal)">💵</div><span>Ugovorna plata</span><b>1.040,57</b></div>
+            <div class="wf-row"><div class="ico" style="--c:var(--orange)">🍽️</div><span>Topli obrok <small style="color:var(--muted)">(13 × 25)</small></span><b>325,00</b></div>
+            <div class="wf-row"><div class="ico" style="--c:var(--sky)">🚌</div><span>Prevoz</span><b>60,00</b></div>
+            <div class="wf-row"><div class="ico" style="--c:var(--green)">⏳</div><span>Minuli rad</span><b>20,81</b></div>
+          </div>
+          <div class="wf-group r" style="--d:1.25;--c:var(--amber)">
+            <div class="wf-head"><span>2 · Stimulacija</span><b>209,12</b></div>
+            <div class="wf-row"><div class="ico" style="--c:var(--sky)">🚀</div><span>Stimulacija prema prometu</span><b>84,22</b></div>
+            <div class="wf-row"><div class="ico" style="--c:var(--amber)">🏆</div><span>Stimulacija na ostvareni plan</span><b>124,90</b></div>
+          </div>
+          <div class="wf-group r" style="--d:1.5;--c:var(--violet)">
+            <div class="wf-head"><span>3 · Rad u drugim prodavnicama</span><b>45,00</b></div>
+            <div class="wf-row"><div class="ico" style="--c:var(--violet)">🏬</div><span>Stimulacija za rad u drugim prodavnicama</span><b>45,00</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Finansije + HR -->
+  <section class="slide">
+    <h2 class="r" style="--d:.15">Manje papira, <span class="grad">više kontrole</span></h2>
+    <div class="split">
+      <div class="glass phone compact pop" style="--d:.3">
+        <div class="top"><span style="font-size:18px;color:var(--text);font-weight:700">💶 Finansije — Krediti</span><span class="tag">aktivno</span></div>
+        <div class="list">
+          <div class="row r" style="--d:.5"><div class="ico" style="--c:var(--teal)">📥</div><div><b>Uvoz administrativnih zabrana</b><p>Excel i PDF uvoz sa jasnim izvještajem o rezultatu.</p></div></div>
+          <div class="row r" style="--d:.6"><div class="ico" style="--c:var(--sky)">🔎</div><div><b>Skeniranje i OCR</b><p>Automatsko čitanje broja kredita iz dokumenata.</p></div></div>
+          <div class="row r" style="--d:.7"><div class="ico" style="--c:var(--violet)">📑</div><div><b>Spiskovi aktivnih ugovora</b><p>Pregled po firmama, registrar i izmjene.</p></div></div>
+          <div class="row r" style="--d:.8"><div class="ico" style="--c:var(--amber)">📊</div><div><b>Izvještaji</b><p>Stanje zabrana i obaveza u svakom trenutku.</p></div></div>
+        </div>
+        <div class="top r" style="--d:.9;margin-top:4px;padding-top:12px;border-top:1px solid var(--border)"><span style="font-size:18px;color:var(--text);font-weight:700">📦 Reklamacije</span><span class="tag">aktivno</span></div>
+        <div class="list">
+          <div class="row r" style="--d:1"><div class="ico" style="--c:var(--pink)">📸</div><div><b>Prijem i evidencija</b><p>Fotografije, statusi i praćenje svake reklamacije.</p></div></div>
+          <div class="row r" style="--d:1.1"><div class="ico" style="--c:var(--orange)">✉️</div><div><b>Dopisi kupcima</b><p>Odgovori i rješenja kupcima na jednom mjestu.</p></div></div>
+        </div>
+      </div>
+      <div class="glass phone pop" style="--d:.45">
+        <div class="top"><span style="font-size:18px;color:var(--text);font-weight:700">🧑‍💼 HR — životni ciklus zaposlenog</span></div>
+        <div class="chips" style="gap:8px">
+          <span class="chip r" style="--d:.6">🧲 ATS zapošljavanje</span><span class="chip r" style="--d:.65">🚪 Onboarding</span>
+          <span class="chip r" style="--d:.7">📝 Ugovori</span><span class="chip r" style="--d:.75">🗃️ Kartoteka</span>
+          <span class="chip r" style="--d:.8">🏛️ Odjeli</span><span class="chip r" style="--d:.85">⏱️ Evidencije rada</span>
+          <span class="chip r" style="--d:.9">🌴 Godišnji i bolovanja</span><span class="chip r" style="--d:.95">📈 Evaluacije</span>
+          <span class="chip r" style="--d:1">🎓 Edukacije</span><span class="chip r" style="--d:1.05">💎 Talent management</span>
+          <span class="chip r" style="--d:1.1">⚖️ Rješenja i odluke</span><span class="chip r" style="--d:1.15">👋 Offboarding</span>
+        </div>
+        <p class="lead r" style="--d:1.3;text-align:left;font-size:15px;margin-top:6px">Od prvog razgovora do odlaska — svi podaci o zaposlenom na jednom mjestu.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Roadmap — edit ROADMAP in the script to update this slide -->
+  <section class="slide road-slide" id="roadmap-slide">
+    <div class="road-head">
+      <span class="kicker r" id="road-kicker"></span>
+      <h2 class="r" style="--d:.12" id="road-title"></h2>
+      <p class="road-msg r" style="--d:.3" id="road-msg"></p>
+      <div class="road-pulse r" style="--d:.45">
+        <span class="live"></span>
+        <span id="road-stats"></span>
+        <span class="road-meter" id="road-meter"><i></i></span>
+      </div>
+    </div>
+    <div class="road">
+      <div class="road-col r" style="--d:.35;--c:var(--teal)">
+        <div class="road-label"><h3>Gotovo</h3><small id="road-done-label"></small></div>
+        <div class="done-flow"><div class="done-track" id="road-done"></div></div>
+      </div>
+      <div class="road-col r" style="--d:.5;--c:var(--violet)">
+        <div class="road-label"><h3>U razvoju</h3><small id="road-build-label"></small></div>
+        <div class="build" id="road-build"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. Thanks -->
+  <section class="slide">
+    <div class="final-edel pop" style="--d:.1" data-edel></div>
+    <h1 class="r" style="--d:.4;margin-top:2vh;text-align:center"><span class="grad">Hvala!</span></h1>
+    <p class="lead r" style="--d:.6;margin-top:16px">PlanTim — jedan sistem, jedan tim, jedna Planika.</p>
+    <div class="chips r" style="--d:.8;margin-top:26px;justify-content:center"><span class="chip">💬 Pitanja i prijedlozi</span><span class="chip">🚀 Idemo dalje zajedno</span></div>
+  </section>
+
+</main>
+
+<div class="counter" id="counter"></div>
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════
+     PLAN RAZVOJA — uređujte ovdje. Slajd se puni automatski.
+     status: 'done' | 'building'
+     progress: 0–100 (samo za building)
+     features: tekstovi koji se rotiraju (samo za building)
+     ═══════════════════════════════════════════════════════════════ */
+  const ROADMAP = {
+    kicker: 'Tim Planike · interni razvoj',
+    title: 'Plan razvoja',
+    message: 'Gradimo platformu iznutra — brzo, kvalitetno i zajedno. Svaki modul je korak ka jačoj Planici.',
+    doneLabel: 'PlanTim moduli',
+    buildLabel: 'naredni moduli',
+    modules: [
+      { name: 'Dashboard', icon: '📊', color: 'var(--teal)', status: 'done' },
+      { name: 'Projekti', icon: '🗂️', color: 'var(--sky)', status: 'done' },
+      { name: 'CRM', icon: '🤝', color: 'var(--violet)', status: 'done' },
+      { name: 'DMS', icon: '📁', color: 'var(--amber)', status: 'done' },
+      { name: 'LMS', icon: '🎓', color: 'var(--pink)', status: 'done' },
+      { name: 'Inbox', icon: '💬', color: 'var(--cyan)', status: 'done' },
+      { name: 'Sale', icon: '🏢', color: 'var(--orange)', status: 'done' },
+      { name: 'HRM', icon: '👥', color: 'var(--green)', status: 'building', progress: 55,
+        features: ['Zaposleni i kartoteka', 'Odsustva i evidencije', 'Evaluacije i razvoj'] },
+      { name: 'Edel', icon: 'edel-hd.png', color: 'var(--planika)', status: 'building', progress: 40,
+        features: ['Interaktivni vodič', 'Pomoć u prezentaciji', 'AI podrška timu'] },
+      { name: 'Office 365', icon: '☁️', color: 'var(--sky)', status: 'building', progress: 30,
+        features: ['Single sign-on', 'Outlook sinkronizacija', 'Teams povezanost'] },
+      { name: 'GDPR', icon: '🛡️', color: 'var(--green)', status: 'building', progress: 25,
+        features: ['Zahtjevi ispitanika', 'Registar obrada', 'Politike privatnosti'] },
+      { name: 'Prodaja', icon: '📈', color: 'var(--orange)', status: 'building', progress: 35,
+        features: ['Upravljanje leadovima', 'Sinhronizacija proizvoda', 'Pravila cijena'] },
+      { name: 'Marketing', icon: '📣', color: 'var(--violet)', status: 'building', progress: 28,
+        features: ['Kreator kampanja', 'Segmentacija publike', 'Centar sadržaja'] },
+      { name: 'Planika Club', icon: '⭐', color: 'var(--amber)', status: 'building', progress: 18,
+        features: ['Kampanje lojalnosti', 'Nagrade za kupce', 'Analitika članova'] },
+    ],
+  };
+
+  (function renderRoadmap() {
+    const done = ROADMAP.modules.filter((m) => m.status === 'done');
+    const building = ROADMAP.modules.filter((m) => m.status === 'building');
+    const total = done.length + building.length;
+    const pct = total ? Math.round((done.length / total) * 100) : 0;
+    const circ = 2 * Math.PI * 20.5;
+
+    document.getElementById('road-kicker').textContent = ROADMAP.kicker;
+    document.getElementById('road-title').textContent = ROADMAP.title;
+    document.getElementById('road-msg').textContent = ROADMAP.message;
+    document.getElementById('road-done-label').textContent = ROADMAP.doneLabel;
+    document.getElementById('road-build-label').textContent = ROADMAP.buildLabel;
+    document.getElementById('road-stats').innerHTML =
+      `<strong>${done.length}</strong> gotovo · <strong>${building.length}</strong> u izradi · <strong>${pct}%</strong>`;
+    document.getElementById('road-meter').style.setProperty('--p', pct + '%');
+
+    const iconHtml = (m) => /\.(png|jpe?g|webp|svg)$/i.test(m.icon)
+      ? `<img src="${m.icon}" alt="${m.name}" />`
+      : m.icon;
+
+    document.getElementById('road-done').innerHTML = done.map((m, i) => `
+      <div class="done-tile r" style="--d:${(.4 + i * .05).toFixed(2)}">
+        <div class="spin">${iconHtml(m)}</div>
+        <div><b>${m.name}</b><em>gotovo</em></div>
+      </div>`).join('');
+
+    document.getElementById('road-build').innerHTML = building.map((m, i) => {
+      const p = Math.max(0, Math.min(100, m.progress || 0));
+      const off = circ * (1 - p / 100);
+      const feats = m.features && m.features.length ? m.features : ['U izradi'];
+      const slot = 3, morph = Math.max(feats.length, 1) * slot;
+      const featHtml = feats.map((f, fi) =>
+        `<span class="${feats.length === 1 ? 'is-solo' : ''}" style="animation-delay:${(fi * slot).toFixed(1)}s">${f}</span>`
+      ).join('');
+      return `
+        <div class="build-card r" style="--d:${(.45 + i * .06).toFixed(2)};--p:${p}%;--off:${off.toFixed(1)};--morph:${morph}s">
+          <div class="build-ring">
+            <svg viewBox="0 0 58 58" aria-hidden="true">
+              <circle class="bg" cx="29" cy="29" r="20.5"></circle>
+              <circle class="fg" cx="29" cy="29" r="20.5" style="stroke-dasharray:${circ.toFixed(1)}"></circle>
+            </svg>
+            <div class="pct">${p}%</div>
+          </div>
+          <div class="build-body">
+            <h4><span class="ico">${iconHtml(m)}</span>${m.name}</h4>
+            <div class="build-morph">${featHtml}</div>
+            <div class="build-bar"><i></i></div>
+          </div>
+        </div>`;
+    }).join('');
+  })();
+
+  // Edel instances
+  const tpl = document.getElementById('edel-tpl');
+  document.querySelectorAll('[data-edel]').forEach((el) => el.appendChild(tpl.content.cloneNode(true)));
+
+  // Edel's walk: stance foot stays planted while the body moves over it, swing leg lifts and bends at the knee.
+  (function buildWalk() {
+    const CYCLES = 5, N = 200;
+    const A = 20;           // thigh swing, degrees (negative = foot forward / to the right)
+    const KNEE = 46;        // max knee bend during swing, degrees
+    const LIFT = 2.4;       // foot lift during swing, % of figure height
+    const BOB = 1.3;        // body rise at mid-stance, % of figure height
+    const LEG = 38.2 * Math.cos(24 * Math.PI / 180); // hip-to-sole length in % of figure width, foreshortened by the walking turn
+    const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    const envelope = (t) => smooth(t / 0.08) * smooth((1 - t) / 0.12);
+    const gait = (p, e) => {
+      if (p < 0.5) return { thigh: (-A + 4 * A * p) * e, lift: 0, knee: 0 };
+      const s = (p - 0.5) / 0.5, ease = (1 - Math.cos(Math.PI * s)) / 2;
+      return { thigh: (A - 2 * A * ease) * e, lift: -LIFT * Math.sin(Math.PI * s) * e, knee: KNEE * Math.sin(Math.PI * Math.min(1, s * 1.25)) * e };
+    };
+    const foot = (g) => -LEG * Math.sin(g.thigh * Math.PI / 180);
+    const frames = { walkX: [], walkLegL: [], walkLegR: [], walkShinL: [], walkShinR: [], walkBob: [] };
+    let x = 0, prev = null;
+    const xs = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, e = envelope(t), pl = (t * CYCLES) % 1, pr = (t * CYCLES + 0.5) % 1;
+      const L = gait(pl, e), R = gait(pr, e);
+      if (prev) {
+        const stanceLeft = pl < 0.5;
+        x -= stanceLeft ? foot(L) - foot(prev.L) : foot(R) - foot(prev.R);
+      }
+      prev = { L, R };
+      xs.push(x);
+      const pct = (t * 100).toFixed(2) + '%';
+      frames.walkLegL.push(`${pct}{transform:translateY(${L.lift.toFixed(3)}%) rotate(${L.thigh.toFixed(2)}deg)}`);
+      frames.walkLegR.push(`${pct}{transform:translateY(${R.lift.toFixed(3)}%) rotate(${R.thigh.toFixed(2)}deg)}`);
+      frames.walkShinL.push(`${pct}{transform:rotate(${L.knee.toFixed(2)}deg)}`);
+      frames.walkShinR.push(`${pct}{transform:rotate(${R.knee.toFixed(2)}deg)}`);
+      const rise = -BOB * Math.sin(Math.PI * ((2 * pl) % 1)) * e, tilt = 1.1 * Math.sin(2 * Math.PI * pl) * e;
+      frames.walkBob.push(`${pct}{transform:translateY(${rise.toFixed(3)}%) rotate(${tilt.toFixed(2)}deg)}`);
+    }
+    const end = xs[xs.length - 1];
+    xs.forEach((v, i) => frames.walkX.push(`${((i / N) * 100).toFixed(2)}%{transform:translateX(${(v - end).toFixed(2)}%)}`));
+    const style = document.createElement('style');
+    style.textContent = Object.entries(frames).map(([name, list]) => `@keyframes ${name}{${list.join('')}}`).join('\n');
+    document.head.appendChild(style);
+  })();
+
+  const slides = [...document.querySelectorAll('.slide')];
+  let current = -1;
+  // network reveal: null = whole network visible; otherwise it grows from the screen centre starting at this time
+  const reveal = { start: null, origin: null };
+  const NETWORK_AFTER_GREETING = 12600, TEXT_AFTER_NETWORK = 18400;
+  let quietTimer = null;
+
+  // Edel "talks" on the intro slide (mouth only, no sound): the greeting when the bubble pops, then the intro text as it appears
+  const GREET_AT = 10650, READ_AT = TEXT_AFTER_NETWORK + 600;
+  const introEdel = document.querySelector('.edel[data-edel]');
+  const plainText = (el) => el.textContent.replace(/\p{Extended_Pictographic}|\uFE0F/gu, '').replace(/\s+/g, ' ').trim();
+  let speechTimers = [], talkTimer = null;
+
+  function talk(text) {
+    clearTimeout(talkTimer);
+    introEdel.classList.add('talking');
+    talkTimer = setTimeout(() => introEdel.classList.remove('talking'), text.length * 68);
+  }
+
+  function stopSpeech() {
+    speechTimers.forEach(clearTimeout); speechTimers = [];
+    clearTimeout(talkTimer);
+    introEdel.classList.remove('talking');
+  }
+
+  function scheduleIntroSpeech() {
+    const bubble = introEdel.querySelector('.bubble'), intro = document.querySelector('.intro-text');
+    speechTimers.push(setTimeout(() => talk(plainText(bubble)), GREET_AT));
+    speechTimers.push(setTimeout(() => talk(plainText(intro)), READ_AT));
+  }
+
+  function countUp(slide) {
+    slide.querySelectorAll('[data-count]').forEach((el) => {
+      const target = +el.dataset.count, suffix = el.dataset.suffix || '';
+      const start = performance.now(), dur = 1400;
+      const tick = (t) => {
+        const p = Math.min(1, (t - start) / dur), e = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * e) + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      el.textContent = '0' + suffix;
+      setTimeout(() => requestAnimationFrame(tick), 500);
+    });
+  }
+
+  function go(i) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    if (i === current) return;
+    slides.forEach((s, k) => {
+      s.classList.remove('active', 'prev');
+      if (k < i) s.classList.add('prev');
+    });
+    const s = slides[i];
+    void s.offsetWidth; // restart CSS animations
+    s.classList.add('active');
+    current = i;
+    document.body.classList.toggle('on-intro', i === 0);
+    document.body.classList.toggle('on-roadmap', !!s.classList.contains('road-slide'));
+    clearTimeout(quietTimer);
+    document.body.classList.toggle('quiet', i === 0);
+    if (i === 0) quietTimer = setTimeout(() => document.body.classList.remove('quiet'), TEXT_AFTER_NETWORK);
+    reveal.start = i === 0 ? performance.now() + NETWORK_AFTER_GREETING : null;
+    reveal.origin = null;
+    stopSpeech();
+    if (i === 0) scheduleIntroSpeech();
+    document.getElementById('progress').style.width = ((i + 1) / slides.length) * 100 + '%';
+    document.getElementById('counter').textContent = `${i + 1} / ${slides.length}`;
+    countUp(s);
+    history.replaceState(null, '', '#' + (i + 1));
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); go(current + 1); }
+    if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); go(current - 1); }
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+    if (e.key.toLowerCase() === 'f') {
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    }
+  });
+  let touchX = null;
+  document.addEventListener('touchstart', (e) => (touchX = e.touches[0].clientX), { passive: true });
+  document.addEventListener('touchend', (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) go(current + (dx < 0 ? 1 : -1));
+    touchX = null;
+  });
+
+  go(Math.max(0, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+
+  // Network of people: coloured person icons linked by lines, with signals travelling along the links
+  const cv = document.getElementById('particles'), ctx = cv.getContext('2d');
+  const COLORS = ['#0d9488', '#c8102e', '#7c3aed', '#0284c7', '#d97706', '#db2777', '#059669'];
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(',');
+  let W, H, pts, dpr, icons, dots;
+
+  function personIcon(color, size) {
+    const pad = 6, c = document.createElement('canvas'), s = size;
+    c.width = c.height = s + pad * 2;
+    const g = c.getContext('2d'), cx = c.width / 2, cy = c.height / 2;
+    g.fillStyle = 'rgba(255,255,255,.92)'; g.shadowColor = `rgba(${rgb(color)},.45)`; g.shadowBlur = pad;
+    g.beginPath(); g.arc(cx, cy, s * .62, 0, Math.PI * 2); g.fill();
+    g.shadowBlur = 0; g.fillStyle = color;
+    g.beginPath(); g.ellipse(cx, cy + s * .42, s * .42, s * .34, 0, Math.PI, 0); g.closePath(); g.fill();
+    g.beginPath(); g.arc(cx, cy - s * .16, s * .22, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#fff'; g.lineWidth = s * .06; g.stroke();
+    return c;
+  }
+
+  function resize() {
+    dpr = devicePixelRatio || 1;
+    W = cv.width = innerWidth * dpr; H = cv.height = innerHeight * dpr;
+    cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+    icons = COLORS.map((c) => [personIcon(c, 15 * dpr), personIcon(c, 21 * dpr)]);
+    dots = COLORS.map((c) => {
+      const s = Math.ceil(12 * dpr), d = document.createElement('canvas');
+      d.width = d.height = s;
+      const g = d.getContext('2d');
+      g.fillStyle = c; g.beginPath(); g.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2); g.fill();
+      return d;
+    });
+    const n = Math.round((innerWidth * innerHeight) / 15000);
+    pts = Array.from({ length: n }, (_, k) => ({
+      x: Math.random() * W, y: Math.random() * H,
+      dir: Math.random() * Math.PI * 2, speed: (6.25 + Math.random() * 7.4) * dpr,
+      turn: (Math.random() - .5) * .16, tph: Math.random() * Math.PI * 2,
+      c: k % COLORS.length, big: Math.random() < .25, ph: Math.random() * Math.PI * 2,
+    }));
+  }
+
+  const smoothstep = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+
+  // radius of the visible part of the network: a small cluster in the centre first, then it spreads over the whole screen
+  function revealRadius(t) {
+    if (reveal.start === null) return Infinity;
+    const e = t - reveal.start;
+    if (e < 0) return 0;
+    if (!reveal.origin) reveal.origin = { x: W / 2, y: H / 2 };
+    const small = 170 * dpr, full = Math.hypot(W, H) * 1.1;
+    if (e < 900) return small * smoothstep(e / 900);
+    if (e < 1900) return small;
+    return small + (full - small) * smoothstep((e - 1900) / 4200);
+  }
+
+  let lastT = null;
+  function frame(t) {
+    ctx.clearRect(0, 0, W, H);
+    const dt = lastT === null ? 0 : Math.min(.1, (t - lastT) / 1000);
+    lastT = t;
+    const max = 190 * dpr, R = revealRadius(t), fade = 110 * dpr, edge = 30 * dpr;
+    const o = reveal.origin;
+    for (const p of pts) {
+      // people wander along gently curving paths, so links keep forming and breaking
+      p.dir += (p.turn + .14 * Math.sin(t / 5200 + p.tph)) * dt;
+      p.x += Math.cos(p.dir) * p.speed * dt; p.y += Math.sin(p.dir) * p.speed * dt;
+      if (p.x < -edge || p.x > W + edge) { p.dir = Math.PI - p.dir; p.x = Math.max(-edge, Math.min(W + edge, p.x)); }
+      if (p.y < -edge || p.y > H + edge) { p.dir = -p.dir; p.y = Math.max(-edge, Math.min(H + edge, p.y)); }
+      p.a = R === Infinity ? 1 : R === 0 ? 0 : Math.max(0, Math.min(1, (R - Math.hypot(p.x - o.x, p.y - o.y)) / fade));
+    }
+    if (R > 0) {
+      ctx.lineCap = 'round';
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+        const a = pts[i], b = pts[j];
+        const vis = Math.min(a.a, b.a);
+        if (vis <= 0) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        if (dx > max || dx < -max || dy > max || dy < -max) continue;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d >= max) continue;
+        const k = 1 - d / max, mx = a.x + dx / 2, my = a.y + dy / 2;
+        // each half of the link takes the colour of its person
+        ctx.globalAlpha = .6 * k * vis; ctx.lineWidth = (1 + 1.2 * k) * dpr;
+        ctx.strokeStyle = COLORS[a.c]; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mx, my); ctx.stroke();
+        ctx.strokeStyle = COLORS[b.c]; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(b.x, b.y); ctx.stroke();
+        if (k < .15) continue;
+        // several signals travel along every link, in both directions
+        const count = k > .55 ? 3 : 2, speed = 3720 + ((i * 31 + j * 17) % 5) * 740, r = (1.6 + 1.2 * k) * dpr * 2;
+        ctx.globalAlpha = .9 * k * vis;
+        for (let s = 0; s < count; s++) {
+          let f = (t / speed + s / count + (i * 7 + j) * .13) % 1;
+          if ((i + j + s) % 2) f = 1 - f;
+          ctx.drawImage(dots[f < .5 ? a.c : b.c], a.x + dx * f - r / 2, a.y + dy * f - r / 2, r, r);
+        }
+      }
+      ctx.globalAlpha = 1;
+      for (const p of pts) {
+        if (p.a <= 0) continue;
+        const img = icons[p.c][p.big ? 1 : 0], sc = (1 + .06 * Math.sin(t / 700 + p.ph)) * (.6 + .4 * p.a);
+        const w = img.width * sc;
+        ctx.globalAlpha = p.a;
+        ctx.drawImage(img, p.x - w / 2, p.y - w / 2, w, w);
+      }
+      ctx.globalAlpha = 1;
+    }
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', resize);
+  resize(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

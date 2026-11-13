@@ -121,7 +121,8 @@ class RetailPayrollController extends Controller
 
         $totals = [
             'contract_salary' => 0, 'base_salary' => 0, 'turnover_difference' => 0, 'salary' => 0, 'stimulation' => 0,
-            'total' => 0, 'meal_allowance' => 0, 'transport' => 0, 'total_with_transport' => 0, 'total_payout' => 0,
+            'assistance_stimulation' => 0, 'total' => 0, 'meal_allowance' => 0, 'seniority' => 0, 'transport' => 0,
+            'total_with_transport' => 0, 'total_payout' => 0,
         ];
         foreach ($workers as $w) {
             foreach ($totals as $k => $_) {

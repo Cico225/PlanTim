@@ -1,8 +1,9 @@
 {
-    "version": "1.2.37",
-    "version_name": "Release 2026-10-13",
-    "release_notes": "dodata reultata",
+    "version": "1.2.38",
+    "version_name": "Release 2026-11-13",
+    "release_notes": "ucitavanje zabrana dorada...",
     "changelog": [
+        "ucitavanje zabrana dorada...",
         "dodata reultata",
         "modul rezultati",
         "Dorada modula ostvareni rezultati",
@@ -21,7 +22,6 @@
         "DOrada modula ovlaštenja",
         "postavljanje recaptca",
         "korekcija porta",
-        "podesavanje porta",
-        "ukidanje porta"
+        "podesavanje porta"
     ]
 }
