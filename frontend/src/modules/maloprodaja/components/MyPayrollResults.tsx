@@ -6,6 +6,8 @@ import {
   CarFront,
   ChartLine,
   ChevronDown,
+  Clock,
+  Handshake,
   HandCoins,
   Loader2,
   Medal,
@@ -33,17 +35,42 @@ const num = (v: number | null | undefined, digits = 2) =>
 const periodKey = (p: { year: number; month: number }) => `${p.year}-${p.month}`;
 const SHORT_MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Avg', 'Sep', 'Okt', 'Nov', 'Dec'];
 
-/** Order matters: the salary is built up step by step (waterfall). The first two are always shown. */
-const SEGMENTS = [
-  { key: 'contract_salary', label: 'Ugovorna plata', bg: 'bg-teal-400', soft: 'bg-teal-50 text-teal-500 dark:bg-teal-900/30 dark:text-teal-300', icon: Banknote },
-  { key: 'base_salary', label: 'Dodatak kategorije', bg: 'bg-emerald-300', soft: 'bg-emerald-50 text-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-300', icon: BadgePercent },
-  { key: 'meal_allowance', label: 'Topli obrok', bg: 'bg-orange-300', soft: 'bg-orange-50 text-orange-500 dark:bg-orange-900/30 dark:text-orange-300', icon: Utensils },
-  { key: 'turnover_difference', label: 'Razlika prema prometu', bg: 'bg-sky-400', soft: 'bg-sky-50 text-sky-500 dark:bg-sky-900/30 dark:text-sky-300', icon: Rocket },
-  { key: 'stimulation', label: 'Stimulacija za plan', bg: 'bg-amber-400', soft: 'bg-amber-50 text-amber-500 dark:bg-amber-900/30 dark:text-amber-300', icon: Trophy },
-  { key: 'transport', label: 'Prevoz', bg: 'bg-violet-300', soft: 'bg-violet-50 text-violet-500 dark:bg-violet-900/30 dark:text-violet-300', icon: CarFront },
-] as const;
+type SegmentDef = {
+  key: 'contract_salary' | 'meal_allowance' | 'seniority' | 'transport' | 'base_salary' | 'turnover_difference' | 'stimulation' | 'assistance_stimulation';
+  label: string;
+  bg: string;
+  soft: string;
+  icon: typeof Banknote;
+};
 
-type SegmentKey = (typeof SEGMENTS)[number]['key'];
+/** Ugovorna (fiksna) primanja. */
+const CONTRACTUAL: SegmentDef[] = [
+  { key: 'contract_salary', label: 'Ugovorna plata', bg: 'bg-teal-400', soft: 'bg-teal-50 text-teal-500 dark:bg-teal-900/30 dark:text-teal-300', icon: Banknote },
+  { key: 'meal_allowance', label: 'Topli obrok', bg: 'bg-orange-300', soft: 'bg-orange-50 text-orange-500 dark:bg-orange-900/30 dark:text-orange-300', icon: Utensils },
+  { key: 'seniority', label: 'Minuli rad', bg: 'bg-rose-300', soft: 'bg-rose-50 text-rose-500 dark:bg-rose-900/30 dark:text-rose-300', icon: Clock },
+  { key: 'transport', label: 'Prevoz', bg: 'bg-violet-300', soft: 'bg-violet-50 text-violet-500 dark:bg-violet-900/30 dark:text-violet-300', icon: CarFront },
+];
+
+/** Stimulativni / učinak dio. */
+const STIMULATIVE: SegmentDef[] = [
+  { key: 'base_salary', label: 'Dodatak kategorije', bg: 'bg-emerald-300', soft: 'bg-emerald-50 text-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-300', icon: BadgePercent },
+  { key: 'turnover_difference', label: 'Razlika po prometu', bg: 'bg-sky-400', soft: 'bg-sky-50 text-sky-500 dark:bg-sky-900/30 dark:text-sky-300', icon: Rocket },
+  { key: 'stimulation', label: 'Stimulacija ispunjen plan', bg: 'bg-amber-400', soft: 'bg-amber-50 text-amber-500 dark:bg-amber-900/30 dark:text-amber-300', icon: Trophy },
+  { key: 'assistance_stimulation', label: 'Stimulacija ispomoć', bg: 'bg-fuchsia-400', soft: 'bg-fuchsia-50 text-fuchsia-500 dark:bg-fuchsia-900/30 dark:text-fuchsia-300', icon: Handshake },
+];
+
+type SegmentKey = SegmentDef['key'];
+
+function segmentSteps(parts: SegmentDef[], t: PayrollWorkerResult['totals']) {
+  const sum = parts.reduce((a, s) => a + Math.max(0, t[s.key] ?? 0), 0) || 1;
+  let cumulative = 0;
+  return parts.map((s) => {
+    const value = Math.max(0, t[s.key] ?? 0);
+    const step = { ...s, value, start: (cumulative / sum) * 100, width: (value / sum) * 100 };
+    cumulative += value;
+    return step;
+  });
+}
 
 /** Combines several result rows of one period (normally there is just one). */
 function mergeResults(list: PayrollWorkerResult[]): PayrollWorkerResult | null {
@@ -116,40 +143,41 @@ export default function MyPayrollResults({ periods }: { periods: PayrollPeriod[]
   }
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-3">
+      {result && <CategoryInfo stores={result.stores} />}
+
       <PeriodPills periods={chronological} value={period} onChange={setPeriod} />
 
       {!result ? (
         <p className="py-12 text-center text-sm text-gray-500">Nema podataka za odabrani mjesec.</p>
       ) : (
-        <>
-          <CategoryInfo stores={result.stores} />
-
-          <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <Hero result={result} previous={previous} />
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-1">
-              <KpiTiles result={result} />
-            </div>
+        <div className="grid gap-3 lg:grid-cols-12">
+          <div className="lg:col-span-7">
+            <Hero result={result} previous={previous} />
           </div>
 
-          {chronological.length > 1 && <Trend periods={chronological} byPeriod={byPeriod} selected={period} onSelect={setPeriod} />}
-
-          <section>
-            <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
-              <Store className="h-4 w-4 text-teal-500" />
-              {result.stores.length > 1 ? `Prodavnice (${result.stores.length})` : 'Prodavnica'}
-            </h3>
-            <div className="space-y-2.5 sm:space-y-3">
-              {result.stores.map((s) => (
-                <StoreCard key={s.row_id} s={s} />
-              ))}
+          <div className="space-y-3 lg:col-span-5">
+            <div className="grid grid-cols-2 gap-3">
+              <KpiTiles result={result} />
             </div>
-          </section>
 
-          {result.warnings.length > 0 && <Warnings warnings={result.warnings} />}
-        </>
+            {chronological.length > 1 && <Trend periods={chronological} byPeriod={byPeriod} selected={period} onSelect={setPeriod} />}
+
+            <section>
+              <h3 className="mb-1.5 flex items-center gap-2 px-1 text-[13px] font-semibold text-gray-700 dark:text-gray-200">
+                <Store className="h-4 w-4 text-teal-500" />
+                {result.stores.length > 1 ? `Prodavnice (${result.stores.length})` : 'Prodavnica'}
+              </h3>
+              <div className="space-y-2">
+                {result.stores.map((s) => (
+                  <StoreCard key={s.row_id} s={s} />
+                ))}
+              </div>
+            </section>
+
+            {result.warnings.length > 0 && <Warnings warnings={result.warnings} />}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -190,11 +218,12 @@ function PeriodPills({ periods, value, onChange }: { periods: PayrollPeriod[]; v
   );
 }
 
-const CATEGORY_TONES: Record<string, string> = {
-  A: 'from-amber-300 to-yellow-200 text-amber-700 ring-amber-200',
-  B: 'from-sky-300 to-cyan-200 text-sky-700 ring-sky-200',
-  C: 'from-teal-300 to-emerald-200 text-teal-700 ring-teal-200',
+const CATEGORY_TONES: Record<string, { card: string; badge: string }> = {
+  A: { card: 'from-amber-500 to-orange-400', badge: 'text-amber-600' },
+  B: { card: 'from-sky-600 to-cyan-500', badge: 'text-sky-600' },
+  C: { card: 'from-teal-600 to-emerald-500', badge: 'text-teal-600' },
 };
+const DEFAULT_TONE = { card: 'from-slate-600 to-slate-500', badge: 'text-slate-600' };
 
 function CategoryInfo({ stores }: { stores: PayrollStoreBreakdown[] }) {
   const categories = Array.from(
@@ -203,28 +232,31 @@ function CategoryInfo({ stores }: { stores: PayrollStoreBreakdown[] }) {
   if (categories.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row">
       {categories.map((s) => {
         const letter = (s.category ?? '?').toUpperCase();
         const position = s.position_type === 'manager' ? 'Šef prodavnice' : 'Prodavač';
+        const tone = CATEGORY_TONES[letter] ?? DEFAULT_TONE;
         return (
           <div
             key={`${s.position_type}-${letter}`}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-100 bg-white px-3.5 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:flex-none sm:pr-6"
+            className={`relative flex min-w-0 flex-1 items-center gap-4 overflow-hidden rounded-2xl bg-gradient-to-r px-4 py-3 text-white shadow-md ${tone.card}`}
           >
+            <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/15" />
+            <div className="pointer-events-none absolute -bottom-12 right-24 h-24 w-24 rounded-full bg-white/10" />
             <span
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xl font-bold ring-1 dark:ring-0 ${CATEGORY_TONES[letter] ?? 'from-gray-200 to-gray-100 text-gray-600 ring-gray-200'}`}
+              className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl font-black shadow-lg ${tone.badge}`}
             >
               {letter}
             </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Vaša kategorija</p>
-              <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                {position} · Kategorija {letter}
-              </p>
-              <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                Dodatak kategorije <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-300">+{km(s.category_salary)} KM</span>
-              </p>
+            <div className="relative min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/80">Vaša kategorija</p>
+              <p className="truncate text-xl font-bold leading-tight sm:text-2xl">Kategorija {letter}</p>
+              <p className="truncate text-[13px] text-white/90">{position}</p>
+            </div>
+            <div className="relative shrink-0 rounded-xl bg-white/20 px-3 py-1.5 text-right ring-1 ring-white/30 backdrop-blur-sm">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-white/80">Dodatak kategorije</p>
+              <p className="text-lg font-bold tabular-nums">+{km(s.category_salary)} KM</p>
             </div>
           </div>
         );
@@ -237,26 +269,23 @@ function Hero({ result, previous }: { result: PayrollWorkerResult; previous: Pay
   const t = result.totals;
   const diff = previous ? t.total_payout - previous.totals.total_payout : null;
   const planMet = result.stores.some((s) => s.plan_met);
-  const parts = SEGMENTS.filter((s, i) => i < 2 || t[s.key as SegmentKey] > 0);
-  const sum = parts.reduce((a, s) => a + Math.max(0, t[s.key as SegmentKey]), 0) || 1;
-  let cumulative = 0;
-  const steps = parts.map((s) => {
-    const value = Math.max(0, t[s.key as SegmentKey]);
-    const step = { ...s, value, start: (cumulative / sum) * 100, width: (value / sum) * 100 };
-    cumulative += value;
-    return step;
-  });
-  const mealRates = Array.from(new Set(result.stores.filter((s) => s.meal_allowance_daily > 0).map((s) => s.meal_allowance_daily)));
-  const mealDays = result.stores.reduce((a, s) => a + (s.meal_allowance_daily > 0 ? s.working_days : 0), 0);
+  const contractual = segmentSteps(CONTRACTUAL, t);
+  const stimulative = segmentSteps(STIMULATIVE, t);
+  const allBar = [...contractual, ...stimulative].filter((s) => s.value > 0);
+  const barSum = allBar.reduce((a, s) => a + s.value, 0) || 1;
+  const mealRates = Array.from(new Set(result.stores.filter((s) => s.meal_allowance_daily > 0 && !s.is_assistance).map((s) => s.meal_allowance_daily)));
+  const mealDays = result.stores.reduce((a, s) => a + (!s.is_assistance && s.meal_allowance_daily > 0 ? s.working_days : 0), 0);
+  const assistStores = result.stores.filter((s) => s.is_assistance);
   const hints: Partial<Record<SegmentKey, string>> = {
     meal_allowance: mealRates.length === 1 ? `${km(mealRates[0])} KM × ${num(mealDays, 0)} dana` : undefined,
+    assistance_stimulation:
+      assistStores.length > 0 ? assistStores.map((s) => km(s.total_payout)).join(' + ') : undefined,
   };
-  const budgetKeys: SegmentKey[] = ['contract_salary', 'base_salary', 'meal_allowance'];
-  const subtotalAt = steps.findIndex((s) => !budgetKeys.includes(s.key));
-  const covered = t.guaranteed_salary + t.meal_allowance;
+  const contractualTotal = contractual.reduce((a, s) => a + s.value, 0);
+  const stimulativeTotal = stimulative.reduce((a, s) => a + s.value, 0);
 
   return (
-    <div className="relative h-full overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-sky-50 p-4 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 sm:p-6">
+    <div className="relative h-full overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-sky-50 p-4 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 sm:p-5">
       <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-500/10" />
 
       <div className="relative">
@@ -275,7 +304,7 @@ function Hero({ result, previous }: { result: PayrollWorkerResult; previous: Pay
         </div>
 
         <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="bg-gradient-to-r from-teal-600 to-sky-500 bg-clip-text text-[2rem] font-bold leading-none tracking-tight text-transparent tabular-nums sm:text-5xl">
+          <span className="bg-gradient-to-r from-teal-600 to-sky-500 bg-clip-text text-[2rem] font-bold leading-none tracking-tight text-transparent tabular-nums sm:text-[2.6rem]">
             {km(t.total_payout)}
           </span>
           <span className="text-sm font-medium text-gray-400 sm:text-base">KM</span>
@@ -292,71 +321,89 @@ function Hero({ result, previous }: { result: PayrollWorkerResult; previous: Pay
           )}
         </div>
 
-        <div className="mt-4 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-white/80 dark:bg-gray-700">
-          {steps.map((s) =>
-            s.width > 0 ? <div key={s.key} className={`${s.bg} h-full first:rounded-l-full last:rounded-r-full`} style={{ width: `${s.width}%` }} /> : null,
-          )}
+        <div className="mt-3 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-white/80 dark:bg-gray-700">
+          {allBar.map((s) => (
+            <div key={s.key} className={`${s.bg} h-full first:rounded-l-full last:rounded-r-full`} style={{ width: `${(s.value / barSum) * 100}%` }} />
+          ))}
         </div>
 
-        <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-gray-400">Kako je nastala plata</p>
-        <ul className="mt-2 space-y-2">
-          {steps.map((s, i) => {
-            const Icon = s.icon;
-            return (
-              <li key={s.key}>
-                {i === subtotalAt && i > 0 && (
-                  <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-1.5 text-[12px] ring-1 ring-teal-100 dark:bg-gray-900/40 dark:ring-gray-700">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      = Zagarantovano{t.meal_allowance > 0 ? ' (s toplim obrokom)' : ''}
-                    </span>
-                    <span className="font-semibold text-teal-600 tabular-nums dark:text-teal-300">{km(covered)}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2.5">
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${s.soft}`}>
-                    <Icon className="h-3.5 w-3.5" strokeWidth={2} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[13px] text-gray-600 dark:text-gray-300">
-                        {i > 0 && <span className="mr-1 text-gray-400">+</span>}
-                        {s.label}
-                        {hints[s.key] && <span className="ml-1.5 text-[11px] text-gray-400">({hints[s.key]})</span>}
-                      </span>
-                      <span className="shrink-0 text-[13px] font-semibold text-gray-900 tabular-nums dark:text-white">{km(s.value)}</span>
-                    </div>
-                    <div className="relative mt-1 h-1.5 rounded-full bg-white/80 dark:bg-gray-700">
-                      <div
-                        className={`absolute inset-y-0 rounded-full ${s.bg} transition-all duration-500`}
-                        style={{ left: `${s.start}%`, width: `${Math.max(s.width, s.value > 0 ? 1.5 : 0)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <PayGroup title="Ugovorna primanja" total={contractualTotal} steps={contractual} hints={hints} tone="teal" />
+          <PayGroup title="Stimulativni dio" total={stimulativeTotal} steps={stimulative} hints={hints} tone="amber" />
+        </div>
 
-        {t.turnover_salary > 0 && (
-          <div className="mt-3 rounded-xl bg-sky-50/80 px-3 py-2 text-[12px] text-sky-800 ring-1 ring-sky-100 dark:bg-sky-900/20 dark:text-sky-200 dark:ring-sky-800">
-            <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 font-medium">
-                <ChartLine className="h-3.5 w-3.5" /> Budžet plate po procentu prometa
-              </span>
-              <span className="font-semibold tabular-nums">{km(t.turnover_salary)}</span>
-            </div>
-            <p className="mt-0.5 text-[11px] text-sky-700/80 dark:text-sky-300/80">
-              Iz budžeta se pokriva ugovorna plata, dodatak kategorije i topli obrok, a ostatak je razlika prema prometu.
-            </p>
+        <div className="mt-3 rounded-xl bg-gradient-to-r from-teal-500 to-sky-500 px-3 py-2.5 text-white shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[12px] text-white/85">Ukupno za isplatu</p>
+            <p className="text-base font-bold tabular-nums">{km(t.total_payout)} KM</p>
           </div>
-        )}
-
-        <div className="mt-3 flex items-center justify-between gap-2 border-t border-teal-100 pt-2.5 text-[13px] dark:border-gray-700">
-          <span className="font-semibold text-gray-900 dark:text-white">= Ukupno za isplatu</span>
-          <span className="font-bold text-teal-600 tabular-nums dark:text-teal-300">{km(t.total_payout)} KM</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PayGroup({
+  title,
+  total,
+  steps,
+  hints,
+  tone,
+}: {
+  title: string;
+  total: number;
+  steps: ReturnType<typeof segmentSteps>;
+  hints: Partial<Record<SegmentKey, string>>;
+  tone: 'teal' | 'amber';
+}) {
+  const heading =
+    tone === 'teal'
+      ? 'text-teal-700 dark:text-teal-300'
+      : 'text-amber-700 dark:text-amber-300';
+  const totalTone =
+    tone === 'teal'
+      ? 'text-teal-600 dark:text-teal-300'
+      : 'text-amber-600 dark:text-amber-300';
+  const ring =
+    tone === 'teal'
+      ? 'ring-teal-100 dark:ring-teal-900/40'
+      : 'ring-amber-100 dark:ring-amber-900/40';
+
+  return (
+    <div className={`rounded-xl bg-white/70 p-3 ring-1 ${ring} dark:bg-gray-900/40`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className={`text-[11px] font-semibold uppercase tracking-wide ${heading}`}>{title}</p>
+        <p className={`text-[13px] font-bold tabular-nums ${totalTone}`}>{km(total)}</p>
+      </div>
+      <ul className="space-y-2">
+        {steps.map((s) => {
+          const Icon = s.icon;
+          return (
+            <li key={s.key}>
+              <div className="flex items-center gap-2.5">
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${s.soft}`}>
+                  <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[13px] text-gray-600 dark:text-gray-300">
+                      {s.label}
+                      {hints[s.key] && <span className="ml-1.5 text-[11px] text-gray-400">({hints[s.key]})</span>}
+                    </span>
+                    <span className="shrink-0 text-[13px] font-semibold text-gray-900 tabular-nums dark:text-white">{km(s.value)}</span>
+                  </div>
+                  <div className="relative mt-1 h-1.5 rounded-full bg-white/80 dark:bg-gray-700">
+                    <div
+                      className={`absolute inset-y-0 left-0 rounded-full ${s.bg} transition-all duration-500`}
+                      style={{ width: `${Math.max(s.width, s.value > 0 ? 4 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -369,14 +416,14 @@ function KpiTiles({ result }: { result: PayrollWorkerResult }) {
 
   return (
     <>
-      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-50 text-sky-500 dark:bg-sky-900/30 dark:text-sky-300">
             <ChartLine className="h-4 w-4" />
           </span>
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Vaš promet</p>
         </div>
-        <p className="mt-2 truncate text-lg font-bold text-gray-900 tabular-nums dark:text-white sm:text-2xl">{km(t.turnover_worker_cy)}</p>
+        <p className="mt-2 truncate text-lg font-bold text-gray-900 tabular-nums dark:text-white sm:text-xl">{km(t.turnover_worker_cy)}</p>
         {lyChange != null && (
           <p className={`mt-0.5 text-[11px] font-medium ${lyChange >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
             {lyChange >= 0 ? '+' : ''}
@@ -385,14 +432,14 @@ function KpiTiles({ result }: { result: PayrollWorkerResult }) {
         )}
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-500 dark:bg-amber-900/30 dark:text-amber-300">
             <Medal className="h-4 w-4" />
           </span>
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Plan prodavnice</p>
         </div>
-        <p className="mt-2 text-lg font-bold text-gray-900 tabular-nums dark:text-white sm:text-2xl">{achievement != null ? `${num(achievement, 1)} %` : '—'}</p>
+        <p className="mt-2 text-lg font-bold text-gray-900 tabular-nums dark:text-white sm:text-xl">{achievement != null ? `${num(achievement, 1)} %` : '—'}</p>
         {achievement != null && (
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
             <div
@@ -425,9 +472,9 @@ function Trend({
   const max = Math.max(...data.map((d) => d.total), 1);
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white px-4 pb-3 pt-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-5">
+    <div className="rounded-2xl border border-gray-100 bg-white px-4 pb-2.5 pt-3 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:px-5">
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Zadnji mjeseci</p>
-      <div className="mt-2 flex h-20 items-end gap-2">
+      <div className="mt-1.5 flex h-14 items-end gap-2">
         {data.map((d) => {
           const active = d.key === selected;
           return (
@@ -465,32 +512,47 @@ function StoreCard({ s }: { s: PayrollStoreBreakdown }) {
     ] as [string, number][]
   ).filter(([, v]) => v > 0);
 
-  const details: [string, string][] = [
-    ...attendance.map(([label, v]): [string, string] => [label, `${num(v, 0)} dana`]),
-    [s.share < 1 ? `Ugovorna plata (${num(s.share * 100, 0)} % od ${km(s.contract_salary_monthly)})` : 'Ugovorna plata', km(s.contract_salary)],
-    [s.share < 1 ? `Dodatak kategorije (${num(s.share * 100, 0)} % od ${km(s.category_salary)})` : 'Dodatak kategorije', km(s.base_salary)],
-    [
-      s.meal_allowance_daily > 0 ? `Topli obrok (${km(s.meal_allowance_daily)} × ${num(s.working_days, 0)} dana)` : 'Topli obrok',
-      km(s.meal_allowance),
-    ],
-    ['Koeficijent plate (KP)', `${num(s.kp * 100, 2)} %`],
-    ['Budžet plate (KP × promet)', km(s.turnover_salary)],
-    ['Razlika prema prometu', km(s.turnover_difference)],
-    ['Promet / plan prodavnice', `${num(s.turnover_store_cy, 0)} / ${num(s.plan_store, 0)}`],
-    ['Vaše učešće u prometu', `${num(s.worker_share * 100, 1)} %`],
-    ['Stimulacija', km(s.stimulation)],
-    ['Prevoz', km(s.transport)],
-  ];
+  const details: [string, string][] = s.is_assistance
+    ? [
+        ...attendance.map(([label, v]): [string, string] => [label, `${num(v, 0)} dana`]),
+        ['Vaš promet u ovoj radnji', km(s.turnover_worker_cy)],
+        ['Promet / plan prodavnice', `${num(s.turnover_store_cy, 0)} / ${num(s.plan_store, 0)}`],
+        ['Stimulacija ispomoć (ukupan obračun)', km(s.total_payout)],
+      ]
+    : [
+        ...attendance.map(([label, v]): [string, string] => [label, `${num(v, 0)} dana`]),
+        [s.share < 1 ? `Ugovorna plata (${num(s.share * 100, 0)} % od ${km(s.contract_salary_monthly)})` : 'Ugovorna plata', km(s.contract_salary)],
+        [
+          s.meal_allowance_daily > 0 ? `Topli obrok (${km(s.meal_allowance_daily)} × ${num(s.working_days, 0)} dana)` : 'Topli obrok',
+          km(s.meal_allowance),
+        ],
+        ['Minuli rad', km(s.seniority ?? 0)],
+        ['Prevoz', km(s.transport)],
+        [s.share < 1 ? `Dodatak kategorije (${num(s.share * 100, 0)} % od ${km(s.category_salary)})` : 'Dodatak kategorije', km(s.base_salary)],
+        ['Koeficijent plate (KP)', `${num(s.kp * 100, 2)} %`],
+        ['Budžet plate (KP × promet)', km(s.turnover_salary)],
+        ['Razlika po prometu', km(s.turnover_difference)],
+        ['Promet / plan prodavnice', `${num(s.turnover_store_cy, 0)} / ${num(s.plan_store, 0)}`],
+        ['Vaše učešće u prometu', `${num(s.worker_share * 100, 1)} %`],
+        ['Stimulacija ispunjen plan', km(s.stimulation)],
+      ];
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full p-3.5 text-left active:bg-gray-50 dark:active:bg-gray-700/40 sm:p-4">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full p-3.5 text-left active:bg-gray-50 dark:active:bg-gray-700/40">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-500 dark:bg-teal-900/30 dark:text-teal-300">
             <Store className="h-5 w-5" strokeWidth={1.8} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-semibold text-gray-900 dark:text-white">{s.store_name}</p>
+            <p className="flex items-center gap-1.5 truncate text-[15px] font-semibold text-gray-900 dark:text-white">
+              <span className="truncate">{s.store_name}</span>
+              {s.is_assistance && (
+                <span className="shrink-0 rounded-full bg-fuchsia-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fuchsia-600 ring-1 ring-fuchsia-200 dark:bg-fuchsia-900/30 dark:text-fuchsia-300 dark:ring-fuchsia-800">
+                  Ispomoć
+                </span>
+              )}
+            </p>
             <p className="text-[11px] text-gray-500 dark:text-gray-400">
               Kat. {s.category ?? '?'} · {num(s.working_days, 0)} dana
               {s.sick_leave_days > 0 && <span className="text-rose-500"> · bol. {num(s.sick_leave_days, 0)}</span>}
@@ -504,7 +566,7 @@ function StoreCard({ s }: { s: PayrollStoreBreakdown }) {
           <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
             <div
               className={`h-full rounded-full ${s.plan_met ? 'bg-emerald-400' : 'bg-amber-300'}`}

@@ -10,7 +10,7 @@ use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
 
 /**
  * Uvoz kredita — prilagođen Planika exportu (npr. 2026_05.xlsx):
- * Broj dokumenta | Datum | WhsName | Naziv kupca (firma) | Naziv kupca (kupac) | Ukupno | PIO filijala | Status
+ * Broj dokumenta | Datum / Datum knjiženja | WhsName | Naziv kupca (firma) | Naziv kupca (kupac) | Ukupno / Ukupni iznos dokumenta | PIO filijala | Status
  */
 class KreditiImport implements ToCollection, WithCalculatedFormulas
 {
@@ -162,7 +162,7 @@ class KreditiImport implements ToCollection, WithCalculatedFormulas
             }
         }
 
-        // Fallback for header variants such as "Datum dokumenta" or "Ukupno KM".
+        // Fallback for header variants such as "Datum knjiženja", "Ukupno KM" or "Ukupni iznos dokumenta".
         foreach ($headerRow as $colIndex => $cell) {
             $norm = $this->normalizeHeaderCell((string) $cell);
             if ($norm === '' || in_array($colIndex, $map, true) || in_array($colIndex, $nazivCols, true)) {
@@ -171,7 +171,7 @@ class KreditiImport implements ToCollection, WithCalculatedFormulas
             if (! isset($map['issue_date']) && str_starts_with($norm, 'datum')
                 && ! preg_match('/dospij|isplat|zabran|valut/u', $norm)) {
                 $map['issue_date'] = $colIndex;
-            } elseif (! isset($map['amount']) && preg_match('/^(ukupno|iznos)/u', $norm)) {
+            } elseif (! isset($map['amount']) && preg_match('/^(ukupn\p{L}*|iznos)/u', $norm)) {
                 $map['amount'] = $colIndex;
             }
         }

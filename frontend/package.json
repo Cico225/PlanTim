@@ -1,7 +1,7 @@
 {
     "name": "plantim-frontend",
     "private": true,
-    "version": "1.2.37",
+    "version": "1.2.38",
     "type": "module",
     "description": "PlanTim Frontend - React Application",
     "scripts": {

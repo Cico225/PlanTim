@@ -68,9 +68,13 @@ export interface PayrollStoreBreakdown {
   stimulation_base: number;
   worker_share: number;
   stimulation: number;
+  assistance_stimulation: number;
+  is_primary?: boolean;
+  is_assistance?: boolean;
   total: number;
   meal_allowance_daily: number;
   meal_allowance: number;
+  seniority: number;
   transport: number;
   total_payout: number;
 }
@@ -83,8 +87,10 @@ export interface PayrollTotals {
   turnover_difference: number;
   salary: number;
   stimulation: number;
+  assistance_stimulation: number;
   total: number;
   meal_allowance: number;
+  seniority: number;
   transport: number;
   total_with_transport: number;
   total_payout: number;
@@ -119,8 +125,10 @@ export interface PayrollSummary {
     | 'turnover_difference'
     | 'salary'
     | 'stimulation'
+    | 'assistance_stimulation'
     | 'total'
     | 'meal_allowance'
+    | 'seniority'
     | 'transport'
     | 'total_with_transport'
     | 'total_payout'

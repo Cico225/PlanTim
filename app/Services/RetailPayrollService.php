@@ -59,13 +59,16 @@ class RetailPayrollService
         // Columns added to the template later; matched by header only.
         'contract_salary' => [['ugovorna plata', 'osnovna plata', 'ugovorna neto plata', 'osnovna ugovorna plata', 'ugovorna'], null],
         'meal_allowance' => [['topli obrok', 'iznos toplog obroka', 'topli obrok iznos', 'topli obrok dnevno', 'topli obrok po danu', 'dnevni topli obrok', 'topli obrok km'], null],
+        'seniority' => [['minuli rad', 'minuli rad iznos', 'iznos minulog rada', 'minuli'], null],
+        'assistance_stimulation' => [['stimulacija ispomoc', 'ispomoc', 'stimulacija za ispomoc', 'stimulacija ispomoci', 'ispomoc stimulacija'], null],
         'regular_days' => [['redovan rad dana', 'redovan rad', 'redovni rad', 'redovni rad dana', 'dani redovnog rada'], null],
         'sick_leave_days' => [['bolovanje', 'bolovanje dana', 'dani bolovanja', 'bolovanje dani'], null],
         'annual_leave_days' => [['godisnji odmor', 'godisnji', 'godisnji odmor dana', 'dani godisnjeg odmora', 'godisnji dani'], null],
     ];
 
     private const AMOUNT_FIELDS = [
-        'contract_salary', 'meal_allowance', 'regular_days', 'sick_leave_days', 'annual_leave_days',
+        'contract_salary', 'meal_allowance', 'seniority', 'assistance_stimulation',
+        'regular_days', 'sick_leave_days', 'annual_leave_days',
         'plan_worker_ly', 'turnover_worker_ly', 'plan_worker_cy', 'turnover_worker_cy',
         'plan_store', 'turnover_store_ly', 'turnover_store_cy', 'transport_amount', 'working_days',
         'net_salary_store_cy', 'net_salary_store_ly', 'net_salary_worker_cy', 'net_salary_worker_ly',
@@ -335,7 +338,8 @@ class RetailPayrollService
      * Calculate the salary breakdown for all rows of a period, grouped by worker.
      *
      * Salary budget = KP × turnover; it covers contract salary + category allowance + meal allowance,
-     * the remainder is paid as the difference by turnover. Plan stimulation and transport are paid on top.
+     * the remainder is paid as the difference by turnover. Plan/assistance stimulation, seniority,
+     * meal allowance and transport are paid on top.
      *
      * @param Collection $rows retail_payroll_rows records (may include user_id from links)
      */
@@ -354,10 +358,14 @@ class RetailPayrollService
             $monthlyContract = (float) $group->max(fn ($r) => (float) ($r->contract_salary ?? 0));
 
             $stores = [];
+            // Minuli rad is a monthly worker amount (may be repeated on every store row).
+            $monthlySeniority = (float) $group->max(fn ($r) => (float) ($r->seniority ?? 0));
+
             $totals = [
                 'contract_salary' => 0.0, 'base_salary' => 0.0, 'guaranteed_salary' => 0.0,
                 'turnover_salary' => 0.0, 'turnover_difference' => 0.0, 'salary' => 0.0,
-                'stimulation' => 0.0, 'total' => 0.0, 'meal_allowance' => 0.0, 'transport' => 0.0,
+                'stimulation' => 0.0, 'assistance_stimulation' => 0.0, 'total' => 0.0,
+                'meal_allowance' => 0.0, 'seniority' => 0.0, 'transport' => 0.0,
                 'total_with_transport' => 0.0, 'total_payout' => 0.0,
                 'turnover_worker_cy' => 0.0, 'turnover_worker_ly' => 0.0, 'working_days' => $totalDays,
                 'regular_days' => 0.0, 'sick_leave_days' => 0.0, 'annual_leave_days' => 0.0,
@@ -425,6 +433,8 @@ class RetailPayrollService
                 $stimulation = $stimulationBase * $kp * $workerShare;
 
                 $transport = $r->has_transport || (float) $r->transport_amount > 0 ? (float) $r->transport_amount : 0.0;
+                $seniority = $monthlySeniority * $share;
+                $assistanceExcel = max(0, (float) ($r->assistance_stimulation ?? 0));
                 $storeTotal = $salary + $stimulation;
 
                 $stores[] = [
@@ -462,34 +472,90 @@ class RetailPayrollService
                     'stimulation_base' => round($stimulationBase, 2),
                     'worker_share' => round($workerShare, 6),
                     'stimulation' => round($stimulation, 2),
+                    // Filled below after the primary store is known; Excel amount is the fallback seed.
+                    'assistance_stimulation' => round($assistanceExcel, 2),
+                    'assistance_from_excel' => round($assistanceExcel, 2),
+                    'is_primary' => false,
+                    'is_assistance' => false,
                     'total' => round($storeTotal, 2),
                     'meal_allowance_daily' => round($mealDaily, 2),
                     'meal_allowance' => round($meal, 2),
+                    'seniority' => round($seniority, 2),
                     'transport' => round($transport, 2),
-                    'total_payout' => round($storeTotal + $meal + $transport, 2),
+                    'total_payout' => round($storeTotal + $meal + $seniority + $transport + $assistanceExcel, 2),
                 ];
+            }
 
-                $totals['contract_salary'] += $contract;
-                $totals['base_salary'] += $categoryAddon;
-                $totals['guaranteed_salary'] += $guaranteed;
-                $totals['turnover_salary'] += $turnoverSalary;
-                $totals['turnover_difference'] += $difference;
-                $totals['salary'] += $salary;
-                $totals['stimulation'] += $stimulation;
-                $totals['total'] += $storeTotal;
-                $totals['meal_allowance'] += $meal;
-                $totals['transport'] += $transport;
-                $totals['turnover_worker_cy'] += $workerCy;
-                $totals['turnover_worker_ly'] += $workerLy;
-                $totals['regular_days'] += (float) ($r->regular_days ?? 0);
-                $totals['sick_leave_days'] += (float) ($r->sick_leave_days ?? 0);
-                $totals['annual_leave_days'] += (float) ($r->annual_leave_days ?? 0);
+            // Primary store = most working days (then highest worker turnover). Other stores = ispomoć.
+            $primaryIdx = 0;
+            foreach ($stores as $i => $s) {
+                $best = $stores[$primaryIdx];
+                if (
+                    $s['working_days'] > $best['working_days']
+                    || ($s['working_days'] == $best['working_days'] && $s['turnover_worker_cy'] > $best['turnover_worker_cy'])
+                ) {
+                    $primaryIdx = $i;
+                }
+            }
+            $multiStore = count($stores) > 1;
+            foreach ($stores as $i => &$s) {
+                $s['is_primary'] = $i === $primaryIdx;
+                $s['is_assistance'] = $multiStore && $i !== $primaryIdx;
+                $excelAssistance = $s['assistance_from_excel'];
+                // Ukupan iznos po radnji (ugovorno + stimulativno + eventualni excel iznos).
+                $s['total_payout'] = round(
+                    $s['contract_salary'] + $s['base_salary'] + $s['turnover_difference'] + $s['stimulation']
+                    + $s['meal_allowance'] + $s['seniority'] + $s['transport']
+                    + $excelAssistance,
+                    2
+                );
+                // Stimulacija ispomoć = cijeli obračun tuđe radnje (isti iznos kao na kartici prodavnice).
+                if ($s['is_assistance']) {
+                    $s['assistance_stimulation'] = $excelAssistance > 0
+                        ? round($excelAssistance, 2)
+                        : $s['total_payout'];
+                } else {
+                    $s['assistance_stimulation'] = round($excelAssistance, 2);
+                }
+            }
+            unset($s);
+
+            foreach ($stores as $s) {
+                $totals['turnover_salary'] += $s['turnover_salary'];
+                $totals['turnover_worker_cy'] += $s['turnover_worker_cy'];
+                $totals['turnover_worker_ly'] += $s['turnover_worker_ly'];
+                $totals['regular_days'] += $s['regular_days'];
+                $totals['sick_leave_days'] += $s['sick_leave_days'];
+                $totals['annual_leave_days'] += $s['annual_leave_days'];
+
+                if ($s['is_assistance'] && $s['assistance_from_excel'] <= 0) {
+                    // Cijeli iznos ispomoć radnje ide u stimulaciju ispomoć (ne u ugovorna/ostale stavke).
+                    $totals['assistance_stimulation'] += $s['total_payout'];
+                    $totals['total'] += $s['total'];
+                } else {
+                    $totals['contract_salary'] += $s['contract_salary'];
+                    $totals['base_salary'] += $s['base_salary'];
+                    $totals['guaranteed_salary'] += $s['guaranteed_salary'];
+                    $totals['turnover_difference'] += $s['turnover_difference'];
+                    $totals['salary'] += $s['salary'];
+                    $totals['stimulation'] += $s['stimulation'];
+                    $totals['total'] += $s['total'];
+                    $totals['meal_allowance'] += $s['meal_allowance'];
+                    $totals['seniority'] += $s['seniority'];
+                    $totals['transport'] += $s['transport'];
+                    $totals['assistance_stimulation'] += $s['assistance_from_excel'];
+                }
             }
             $totals['total_with_transport'] = $totals['total'] + $totals['transport'];
-            $totals['total_payout'] = $totals['total'] + $totals['meal_allowance'] + $totals['transport'];
+            $totals['total_payout'] = $totals['contract_salary'] + $totals['meal_allowance'] + $totals['seniority'] + $totals['transport']
+                + $totals['base_salary'] + $totals['turnover_difference'] + $totals['stimulation'] + $totals['assistance_stimulation'];
             foreach ($totals as $k => $v) {
                 $totals[$k] = round($v, 2);
             }
+            foreach ($stores as &$s) {
+                unset($s['assistance_from_excel']);
+            }
+            unset($s);
 
             $workers[] = [
                 'worker_key' => $first->worker_key,

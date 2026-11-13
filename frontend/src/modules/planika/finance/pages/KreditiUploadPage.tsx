@@ -82,8 +82,8 @@ export default function KreditiUploadPage() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Mjesečni uvoz kredita iz Excel-a</h2>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           Prilagođeno Planika exportu (npr. <strong>2026_05.xlsx</strong>). Zaglavlje u prvom redu:
-          Broj dokumenta, Datum, WhsName, Naziv kupca/dobavljača (firma), Naziv kupca/dobavljača (kupac),
-          Ukupno, PIO filijala, Status. Ako se fajl zove <code className="rounded bg-gray-100 px-1 dark:bg-dark-700">YYYY_MM</code>,
+          Broj dokumenta, Datum ili Datum knjiženja, WhsName, Naziv kupca/dobavljača (firma), Naziv kupca/dobavljača (kupac),
+          Ukupno ili Ukupni iznos dokumenta, PIO filijala, Status. Ako se fajl zove <code className="rounded bg-gray-100 px-1 dark:bg-dark-700">YYYY_MM</code>,
           godina i mjesec se automatski prepoznaju.
         </p>
 
