@@ -1,10 +1,25 @@
+import { useEffect, useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { isAuthCleared } from '@/services/authSession';
 
 export default function AuthLayout() {
   const { isAuthenticated } = useAuthStore();
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
 
-  if (isAuthenticated) {
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+      return;
+    }
+    return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  if (!hydrated) {
+    return null;
+  }
+
+  if (isAuthenticated && !isAuthCleared()) {
     return <Navigate to="/dashboard" replace />;
   }
 

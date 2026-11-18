@@ -166,6 +166,7 @@ export interface EmploymentContractTemplate {
   is_active: boolean;
   file_exists?: boolean;
   file_size?: number | null;
+  contracts_count?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -230,6 +231,19 @@ export interface EmploymentContractFilters {
 export interface EmploymentContractSettings {
   default_renewal_notice_days: number;
   auto_create_renewal_draft: boolean;
+  default_employment_term: 'indefinite' | 'fixed';
+  default_fixed_months: number;
+  default_auto_renew: boolean;
+  default_currency: string;
+  generate_document_by_default: boolean;
+  contract_number_prefix: string;
+  contract_number_next: number;
+  employer_name: string;
+  employer_address: string;
+  sign_city: string;
+  director_name: string;
+  weekly_hours: number;
+  probation_months: number;
 }
 
 export interface EmploymentContractSummary {
@@ -543,6 +557,91 @@ export interface HRWorkPosition {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type DecisionKind =
+  | 'annual_leave'
+  | 'unpaid_leave'
+  | 'employment'
+  | 'position_change'
+  | 'salary_change'
+  | 'termination'
+  | 'other';
+
+export interface EmploymentDecision {
+  id: number;
+  employee_id: number;
+  contract_id?: number | null;
+  template_id?: number | null;
+  decision_number?: string | null;
+  kind: DecisionKind;
+  title: string;
+  status: 'draft' | 'issued' | 'cancelled';
+  decision_date: string;
+  effective_date?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  days?: number | null;
+  leave_year?: number | null;
+  notes?: string | null;
+  generated_document_path?: string | null;
+  contract_number?: string | null;
+  employee_full_name?: string | null;
+  employee_user_name?: string | null;
+  store_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DecisionSettings {
+  decision_number_prefix: string;
+  decision_number_next: number;
+  default_annual_leave_days: number;
+  generate_document_by_default: boolean;
+}
+
+export interface DecisionTemplate {
+  id: number;
+  name: string;
+  kind: DecisionKind;
+  template_file: string;
+  output_format: string;
+  is_active: boolean;
+  decisions_count?: number;
+  file_exists?: boolean;
+}
+
+export interface LeavePlanItem {
+  id: number;
+  year: number;
+  employee_id: number;
+  employee_name?: string | null;
+  contract_id?: number | null;
+  contract_number?: string | null;
+  template_id?: number | null;
+  template_name?: string | null;
+  date_from: string;
+  date_to: string;
+  days: number;
+  status: 'planned' | 'confirmed';
+  decision_id?: number | null;
+  decision_number?: string | null;
+  generated_document_path?: string | null;
+  notes?: string | null;
+}
+
+export interface LeaveRegisterRow {
+  employee_id: number;
+  employee_name: string;
+  contract_id: number;
+  contract_number?: string | null;
+  contract_status?: string | null;
+  store_name?: string | null;
+  year: number;
+  entitled_days: number;
+  carried_over_days: number;
+  used_days: number;
+  remaining_days: number;
 }
 
 export interface HRDecisionType {

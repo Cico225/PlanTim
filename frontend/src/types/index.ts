@@ -38,7 +38,6 @@ export interface LoginCredentials {
   email: string;
   password: string;
   remember?: boolean;
-  recaptcha_token?: string;
 }
 
 export interface VerifyLoginCredentials {

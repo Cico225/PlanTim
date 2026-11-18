@@ -46,6 +46,7 @@ import Onboarding from '../components/Onboarding';
 import Offboarding from '../components/Offboarding';
 import HRReports from '../components/HRReports';
 import EmploymentContracts from '../components/EmploymentContracts';
+import DecisionsModule from '../components/DecisionsModule';
 import Education from '../components/Education';
 import TalentManagement from '../components/TalentManagement';
 
@@ -2083,37 +2084,6 @@ function EmployeeDetailModal({ employeeId, onClose }: { employeeId: number; onCl
   );
 }
 
-function DecisionsList() {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <ClipboardCheck className="w-6 h-6 text-indigo-500" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Odluke i rješenja</h3>
-      </div>
-      <p className="text-gray-500 dark:text-gray-400 mb-4">Administrativne odluke i rješenja za zaposlenike</p>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <span className="text-sm text-gray-700 dark:text-gray-300">Rješenja o zapošljavanju</span>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        </div>
-        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <span className="text-sm text-gray-700 dark:text-gray-300">Rješenja o promjeni pozicije</span>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        </div>
-        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <span className="text-sm text-gray-700 dark:text-gray-300">Rješenja o promjeni plaće</span>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        </div>
-        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <span className="text-sm text-gray-700 dark:text-gray-300">Rješenja o neplaćenom odsustvu</span>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 function LeavesList() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -2387,7 +2357,7 @@ export default function HRMOverview({
       case 'ats': return <ATSList />;
       case 'onboarding': return <Onboarding />;
       case 'contracts': return <EmploymentContracts />;
-      case 'decisions': return <DecisionsList />;
+      case 'decisions': return <DecisionsModule />;
       case 'attendance': return <AttendanceList />;
       case 'leaves': return <LeavesList />;
       case 'education': return <Education />;

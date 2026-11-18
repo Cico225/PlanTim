@@ -1,19 +1,21 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  FilePlus,
   FileText,
   Plus,
   RefreshCw,
   Download,
-  Filter,
   Settings,
   AlertTriangle,
   Search,
   Upload,
-  CheckCircle2,
-  XCircle,
   FolderOpen,
   Pencil,
+  Eye,
+  SlidersHorizontal,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -26,10 +28,7 @@ import {
   updateEmploymentContractSettings,
   generateEmploymentContractDocument,
   downloadEmploymentContractDocument,
-  uploadEmploymentContractTemplate,
-  replaceEmploymentContractTemplateFile,
   downloadEmploymentContractTemplate,
-  updateEmploymentContractTemplate,
   bulkUpdateEmploymentContracts,
   getEmployees,
   getStores,
@@ -37,11 +36,49 @@ import {
 import type {
   EmploymentContract,
   EmploymentContractFilters,
+  EmploymentContractSettings,
   EmploymentContractTemplate,
   LegalEntity,
   JobRole,
 } from '../../../types/hrm';
 import { formatDate } from '@/utils/dateFormat';
+import { useAuthStore } from '@/store/authStore';
+
+const DEFAULT_CONTRACT_SETTINGS: EmploymentContractSettings = {
+  default_renewal_notice_days: 30,
+  auto_create_renewal_draft: true,
+  default_employment_term: 'indefinite',
+  default_fixed_months: 12,
+  default_auto_renew: true,
+  default_currency: 'KM',
+  generate_document_by_default: true,
+  contract_number_prefix: '',
+  contract_number_next: 1,
+  employer_name: '',
+  employer_address: '',
+  sign_city: '',
+  director_name: '',
+  weekly_hours: 40,
+  probation_months: 0,
+};
+
+function settingsToForm(settings?: EmploymentContractSettings | null): EmploymentContractSettings {
+  return { ...DEFAULT_CONTRACT_SETTINGS, ...(settings || {}) };
+}
+
+function addMonths(isoDate: string, months: number): string {
+  const date = new Date(`${isoDate || new Date().toISOString().slice(0, 10)}T00:00:00`);
+  const day = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + months);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, lastDay));
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const dayText = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${dayText}`;
+}
+import ContractTemplatesManager, { TemplatePreviewModal } from './ContractTemplatesManager';
 
 const LEGAL_ENTITY_LABELS: Record<LegalEntity, string> = {
   fbih: 'FBiH',
@@ -63,6 +100,163 @@ const STATUS_LABELS: Record<string, string> = {
   superseded: 'Zamijenjen',
 };
 
+type ContractColumnId =
+  | 'contract_number'
+  | 'employee'
+  | 'document_kind'
+  | 'legal_entity'
+  | 'job_role'
+  | 'position_title'
+  | 'store'
+  | 'employment_term'
+  | 'work_start'
+  | 'expiry'
+  | 'sign_date'
+  | 'effective_date'
+  | 'status'
+  | 'salary_gross'
+  | 'salary_net'
+  | 'protocol'
+  | 'template'
+  | 'annex'
+  | 'auto_renew';
+
+const CONTRACT_COLUMNS: { id: ContractColumnId; label: string; defaultVisible: boolean }[] = [
+  { id: 'contract_number', label: 'Broj ugovora', defaultVisible: true },
+  { id: 'employee', label: 'Zaposlenik', defaultVisible: true },
+  { id: 'document_kind', label: 'Vrsta', defaultVisible: true },
+  { id: 'legal_entity', label: 'Entitet', defaultVisible: true },
+  { id: 'job_role', label: 'Pozicija', defaultVisible: true },
+  { id: 'store', label: 'Prodavnica', defaultVisible: true },
+  { id: 'employment_term', label: 'Trajanje', defaultVisible: true },
+  { id: 'work_start', label: 'Početak', defaultVisible: true },
+  { id: 'expiry', label: 'Istek', defaultVisible: true },
+  { id: 'status', label: 'Status', defaultVisible: true },
+  { id: 'position_title', label: 'Radno mjesto', defaultVisible: false },
+  { id: 'salary_gross', label: 'Bruto', defaultVisible: false },
+  { id: 'salary_net', label: 'Neto', defaultVisible: false },
+  { id: 'protocol', label: 'Protokol', defaultVisible: false },
+  { id: 'template', label: 'Šablon', defaultVisible: false },
+  { id: 'sign_date', label: 'Datum potpisa', defaultVisible: false },
+  { id: 'effective_date', label: 'Primjena od', defaultVisible: false },
+  { id: 'annex', label: 'Aneks', defaultVisible: false },
+  { id: 'auto_renew', label: 'Auto. produženje', defaultVisible: false },
+];
+
+const STATUS_CLASS: Record<string, string> = {
+  draft: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+  active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  expired: 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+  terminated: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  superseded: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+};
+
+type ColumnPrefs = { order: ContractColumnId[]; visible: ContractColumnId[] };
+
+function defaultColumnPrefs(): ColumnPrefs {
+  return {
+    order: CONTRACT_COLUMNS.map((column) => column.id),
+    visible: CONTRACT_COLUMNS.filter((column) => column.defaultVisible).map((column) => column.id),
+  };
+}
+
+function columnStorageKey(userId?: number) {
+  return `plantim-hrm-contract-columns:${userId ?? 'local'}`;
+}
+
+function loadColumnPrefs(userId?: number): ColumnPrefs {
+  const defaults = defaultColumnPrefs();
+  try {
+    const raw = localStorage.getItem(columnStorageKey(userId));
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<ColumnPrefs>;
+    const known = new Set(CONTRACT_COLUMNS.map((column) => column.id));
+    const order = (parsed.order || []).filter((id): id is ContractColumnId => known.has(id as ContractColumnId));
+    for (const column of CONTRACT_COLUMNS) {
+      if (!order.includes(column.id)) order.push(column.id);
+    }
+    const visible = (parsed.visible || []).filter((id): id is ContractColumnId => known.has(id as ContractColumnId));
+    return { order, visible: visible.length > 0 ? visible : defaults.visible };
+  } catch {
+    return defaults;
+  }
+}
+
+function formatMoney(value?: number | null, currency?: string) {
+  if (value === null || value === undefined) return '—';
+  const amount = Number(value);
+  if (Number.isNaN(amount)) return '—';
+  return `${amount.toLocaleString('bs-BA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency || 'KM'}`;
+}
+
+function renderContractCell(
+  id: ContractColumnId,
+  contract: EmploymentContract,
+  employeeContractCount: number
+) {
+  switch (id) {
+    case 'contract_number':
+      return (
+        <span className={contract.contract_number ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-400'}>
+          {contract.contract_number || 'Bez broja'}
+        </span>
+      );
+    case 'employee':
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-gray-900 dark:text-white">
+            {contract.employee_full_name || contract.employee_user_name || '—'}
+          </span>
+          {employeeContractCount > 1 && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              {employeeContractCount} ugovora
+            </span>
+          )}
+        </div>
+      );
+    case 'document_kind':
+      return contract.document_kind === 'annex' ? 'Aneks' : 'Ugovor';
+    case 'legal_entity':
+      return LEGAL_ENTITY_LABELS[contract.legal_entity] || '—';
+    case 'job_role':
+      return JOB_ROLE_LABELS[contract.job_role] || '—';
+    case 'position_title':
+      return contract.position_title || '—';
+    case 'store':
+      return contract.store_label || contract.store_name || '—';
+    case 'employment_term':
+      return contract.employment_term === 'fixed' ? 'Određeno' : 'Neodređeno';
+    case 'work_start':
+      return formatDate(contract.work_start_date);
+    case 'expiry':
+      return formatDate(contract.expiry_date || contract.work_end_date);
+    case 'sign_date':
+      return formatDate(contract.contract_sign_date);
+    case 'effective_date':
+      return formatDate(contract.effective_date);
+    case 'status':
+      return (
+        <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_CLASS[contract.status] || STATUS_CLASS.draft}`}>
+          {STATUS_LABELS[contract.status] || contract.status}
+        </span>
+      );
+    case 'salary_gross':
+      return formatMoney(contract.salary_gross, contract.currency);
+    case 'salary_net':
+      return formatMoney(contract.salary_net, contract.currency);
+    case 'protocol':
+      return contract.protocol_number || '—';
+    case 'template':
+      return contract.template_name || '—';
+    case 'annex':
+      return contract.annex_number ? String(contract.annex_number) : '—';
+    case 'auto_renew':
+      return contract.auto_renew ? 'Da' : 'Ne';
+    default:
+      return '—';
+  }
+}
+
 const TERM_PRESETS = [
   { value: '', label: 'Bez promjene trajanja' },
   { value: 'indefinite', label: 'Na neodređeno' },
@@ -73,26 +267,22 @@ const TERM_PRESETS = [
   { value: 'custom', label: 'Prilagođeno (ručni datum)' },
 ] as const;
 
-function formatFileSize(bytes?: number | null) {
-  if (!bytes && bytes !== 0) return '—';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export default function EmploymentContracts() {
   const queryClient = useQueryClient();
-  const replaceFileRef = useRef<HTMLInputElement | null>(null);
+  const userId = useAuthStore((state) => state.user?.id);
+  const columnPanelRef = useRef<HTMLDivElement>(null);
+  const [showColumns, setShowColumns] = useState(false);
+  const [columnPrefs, setColumnPrefs] = useState<ColumnPrefs>(() => loadColumnPrefs(userId));
   const [filters, setFilters] = useState<EmploymentContractFilters>({});
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [renewTarget, setRenewTarget] = useState<EmploymentContract | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showTemplateList, setShowTemplateList] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<EmploymentContractTemplate | null>(null);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [replaceTargetId, setReplaceTargetId] = useState<number | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [bulkForm, setBulkForm] = useState({
     term_preset: '3' as string,
     duration_from: 'work_start' as 'work_start' | 'effective' | 'today',
@@ -105,14 +295,6 @@ export default function EmploymentContracts() {
     store_id: '',
     notes: '',
     generate_document: false,
-  });
-  const [templateForm, setTemplateForm] = useState({
-    name: '',
-    legal_entity: 'fbih' as LegalEntity,
-    job_role: 'salesperson' as JobRole,
-    document_kind: 'full_contract' as 'full_contract' | 'annex',
-    output_format: 'docx' as 'docx' | 'pdf',
-    file: null as File | null,
   });
 
   const [createForm, setCreateForm] = useState({
@@ -151,10 +333,7 @@ export default function EmploymentContracts() {
     generate_document: true,
   });
 
-  const [settingsForm, setSettingsForm] = useState({
-    default_renewal_notice_days: 30,
-    auto_create_renewal_draft: true,
-  });
+  const [settingsForm, setSettingsForm] = useState<EmploymentContractSettings>(DEFAULT_CONTRACT_SETTINGS);
 
   const activeFilters = useMemo(
     () => ({ ...filters, search: search || undefined }),
@@ -179,7 +358,6 @@ export default function EmploymentContracts() {
   const { data: settings } = useQuery({
     queryKey: ['hrm-employment-contract-settings'],
     queryFn: getEmploymentContractSettings,
-    enabled: showSettings,
   });
 
   const { data: employeesData } = useQuery({
@@ -195,6 +373,21 @@ export default function EmploymentContracts() {
 
   const contracts = contractsData?.data || [];
   const employees = employeesData?.data || [];
+  const contractsByEmployee = useMemo(() => {
+    const counts = new Map<number, number>();
+    contracts.forEach((contract) => {
+      counts.set(contract.employee_id, (counts.get(contract.employee_id) || 0) + 1);
+    });
+    return counts;
+  }, [contracts]);
+  const visibleColumns = useMemo(
+    () =>
+      columnPrefs.order
+        .filter((id) => columnPrefs.visible.includes(id))
+        .map((id) => CONTRACT_COLUMNS.find((column) => column.id === id))
+        .filter((column): column is (typeof CONTRACT_COLUMNS)[number] => Boolean(column)),
+    [columnPrefs]
+  );
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const allVisibleSelected =
     contracts.length > 0 && contracts.every((contract) => selectedIdSet.has(contract.id));
@@ -249,6 +442,7 @@ export default function EmploymentContracts() {
     onSuccess: () => {
       toast.success('Postavke su sačuvane.');
       queryClient.invalidateQueries({ queryKey: ['hrm-employment-contract-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['hrm-employment-contracts-summary'] });
       setShowSettings(false);
     },
   });
@@ -258,56 +452,6 @@ export default function EmploymentContracts() {
     onSuccess: () => {
       toast.success('Dokument je generisan.');
       queryClient.invalidateQueries({ queryKey: ['hrm-employment-contracts'] });
-    },
-  });
-
-  const uploadTemplateMutation = useMutation({
-    mutationFn: (formData: FormData) =>
-      uploadEmploymentContractTemplate(formData, (progress) => setUploadProgress(progress)),
-    onSuccess: (result) => {
-      toast.success(result.message || 'Šablon je učitan.');
-      queryClient.invalidateQueries({ queryKey: ['hrm-employment-contract-templates'] });
-      setUploadProgress(null);
-      setTemplateForm({
-        name: '',
-        legal_entity: 'fbih',
-        job_role: 'salesperson',
-        document_kind: 'full_contract',
-        output_format: 'docx',
-        file: null,
-      });
-    },
-    onError: (error: any) => {
-      setUploadProgress(null);
-      toast.error(error?.response?.data?.message || 'Greška pri učitavanju šablona.');
-    },
-  });
-
-  const replaceTemplateMutation = useMutation({
-    mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-      replaceEmploymentContractTemplateFile(id, formData, (progress) => setUploadProgress(progress)),
-    onSuccess: (result) => {
-      toast.success(result.message || 'Datoteka šablona je ažurirana.');
-      queryClient.invalidateQueries({ queryKey: ['hrm-employment-contract-templates'] });
-      setUploadProgress(null);
-      setReplaceTargetId(null);
-    },
-    onError: (error: any) => {
-      setUploadProgress(null);
-      setReplaceTargetId(null);
-      toast.error(error?.response?.data?.message || 'Greška pri zamjeni datoteke.');
-    },
-  });
-
-  const toggleTemplateActiveMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
-      updateEmploymentContractTemplate(id, { is_active }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hrm-employment-contract-templates'] });
-      toast.success('Status šablona je ažuriran.');
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Greška pri ažuriranju šablona.');
     },
   });
 
@@ -405,39 +549,6 @@ export default function EmploymentContracts() {
     setShowBulkEdit(true);
   };
 
-  const handleUploadTemplate = () => {
-    if (!templateForm.file) {
-      toast.error('Odaberite datoteku šablona (.doc, .docx ili .pdf).');
-      return;
-    }
-    if (!templateForm.name.trim()) {
-      toast.error('Unesite naziv šablona.');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', templateForm.file);
-    formData.append('name', templateForm.name.trim());
-    formData.append('legal_entity', templateForm.legal_entity);
-    formData.append('job_role', templateForm.job_role);
-    formData.append('document_kind', templateForm.document_kind);
-    formData.append('output_format', templateForm.output_format);
-    formData.append('is_active', '1');
-
-    uploadTemplateMutation.mutate(formData);
-  };
-
-  const handleReplaceFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    const id = replaceTargetId;
-    event.target.value = '';
-    if (!file || !id) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    replaceTemplateMutation.mutate({ id, formData });
-  };
-
   const handleCreate = () => {
     createMutation.mutate({
       employee_id: Number(createForm.employee_id),
@@ -485,6 +596,27 @@ export default function EmploymentContracts() {
     });
   };
 
+  const openCreate = () => {
+    const current = settingsToForm(settings);
+    const today = new Date().toISOString().slice(0, 10);
+    const fixed = current.default_employment_term === 'fixed';
+    const end = fixed ? addMonths(today, current.default_fixed_months || 12) : '';
+    setCreateForm((prev) => ({
+      ...prev,
+      contract_sign_date: today,
+      work_start_date: today,
+      effective_date: today,
+      employment_term: current.default_employment_term,
+      work_end_date: end,
+      expiry_date: end,
+      auto_renew: current.default_auto_renew,
+      generate_document: current.generate_document_by_default,
+      renewal_notice_days: String(current.default_renewal_notice_days),
+    }));
+    setShowTemplateList(false);
+    setShowCreate(true);
+  };
+
   const openRenew = (contract: EmploymentContract) => {
     setRenewTarget(contract);
     setRenewForm({
@@ -495,17 +627,53 @@ export default function EmploymentContracts() {
       salary_net: contract.salary_net?.toString() || '',
       protocol_number: contract.protocol_number || '',
       notes: '',
-      generate_document: true,
+      generate_document: settingsToForm(settings).generate_document_by_default,
     });
   };
 
-  const applySettingsToForm = () => {
-    if (settings) {
-      setSettingsForm({
-        default_renewal_notice_days: settings.default_renewal_notice_days,
-        auto_create_renewal_draft: settings.auto_create_renewal_draft,
-      });
+  const openSettings = () => {
+    setSettingsForm(settingsToForm(settings));
+    setShowSettings(true);
+  };
+
+  useEffect(() => {
+    setColumnPrefs(loadColumnPrefs(userId));
+  }, [userId]);
+
+  useEffect(() => {
+    if (!showColumns) return;
+    const close = (event: MouseEvent) => {
+      if (!columnPanelRef.current?.contains(event.target as Node)) {
+        setShowColumns(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showColumns]);
+
+  const saveColumnPrefs = (next: ColumnPrefs) => {
+    setColumnPrefs(next);
+    localStorage.setItem(columnStorageKey(userId), JSON.stringify(next));
+  };
+
+  const toggleColumn = (id: ContractColumnId) => {
+    const visible = columnPrefs.visible.includes(id)
+      ? columnPrefs.visible.filter((item) => item !== id)
+      : [...columnPrefs.visible, id];
+    if (visible.length === 0) {
+      toast.error('Ostaje barem jedna kolona.');
+      return;
     }
+    saveColumnPrefs({ ...columnPrefs, visible });
+  };
+
+  const moveColumn = (id: ContractColumnId, direction: -1 | 1) => {
+    const order = [...columnPrefs.order];
+    const index = order.indexOf(id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= order.length) return;
+    [order[index], order[target]] = [order[target], order[index]];
+    saveColumnPrefs({ ...columnPrefs, order });
   };
 
   return (
@@ -523,18 +691,19 @@ export default function EmploymentContracts() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setShowTemplates(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700"
+            onClick={() => setShowTemplateList((open) => !open)}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+              showTemplateList
+                ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
+                : 'border-gray-200 dark:border-gray-700'
+            }`}
           >
             <FolderOpen className="h-4 w-4" />
             Šabloni
           </button>
           <button
             type="button"
-            onClick={() => {
-              setShowSettings(true);
-              applySettingsToForm();
-            }}
+            onClick={openSettings}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700"
           >
             <Settings className="h-4 w-4" />
@@ -542,7 +711,7 @@ export default function EmploymentContracts() {
           </button>
           <button
             type="button"
-            onClick={() => setShowCreate(true)}
+            onClick={openCreate}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
           >
             <Plus className="h-4 w-4" />
@@ -551,6 +720,7 @@ export default function EmploymentContracts() {
         </div>
       </div>
 
+      {showTemplateList && (
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -596,45 +766,51 @@ export default function EmploymentContracts() {
                       {template.file_exists === false ? ' (datoteka nedostaje)' : ''}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    title="Preuzmi šablon"
-                    onClick={() =>
-                      downloadEmploymentContractTemplate(
-                        template.id,
-                        template.file_name || template.template_file
-                      )
-                    }
-                    className="shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-white hover:text-blue-600 dark:hover:bg-gray-800"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      title="Pregled šablona"
+                      onClick={() => setPreviewTemplate(template)}
+                      className="rounded-lg p-1.5 text-gray-500 hover:bg-white hover:text-teal-600 dark:hover:bg-gray-800"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Preuzmi šablon"
+                      onClick={() =>
+                        downloadEmploymentContractTemplate(
+                          template.id,
+                          template.file_name || template.template_file
+                        )
+                      }
+                      className="rounded-lg p-1.5 text-gray-500 hover:bg-white hover:text-blue-600 dark:hover:bg-gray-800"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
           </div>
         )}
       </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <SummaryCard label="Ukupno" value={summary?.total ?? 0} tone="blue" />
-        <SummaryCard label="Aktivni" value={summary?.active ?? 0} tone="green" />
-        <SummaryCard label="Uskoro ističu" value={summary?.expiring_soon ?? 0} tone="amber" />
-        <SummaryCard label="Nacrti" value={summary?.draft ?? 0} tone="slate" />
-      </div>
-
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-          <Filter className="h-4 w-4" />
-          Filteri
+      <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <SummaryChip label="Ukupno" value={summary?.total ?? 0} tone="blue" />
+          <SummaryChip label="Aktivni" value={summary?.active ?? 0} tone="green" />
+          <SummaryChip label="Uskoro ističu" value={summary?.expiring_soon ?? 0} tone="amber" />
+          <SummaryChip label="Nacrti" value={summary?.draft ?? 0} tone="slate" />
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <div className="relative xl:col-span-2">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[14rem] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Pretraga po zaposleniku, broju, prodavnici..."
-              className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+              className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-2 text-xs dark:border-gray-700 dark:bg-gray-900"
             />
           </div>
           <select
@@ -642,7 +818,7 @@ export default function EmploymentContracts() {
             onChange={(e) =>
               setFilters((prev) => ({ ...prev, legal_entity: (e.target.value || undefined) as LegalEntity | undefined }))
             }
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className={filterControl}
           >
             <option value="">Entitet</option>
             <option value="fbih">FBiH</option>
@@ -654,7 +830,7 @@ export default function EmploymentContracts() {
             onChange={(e) =>
               setFilters((prev) => ({ ...prev, job_role: (e.target.value || undefined) as JobRole | undefined }))
             }
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className={filterControl}
           >
             <option value="">Pozicija</option>
             <option value="store_manager">Šef prodavnice</option>
@@ -664,7 +840,7 @@ export default function EmploymentContracts() {
           <select
             value={filters.status || ''}
             onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value || undefined }))}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className={filterControl}
           >
             <option value="">Status</option>
             {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -681,7 +857,7 @@ export default function EmploymentContracts() {
                 store_id: e.target.value ? Number(e.target.value) : undefined,
               }))
             }
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className={filterControl}
           >
             <option value="">Prodavnica</option>
             {stores.map((store) => (
@@ -690,15 +866,32 @@ export default function EmploymentContracts() {
               </option>
             ))}
           </select>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setFilters((prev) => ({ ...prev, expiring_within_days: 30 }))}
-            className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+          <label
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs ${
+              filters.expiring_within_days
+                ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200'
+                : 'border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300'
+            }`}
           >
-            Ističu u 30 dana
-          </button>
+            Ističu u
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={filters.expiring_within_days ?? ''}
+              placeholder="30"
+              onChange={(e) => {
+                const raw = e.target.value;
+                const days = Number(raw);
+                setFilters((prev) => ({
+                  ...prev,
+                  expiring_within_days: raw && Number.isFinite(days) ? Math.min(365, Math.max(1, days)) : undefined,
+                }));
+              }}
+              className="w-12 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-center text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            />
+            dana
+          </label>
           <button
             type="button"
             onClick={() => {
@@ -706,9 +899,9 @@ export default function EmploymentContracts() {
               setSearch('');
               setSelectedIds([]);
             }}
-            className="rounded-lg px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400"
+            className="rounded-lg px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400"
           >
-            Očisti filtere
+            Očisti
           </button>
         </div>
       </div>
@@ -738,7 +931,77 @@ export default function EmploymentContracts() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Pregled ugovora</h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Broj ugovora je zasebna kolona. Ako radnik ima više ugovora, uz ime stoji njihov broj u ovom prikazu.
+            </p>
+          </div>
+          <div className="relative" ref={columnPanelRef}>
+            <button
+              type="button"
+              onClick={() => setShowColumns((open) => !open)}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 dark:border-gray-600 dark:text-gray-200"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Kolone
+            </button>
+            {showColumns && (
+              <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">Prikaz kolona</p>
+                  <button
+                    type="button"
+                    onClick={() => saveColumnPrefs(defaultColumnPrefs())}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Vrati zadano
+                  </button>
+                </div>
+                <p className="mb-2 text-xs text-gray-500">
+                  Svaki nalog pamti svoj raspored. Odabir i akcije ostaju uvijek vidljivi.
+                </p>
+                <div className="max-h-80 space-y-1 overflow-y-auto">
+                  {columnPrefs.order.map((id, index) => {
+                    const column = CONTRACT_COLUMNS.find((item) => item.id === id);
+                    if (!column) return null;
+                    return (
+                      <div key={id} className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <input
+                          type="checkbox"
+                          checked={columnPrefs.visible.includes(id)}
+                          onChange={() => toggleColumn(id)}
+                          aria-label={column.label}
+                        />
+                        <span className="flex-1 text-sm text-gray-800 dark:text-gray-100">{column.label}</span>
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => moveColumn(id, -1)}
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-30 dark:hover:bg-gray-700"
+                          aria-label={`Pomjeri ${column.label} gore`}
+                        >
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === columnPrefs.order.length - 1}
+                          onClick={() => moveColumn(id, 1)}
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-30 dark:hover:bg-gray-700"
+                          aria-label={`Pomjeri ${column.label} dolje`}
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
         {isLoading ? (
           <div className="flex h-40 items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-blue-600" />
@@ -749,10 +1012,10 @@ export default function EmploymentContracts() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900/40">
+            <table className="min-w-full border-collapse text-[13px]">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3">
+                  <th className={excelHeadClass}>
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
@@ -760,83 +1023,67 @@ export default function EmploymentContracts() {
                       aria-label="Odaberi sve"
                     />
                   </th>
-                  <th className="px-4 py-3">Zaposlenik</th>
-                  <th className="px-4 py-3">Entitet</th>
-                  <th className="px-4 py-3">Pozicija</th>
-                  <th className="px-4 py-3">Prodavnica</th>
-                  <th className="px-4 py-3">Trajanje</th>
-                  <th className="px-4 py-3">Početak</th>
-                  <th className="px-4 py-3">Istek</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Akcije</th>
+                  {visibleColumns.map((column) => (
+                    <th key={column.id} className={`${excelHeadClass} whitespace-nowrap`}>
+                      {column.label}
+                    </th>
+                  ))}
+                  <th className={`${excelHeadClass} text-center`}>Akcije</th>
                 </tr>
               </thead>
               <tbody>
-                {contracts.map((contract) => (
-                  <tr
-                    key={contract.id}
-                    className={`border-t border-gray-100 dark:border-gray-700 ${
-                      selectedIdSet.has(contract.id) ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIdSet.has(contract.id)}
-                        onChange={() => toggleSelectOne(contract.id)}
-                        aria-label={`Odaberi ugovor ${contract.id}`}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {contract.employee_full_name || contract.employee_user_name}
-                      </div>
-                      <div className="text-xs text-gray-500">{contract.contract_number || 'Bez broja'}</div>
-                    </td>
-                    <td className="px-4 py-3">{LEGAL_ENTITY_LABELS[contract.legal_entity]}</td>
-                    <td className="px-4 py-3">{JOB_ROLE_LABELS[contract.job_role]}</td>
-                    <td className="px-4 py-3">{contract.store_label || contract.store_name || '—'}</td>
-                    <td className="px-4 py-3">
-                      {contract.employment_term === 'fixed' ? 'Određeno' : 'Neodređeno'}
-                    </td>
-                    <td className="px-4 py-3">{formatDate(contract.work_start_date)}</td>
-                    <td className="px-4 py-3">{formatDate(contract.expiry_date || contract.work_end_date)}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-gray-100 px-2 py-1 text-xs dark:bg-gray-700">
-                        {STATUS_LABELS[contract.status] || contract.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openRenew(contract)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          Produži
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => generateMutation.mutate(contract.id)}
-                          className="rounded-lg bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                        >
-                          Generiši
-                        </button>
-                        {contract.generated_document_path && (
-                          <button
-                            type="button"
-                            onClick={() => downloadEmploymentContractDocument(contract.id)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                {contracts.map((contract, index) => {
+                  const selected = selectedIdSet.has(contract.id);
+                  const rowClass = selected
+                    ? 'bg-[#d6e6f8] dark:bg-blue-900/40'
+                    : index % 2 === 0
+                      ? 'bg-white dark:bg-gray-800'
+                      : 'bg-[#f4f7fb] dark:bg-gray-900/50';
+                  return (
+                    <tr key={contract.id} className={`${rowClass} hover:bg-[#e7f0fb] dark:hover:bg-blue-900/25`}>
+                      <td className={`${excelCellClass} text-center`}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleSelectOne(contract.id)}
+                          aria-label={`Odaberi ugovor ${contract.contract_number || contract.id}`}
+                        />
+                      </td>
+                      {visibleColumns.map((column) => (
+                        <td key={column.id} className={`${excelCellClass} whitespace-nowrap`}>
+                          {renderContractCell(column.id, contract, contractsByEmployee.get(contract.employee_id) || 1)}
+                        </td>
+                      ))}
+                      <td className={`${excelCellClass} text-center`}>
+                        <div className="flex items-center justify-center gap-1">
+                          <IconAction
+                            label="Produži"
+                            onClick={() => openRenew(contract)}
+                            className="text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
                           >
-                            <Download className="h-3.5 w-3.5" />
-                            Preuzmi
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                            <RefreshCw className="h-4 w-4" />
+                          </IconAction>
+                          <IconAction
+                            label="Generiši dokument"
+                            onClick={() => generateMutation.mutate(contract.id)}
+                            className="text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                          >
+                            <FilePlus className="h-4 w-4" />
+                          </IconAction>
+                          {contract.generated_document_path && (
+                            <IconAction
+                              label="Preuzmi dokument"
+                              onClick={() => downloadEmploymentContractDocument(contract.id)}
+                              className="text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                            >
+                              <Download className="h-4 w-4" />
+                            </IconAction>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -903,6 +1150,11 @@ export default function EmploymentContracts() {
                 value={createForm.contract_number}
                 onChange={(e) => setCreateForm((prev) => ({ ...prev, contract_number: e.target.value }))}
                 className="input"
+                placeholder={
+                  settings?.contract_number_prefix
+                    ? `${settings.contract_number_prefix}${String(settings.contract_number_next || 1).padStart(4, '0')}`
+                    : 'Ručni unos'
+                }
               />
             </Field>
             <Field label="Datum potpisa">
@@ -938,12 +1190,17 @@ export default function EmploymentContracts() {
             <Field label="Trajanje">
               <select
                 value={createForm.employment_term}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    employment_term: e.target.value as 'indefinite' | 'fixed',
-                  }))
-                }
+                onChange={(e) => {
+                  const term = e.target.value as 'indefinite' | 'fixed';
+                  const months = settingsToForm(settings).default_fixed_months || 12;
+                  setCreateForm((prev) => {
+                    if (term === 'indefinite') {
+                      return { ...prev, employment_term: term, expiry_date: '', work_end_date: '' };
+                    }
+                    const end = prev.expiry_date || addMonths(prev.work_start_date, months);
+                    return { ...prev, employment_term: term, expiry_date: end, work_end_date: end };
+                  });
+                }}
                 className="input"
               >
                 <option value="indefinite">Na neodređeno</option>
@@ -994,14 +1251,29 @@ export default function EmploymentContracts() {
               />
             </Field>
           </div>
-          <label className="mt-4 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={createForm.generate_document}
-              onChange={(e) => setCreateForm((prev) => ({ ...prev, generate_document: e.target.checked }))}
-            />
-            Generiši dokument odmah nakon kreiranja
-          </label>
+          <div className="mt-4 flex flex-col gap-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={createForm.auto_renew}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, auto_renew: e.target.checked }))}
+              />
+              Automatsko produženje
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={createForm.generate_document}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, generate_document: e.target.checked }))}
+              />
+              Generiši dokument odmah nakon kreiranja
+            </label>
+            {settings?.contract_number_prefix ? (
+              <p className="text-xs text-gray-500">
+                Prazan broj ugovora dobija sljedeći broj iz postavki.
+              </p>
+            ) : null}
+          </div>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">
               Odustani
@@ -1016,9 +1288,14 @@ export default function EmploymentContracts() {
       {renewTarget && (
         <Modal title={`Produženje ugovora — ${renewTarget.employee_full_name || renewTarget.employee_user_name}`} onClose={() => setRenewTarget(null)}>
           <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-            <div className="flex items-center gap-2 font-medium">
-              <AlertTriangle className="h-4 w-4" />
-              Automatski se kreira novi ugovor sa istim podacima osim datuma i ručnih izmjena.
+            <div className="flex items-start gap-2 font-medium">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Novi ugovor preuzima podatke prethodnog. Prethodni se označava kao zamijenjen.
+                {settingsToForm(settings).auto_create_renewal_draft
+                  ? ' Produženje ostaje nacrt dok ga ne aktivirate.'
+                  : ' Produženje se odmah aktivira.'}
+              </span>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1075,6 +1352,14 @@ export default function EmploymentContracts() {
               />
             </Field>
           </div>
+          <label className="mt-4 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={renewForm.generate_document}
+              onChange={(e) => setRenewForm((prev) => ({ ...prev, generate_document: e.target.checked }))}
+            />
+            Generiši dokument produženja
+          </label>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={() => setRenewTarget(null)} className="btn-secondary">
               Odustani
@@ -1251,36 +1536,217 @@ export default function EmploymentContracts() {
       )}
 
       {showSettings && (
-        <Modal title="Postavke ugovora" onClose={() => setShowSettings(false)}>
-          <div className="space-y-3">
-            <Field label="Upozorenje prije isteka (dana)">
-              <input
-                type="number"
-                min={1}
-                max={365}
-                value={settingsForm.default_renewal_notice_days}
-                onChange={(e) =>
-                  setSettingsForm((prev) => ({
-                    ...prev,
-                    default_renewal_notice_days: Number(e.target.value),
-                  }))
-                }
-                className="input"
-              />
-            </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={settingsForm.auto_create_renewal_draft}
-                onChange={(e) =>
-                  setSettingsForm((prev) => ({
-                    ...prev,
-                    auto_create_renewal_draft: e.target.checked,
-                  }))
-                }
-              />
-              Automatski kreiraj nacrt produženja
-            </label>
+        <Modal title="Postavke ugovora" onClose={() => setShowSettings(false)} wide>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Sačuvane vrijednosti ulaze u novi ugovor, produženje, brojač i tekst generisanog dokumenta.
+          </p>
+          <div className="space-y-5">
+            <SettingsGroup title="Rokovi i produženje">
+              <Field label="Upozorenje prije isteka (dana)">
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={settingsForm.default_renewal_notice_days}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      default_renewal_notice_days: Number(e.target.value) || 1,
+                    }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <label className="flex items-start gap-2 text-sm md:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={settingsForm.auto_create_renewal_draft}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      auto_create_renewal_draft: e.target.checked,
+                    }))
+                  }
+                />
+                <span>
+                  Produženje ostaje nacrt
+                  <span className="mt-0.5 block text-xs text-gray-500">
+                    Isključeno: novi ugovor se odmah aktivira, a prethodni postaje zamijenjen.
+                  </span>
+                </span>
+              </label>
+            </SettingsGroup>
+
+            <SettingsGroup title="Podrazumijevani novi ugovor">
+              <Field label="Trajanje">
+                <select
+                  value={settingsForm.default_employment_term}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      default_employment_term: e.target.value as 'indefinite' | 'fixed',
+                    }))
+                  }
+                  className="input"
+                >
+                  <option value="indefinite">Na neodređeno</option>
+                  <option value="fixed">Na određeno</option>
+                </select>
+              </Field>
+              <Field label="Trajanje određenog (mjeseci)">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={settingsForm.default_fixed_months}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      default_fixed_months: Number(e.target.value) || 1,
+                    }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <Field label="Valuta">
+                <input
+                  value={settingsForm.default_currency}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({ ...prev, default_currency: e.target.value }))
+                  }
+                  className="input"
+                  maxLength={10}
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={settingsForm.default_auto_renew}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({ ...prev, default_auto_renew: e.target.checked }))
+                  }
+                />
+                Automatsko produženje
+              </label>
+              <label className="flex items-center gap-2 text-sm md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={settingsForm.generate_document_by_default}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      generate_document_by_default: e.target.checked,
+                    }))
+                  }
+                />
+                Generiši dokument čim se ugovor ili produženje sačuva
+              </label>
+            </SettingsGroup>
+
+            <SettingsGroup title="Broj ugovora">
+              <Field label="Prefiks">
+                <input
+                  value={settingsForm.contract_number_prefix}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({ ...prev, contract_number_prefix: e.target.value }))
+                  }
+                  className="input"
+                  placeholder="UG-2026-"
+                  maxLength={40}
+                />
+              </Field>
+              <Field label="Sljedeći redni broj">
+                <input
+                  type="number"
+                  min={1}
+                  value={settingsForm.contract_number_next}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      contract_number_next: Number(e.target.value) || 1,
+                    }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <p className="text-xs text-gray-500 md:col-span-2">
+                {settingsForm.contract_number_prefix
+                  ? `Sljedeći prazan broj: ${settingsForm.contract_number_prefix}${String(settingsForm.contract_number_next).padStart(4, '0')}`
+                  : 'Bez prefiksa broj se unosi ručno na ugovoru.'}
+              </p>
+            </SettingsGroup>
+
+            <SettingsGroup title="Poslodavac na dokumentu">
+              <Field label="Naziv poslodavca" className="md:col-span-2">
+                <input
+                  value={settingsForm.employer_name}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({ ...prev, employer_name: e.target.value }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <Field label="Adresa" className="md:col-span-2">
+                <input
+                  value={settingsForm.employer_address}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({ ...prev, employer_address: e.target.value }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <Field label="Mjesto potpisa">
+                <input
+                  value={settingsForm.sign_city}
+                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, sign_city: e.target.value }))}
+                  className="input"
+                  placeholder="Sarajevo"
+                />
+              </Field>
+              <Field label="Direktor / potpisnik">
+                <input
+                  value={settingsForm.director_name}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({ ...prev, director_name: e.target.value }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <Field label="Sedmično radno vrijeme (sati)">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={settingsForm.weekly_hours}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      weekly_hours: Number(e.target.value) || 1,
+                    }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <Field label="Probni rad (mjeseci)">
+                <input
+                  type="number"
+                  min={0}
+                  max={24}
+                  value={settingsForm.probation_months}
+                  onChange={(e) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      probation_months: Number(e.target.value) || 0,
+                    }))
+                  }
+                  className="input"
+                />
+              </Field>
+              <p className="text-xs text-gray-500 md:col-span-2">
+                Šablon može koristiti oznake employer_name, employer_address, sign_city, director_name, weekly_hours i probation_months.
+              </p>
+            </SettingsGroup>
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={() => setShowSettings(false)} className="btn-secondary">
@@ -1288,249 +1754,19 @@ export default function EmploymentContracts() {
             </button>
             <button
               type="button"
+              disabled={settingsMutation.isPending}
               onClick={() => settingsMutation.mutate(settingsForm)}
               className="btn-primary"
             >
-              Sačuvaj
+              {settingsMutation.isPending ? 'Spremanje...' : 'Sačuvaj'}
             </button>
           </div>
         </Modal>
       )}
 
-      {showTemplates && (
-        <Modal title="Šabloni ugovora" onClose={() => setShowTemplates(false)}>
-          <input
-            ref={replaceFileRef}
-            type="file"
-            accept=".doc,.docx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
-            className="hidden"
-            onChange={handleReplaceFile}
-          />
-
-          <div className="mb-5 rounded-xl border border-dashed border-blue-200 bg-blue-50/60 p-4 dark:border-blue-800 dark:bg-blue-900/10">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-200">
-              <Upload className="h-4 w-4" />
-              Učitaj novi šablon
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="Naziv šablona *">
-                <input
-                  value={templateForm.name}
-                  onChange={(e) => setTemplateForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="input"
-                  placeholder="npr. FBiH — Prodavač (novi)"
-                />
-              </Field>
-              <Field label="Datoteka *">
-                <input
-                  type="file"
-                  accept=".doc,.docx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    const ext = file?.name.split('.').pop()?.toLowerCase();
-                    setTemplateForm((prev) => ({
-                      ...prev,
-                      file,
-                      name: prev.name || (file ? file.name.replace(/\.[^.]+$/, '') : ''),
-                      output_format: ext === 'pdf' ? 'pdf' : 'docx',
-                    }));
-                  }}
-                  className="input"
-                />
-              </Field>
-              <Field label="Entitet">
-                <select
-                  value={templateForm.legal_entity}
-                  onChange={(e) =>
-                    setTemplateForm((prev) => ({
-                      ...prev,
-                      legal_entity: e.target.value as LegalEntity,
-                    }))
-                  }
-                  className="input"
-                >
-                  <option value="fbih">FBiH</option>
-                  <option value="rs">RS</option>
-                  <option value="bd">BD</option>
-                </select>
-              </Field>
-              <Field label="Pozicija">
-                <select
-                  value={templateForm.job_role}
-                  onChange={(e) =>
-                    setTemplateForm((prev) => ({
-                      ...prev,
-                      job_role: e.target.value as JobRole,
-                    }))
-                  }
-                  className="input"
-                >
-                  <option value="store_manager">Šef prodavnice</option>
-                  <option value="deputy_manager">Zamjenik šefa</option>
-                  <option value="salesperson">Prodavač</option>
-                </select>
-              </Field>
-              <Field label="Vrsta dokumenta">
-                <select
-                  value={templateForm.document_kind}
-                  onChange={(e) =>
-                    setTemplateForm((prev) => ({
-                      ...prev,
-                      document_kind: e.target.value as 'full_contract' | 'annex',
-                    }))
-                  }
-                  className="input"
-                >
-                  <option value="full_contract">Ugovor o radu</option>
-                  <option value="annex">Aneks</option>
-                </select>
-              </Field>
-              <Field label="Izlazni format">
-                <select
-                  value={templateForm.output_format}
-                  onChange={(e) =>
-                    setTemplateForm((prev) => ({
-                      ...prev,
-                      output_format: e.target.value as 'docx' | 'pdf',
-                    }))
-                  }
-                  className="input"
-                >
-                  <option value="docx">DOCX (cijeli šablon + popunjavanje)</option>
-                  <option value="pdf">PDF (puni tekst ugovora)</option>
-                </select>
-              </Field>
-            </div>
-            {uploadProgress !== null && (
-              <div className="mt-3">
-                <div className="mb-1 flex justify-between text-xs text-gray-500">
-                  <span>Učitavanje...</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                  <div
-                    className="h-full rounded-full bg-blue-600 transition-all"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                disabled={uploadTemplateMutation.isPending}
-                onClick={handleUploadTemplate}
-                className="btn-primary inline-flex items-center gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                {uploadTemplateMutation.isPending ? 'Učitavanje...' : 'Učitaj šablon'}
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-            {templatesLoading ? (
-              <div className="flex h-24 items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
-              </div>
-            ) : templates.length === 0 ? (
-              <div className="p-6 text-center text-sm text-gray-500">Nema učitanih šablona.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-900/40">
-                    <tr>
-                      <th className="px-3 py-2">Naziv</th>
-                      <th className="px-3 py-2">Entitet</th>
-                      <th className="px-3 py-2">Pozicija</th>
-                      <th className="px-3 py-2">Datoteka</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Akcije</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {templates.map((template) => (
-                      <tr key={template.id} className="border-t border-gray-100 dark:border-gray-700">
-                        <td className="px-3 py-2">
-                          <div className="font-medium text-gray-900 dark:text-white">{template.name}</div>
-                          <div className="text-xs text-gray-400">{template.code}</div>
-                        </td>
-                        <td className="px-3 py-2">{LEGAL_ENTITY_LABELS[template.legal_entity]}</td>
-                        <td className="px-3 py-2">{JOB_ROLE_LABELS[template.job_role]}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            {template.file_exists ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                            ) : (
-                              <XCircle className="h-3.5 w-3.5 text-rose-500" />
-                            )}
-                            <div>
-                              <div className="max-w-[160px] truncate text-xs">
-                                {template.file_name || template.template_file}
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {template.output_format.toUpperCase()} · {formatFileSize(template.file_size)}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs ${
-                              template.is_active
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                                : 'bg-gray-100 text-gray-500 dark:bg-gray-700'
-                            }`}
-                          >
-                            {template.is_active ? 'Aktivan' : 'Neaktivan'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                downloadEmploymentContractTemplate(
-                                  template.id,
-                                  template.file_name || template.template_file
-                                )
-                              }
-                              className="rounded-lg bg-gray-100 px-2 py-1 text-xs dark:bg-gray-700"
-                            >
-                              Preuzmi
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReplaceTargetId(template.id);
-                                replaceFileRef.current?.click();
-                              }}
-                              className="rounded-lg bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                            >
-                              Zamijeni
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                toggleTemplateActiveMutation.mutate({
-                                  id: template.id,
-                                  is_active: !template.is_active,
-                                })
-                              }
-                              className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
-                            >
-                              {template.is_active ? 'Deaktiviraj' : 'Aktiviraj'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </Modal>
+      {showTemplates && <ContractTemplatesManager onClose={() => setShowTemplates(false)} />}
+      {previewTemplate && (
+        <TemplatePreviewModal template={previewTemplate} onClose={() => setPreviewTemplate(null)} />
       )}
 
       <style>{`
@@ -1543,7 +1779,10 @@ export default function EmploymentContracts() {
   );
 }
 
-function SummaryCard({
+const filterControl =
+  'rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900';
+
+function SummaryChip({
   label,
   value,
   tone,
@@ -1556,14 +1795,14 @@ function SummaryCard({
     blue: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
     green: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
     amber: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300',
-    slate: 'bg-slate-50 text-slate-700 dark:bg-slate-900/20 dark:text-slate-300',
+    slate: 'bg-slate-50 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300',
   };
 
   return (
-    <div className={`rounded-xl p-4 text-center ${tones[tone]}`}>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-sm">{label}</p>
-    </div>
+    <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs ${tones[tone]}`}>
+      <span className="text-sm font-semibold">{value}</span>
+      {label}
+    </span>
   );
 }
 
@@ -1571,14 +1810,16 @@ function Modal({
   title,
   children,
   onClose,
+  wide = false,
 }: {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  wide?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-gray-900">
+      <div className={`max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-gray-900 ${wide ? 'max-w-4xl' : 'max-w-3xl'}`}>
         <div className="mb-4 flex items-center justify-between">
           <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h4>
           <button type="button" onClick={onClose} className="text-sm text-gray-500">
@@ -1588,6 +1829,61 @@ function Modal({
         {children}
       </div>
     </div>
+  );
+}
+
+const excelHeadClass =
+  'sticky top-0 z-10 border border-gray-300 bg-[#f2f2f2] px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-700 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200';
+const excelCellClass =
+  'border border-gray-300 px-2.5 py-1.5 align-middle text-gray-800 dark:border-gray-600 dark:text-gray-100';
+
+function IconAction({
+  label,
+  onClick,
+  className,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
+
+  return (
+    <>
+      <button
+        type="button"
+        title={label}
+        aria-label={label}
+        onClick={onClick}
+        onMouseEnter={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          setTip({ x: rect.left + rect.width / 2, y: rect.top });
+        }}
+        onMouseLeave={() => setTip(null)}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded border border-transparent ${className}`}
+      >
+        {children}
+      </button>
+      {tip && (
+        <span
+          className="pointer-events-none fixed z-[80] -translate-x-1/2 -translate-y-full rounded bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow"
+          style={{ left: tip.x, top: tip.y - 6 }}
+        >
+          {label}
+        </span>
+      )}
+    </>
+  );
+}
+
+function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+      <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{title}</h5>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{children}</div>
+    </section>
   );
 }
 

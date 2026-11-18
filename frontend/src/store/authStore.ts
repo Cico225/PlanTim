@@ -1,14 +1,15 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { LoginVerificationResponse, User } from '@/types';
 import { authService } from '@/services/authService';
+import { clearAuthClearedFlag, isAuthCleared, markAuthCleared } from '@/services/authSession';
 
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, recaptchaToken?: string | null) => Promise<LoginVerificationResponse | void>;
+  login: (email: string, password: string) => Promise<LoginVerificationResponse | void>;
   verifyLogin: (verificationToken: string, code: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,20 +25,17 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
 
-      login: async (email: string, password: string, recaptchaToken?: string | null) => {
+      login: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
-          const credentials: any = { email, password };
-          if (recaptchaToken) {
-            credentials.recaptcha_token = recaptchaToken;
-          }
-          const response = await authService.login(credentials);
+          const response = await authService.login({ email, password });
 
           if ('requires_verification' in response && response.requires_verification) {
             set({ isLoading: false });
             return response;
           }
 
+          clearAuthClearedFlag();
           set({
             user: response.user,
             token: response.token,
@@ -57,6 +55,7 @@ export const useAuthStore = create<AuthState>()(
             verification_token: verificationToken,
             code,
           });
+          clearAuthClearedFlag();
           set({
             user: response.user,
             token: response.token,
@@ -78,6 +77,7 @@ export const useAuthStore = create<AuthState>()(
             password,
             password_confirmation: password,
           });
+          clearAuthClearedFlag();
           set({
             user: response.user,
             token: response.token,
@@ -97,23 +97,24 @@ export const useAuthStore = create<AuthState>()(
           // Continue with logout even if API call fails
           console.warn('Logout API call failed, continuing with local logout:', error);
         } finally {
-          // Clear state
           set({
             user: null,
             token: null,
             isAuthenticated: false,
           });
-          
-          // Clear localStorage manually to ensure it's cleared
-          localStorage.removeItem('token');
-          localStorage.removeItem('auth-storage');
-          
-          // Redirect to login
-          window.location.href = '/login';
+          markAuthCleared();
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.replace('/login');
+          }
         }
       },
 
       checkAuth: async () => {
+        if (isAuthCleared()) {
+          set({ isAuthenticated: false, user: null, token: null });
+          return;
+        }
+
         // First, try to get token from zustand persist storage
         const persistedState = localStorage.getItem('auth-storage');
         let token = null;
@@ -139,6 +140,10 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           const user = await authService.me();
+          if (isAuthCleared()) {
+            set({ user: null, token: null, isAuthenticated: false });
+            return;
+          }
           set({ user, token, isAuthenticated: true });
         } catch (error) {
           set({ user: null, token: null, isAuthenticated: false });
@@ -151,6 +156,23 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      storage: createJSONStorage(() => ({
+        getItem: (name) => (isAuthCleared() ? null : localStorage.getItem(name)),
+        setItem: (name, value) => {
+          if (isAuthCleared()) {
+            localStorage.removeItem(name);
+            return;
+          }
+          localStorage.setItem(name, value);
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      })),
+      onRehydrateStorage: () => () => {
+        if (!isAuthCleared()) return;
+        useAuthStore.setState({ user: null, token: null, isAuthenticated: false });
+        localStorage.removeItem('token');
+        localStorage.removeItem('auth-storage');
+      },
       partialize: (state) => ({
         token: state.token,
         user: state.user,

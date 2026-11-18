@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import { isAuthCleared, markAuthCleared, readStoredToken } from './authSession';
 
 // Always use relative URL for Vite proxy to work correctly
 // Vite proxy will forward /api requests to backend
@@ -20,7 +21,7 @@ class ApiService {
     // Request interceptor
     this.api.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('token');
+        const token = readStoredToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -68,13 +69,29 @@ class ApiService {
 
           // Handle specific status codes
           switch (status) {
-            case 401:
-              // Unauthorized - clear auth and redirect to login
-              localStorage.removeItem('token');
-              localStorage.removeItem('auth-storage');
-              window.location.href = '/login';
-              toast.error('Sesija je istekla. Molimo prijavite se ponovo.');
+            case 401: {
+              const url = error.config?.url || '';
+              const isAuthAttempt = [
+                '/auth/login',
+                '/auth/verify-login',
+                '/auth/resend-login-code',
+                '/auth/forgot-password',
+                '/auth/reset-password',
+                '/auth/register',
+              ].some((path) => url.includes(path));
+
+              if (isAuthAttempt) break;
+
+              const alreadyCleared = isAuthCleared();
+              markAuthCleared();
+
+              const onLogin = window.location.pathname.startsWith('/login');
+              if (!onLogin && !alreadyCleared) {
+                toast.error('Sesija je istekla. Molimo prijavite se ponovo.');
+                window.location.replace('/login');
+              }
               break;
+            }
 
             case 403:
               toast.error('Nemate dozvolu za ovu akciju.');

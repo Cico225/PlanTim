@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { authService } from '@/services/authService';
-import ReCAPTCHA from 'react-google-recaptcha';
 
 type LoginStep = 'credentials' | 'verification';
 
@@ -62,10 +61,6 @@ export default function Login() {
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHA>(null);
-
-  const RECAPTCHA_SITE_KEY = (import.meta.env as any).VITE_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
   useEffect(() => {
     if (step === 'verification' && verificationToken) {
@@ -80,23 +75,11 @@ export default function Login() {
     clearStoredVerificationState();
   }, [step, verificationToken, maskedEmail, verificationCode]);
 
-  const resetRecaptcha = () => {
-    if (recaptchaRef.current) {
-      recaptchaRef.current.reset();
-    }
-    setRecaptchaToken(null);
-  };
-
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!recaptchaToken) {
-      toast.error('Molimo potvrdite da niste robot (reCAPTCHA)');
-      return;
-    }
-
     try {
-      const response = await login(formData.email, formData.password, recaptchaToken);
+      const response = await login(formData.email, formData.password);
 
       if (response?.requires_verification) {
         setVerificationToken(response.verification_token);
@@ -104,22 +87,18 @@ export default function Login() {
         setVerificationCode('');
         setStep('verification');
         toast.success(response.message || t('auth.verificationCodeSent'));
-        resetRecaptcha();
         return;
       }
 
       toast.success(t('auth.loginSuccess'));
       navigate('/dashboard');
-      resetRecaptcha();
     } catch (error: any) {
       const validationErrors = error.response?.data?.errors;
       const message =
         validationErrors?.email?.[0] ||
-        validationErrors?.recaptcha?.[0] ||
         error.response?.data?.message ||
         'Greška pri prijavi';
       toast.error(message);
-      resetRecaptcha();
     }
   };
 
@@ -172,10 +151,6 @@ export default function Login() {
     setVerificationToken('');
     setMaskedEmail('');
     setVerificationCode('');
-  };
-
-  const handleRecaptchaChange = (token: string | null) => {
-    setRecaptchaToken(token);
   };
 
   const handleForgotPassword = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -335,14 +310,6 @@ export default function Login() {
               {' '}u skladu sa GDPR propisima
             </span>
           </label>
-        </div>
-
-        <div className="flex justify-center">
-          <ReCAPTCHA
-            ref={recaptchaRef}
-            sitekey={RECAPTCHA_SITE_KEY}
-            onChange={handleRecaptchaChange}
-          />
         </div>
 
         <button

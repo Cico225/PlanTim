@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { readStoredToken } from '@/services/authSession';
 
 interface UserModule {
   id: number;
@@ -22,8 +23,14 @@ export const useUserModules = () => {
       const maxRetry = 2;
       const retryDelayMs = 1500;
       try {
+        const token = readStoredToken();
+        if (!token) {
+          setModules([]);
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
-        const token = localStorage.getItem('token');
         const response = await fetch('/api/user/accessible-modules', {
           headers: {
             'Authorization': `Bearer ${token}`,

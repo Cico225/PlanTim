@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { authService } from '@/services/authService';
+import { markAuthCleared } from '@/services/authSession';
 import { useNotificationCount } from '@/hooks/useNotificationCount';
 import { useInboxCount } from '@/hooks/useInboxCount';
 import { useUserModules } from '@/hooks/useUserModules';
@@ -659,8 +660,8 @@ function SecurityTab({ profileData, targetUserId, isViewingOtherUser, isAdmin, o
       await authService.logoutAllDevices(targetUserId);
       toast.success('Odjavljeni sa svih uređaja');
       if (!isViewingOtherUser) {
-        // Reload page to logout
-        window.location.href = '/login';
+        markAuthCleared();
+        window.location.replace('/login');
       }
     } catch (error: any) {
       console.error('Failed to logout all devices:', error);
