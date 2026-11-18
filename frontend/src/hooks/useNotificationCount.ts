@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '@/services/api';
+import { readStoredToken } from '@/services/authSession';
 
 export function useNotificationCount() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -17,11 +18,14 @@ export function useNotificationCount() {
   };
 
   useEffect(() => {
+    if (!readStoredToken()) {
+      setLoading(false);
+      return;
+    }
+
     fetchUnreadCount();
-    
-    // Poll every 30 seconds for updates
+
     const interval = setInterval(fetchUnreadCount, 30000);
-    
     return () => clearInterval(interval);
   }, []);
 

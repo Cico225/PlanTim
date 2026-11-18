@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DMSController;
 use App\Http\Controllers\Api\LMSController;
 use App\Http\Controllers\Api\HRMController;
 use App\Http\Controllers\Api\HRMContractsController;
+use App\Http\Controllers\Api\HRMDecisionsController;
 use App\Http\Controllers\Api\HRMEducationController;
 use App\Http\Controllers\Api\HRMTalentController;
 use App\Http\Controllers\Api\NotificationController;
@@ -343,7 +344,9 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
             Route::get('/templates', [HRMContractsController::class, 'templates']);
             Route::post('/templates', [HRMContractsController::class, 'storeTemplate']);
             Route::put('/templates/{id}', [HRMContractsController::class, 'updateTemplate']);
+            Route::delete('/templates/{id}', [HRMContractsController::class, 'destroyTemplate']);
             Route::post('/templates/{id}/file', [HRMContractsController::class, 'uploadTemplateFile']);
+            Route::get('/templates/{id}/preview', [HRMContractsController::class, 'previewTemplate']);
             Route::get('/templates/{id}/download', [HRMContractsController::class, 'downloadTemplate']);
             Route::get('/settings', [HRMContractsController::class, 'settings']);
             Route::put('/settings', [HRMContractsController::class, 'updateSettings']);
@@ -356,6 +359,27 @@ Route::middleware(['auth:sanctum', 'check.active.api'])->group(function () {
             Route::post('/{id}/renew', [HRMContractsController::class, 'renew']);
             Route::post('/{id}/generate-document', [HRMContractsController::class, 'generateDocument']);
             Route::get('/{id}/download-document', [HRMContractsController::class, 'downloadDocument']);
+        });
+
+        Route::prefix('decisions')->group(function () {
+            Route::get('/settings', [HRMDecisionsController::class, 'settings']);
+            Route::put('/settings', [HRMDecisionsController::class, 'updateSettings']);
+            Route::get('/templates', [HRMDecisionsController::class, 'templates']);
+            Route::post('/templates', [HRMDecisionsController::class, 'storeTemplate']);
+            Route::delete('/templates/{id}', [HRMDecisionsController::class, 'destroyTemplate']);
+            Route::get('/summary', [HRMDecisionsController::class, 'summary']);
+            Route::get('/leave-register', [HRMDecisionsController::class, 'leaveRegister']);
+            Route::put('/leave-register/{employeeId}', [HRMDecisionsController::class, 'updateEntitlement']);
+            Route::get('/leave-plan', [HRMDecisionsController::class, 'leavePlan']);
+            Route::post('/leave-plan', [HRMDecisionsController::class, 'storeLeavePlan']);
+            Route::post('/leave-plan/confirm', [HRMDecisionsController::class, 'confirmLeavePlan']);
+            Route::put('/leave-plan/{id}', [HRMDecisionsController::class, 'updateLeavePlan']);
+            Route::delete('/leave-plan/{id}', [HRMDecisionsController::class, 'destroyLeavePlan']);
+            Route::get('/', [HRMDecisionsController::class, 'index']);
+            Route::post('/', [HRMDecisionsController::class, 'store']);
+            Route::post('/{id}/cancel', [HRMDecisionsController::class, 'cancel']);
+            Route::post('/{id}/generate-document', [HRMDecisionsController::class, 'generateDocument']);
+            Route::get('/{id}/download-document', [HRMDecisionsController::class, 'downloadDocument']);
         });
         
         Route::get('/employees', [HRMController::class, 'index']);

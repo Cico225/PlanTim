@@ -51,9 +51,6 @@ export default defineConfig({
     https: getHttpsConfig(),
     // Interna mreza — dozvoli pristup preko LAN IP (npr. 192.168.1.126)
     allowedHosts: true,
-    headers: {
-      'Cache-Control': 'no-store',
-    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',

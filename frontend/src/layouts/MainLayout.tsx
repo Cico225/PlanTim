@@ -1,5 +1,6 @@
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { isAuthCleared } from '@/services/authSession';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useMemo } from 'react';
@@ -67,11 +68,20 @@ export default function MainLayout() {
   const [financeExpanded, setFinanceExpanded] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [edelOpen, setEdelOpen] = useState(false);
+  const [authHydrated, setAuthHydrated] = useState(() => useAuthStore.persist.hasHydrated());
   
   // Get real counts for badges
   const { unreadCount: notificationCount } = useNotificationCount();
   const { unreadCount: inboxCount } = useInboxCount();
   const { modules: userModules, loading: modulesLoading } = useUserModules();
+
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setAuthHydrated(true);
+      return;
+    }
+    return useAuthStore.persist.onFinishHydration(() => setAuthHydrated(true));
+  }, []);
 
   // Handle responsive sidebar - close on mobile by default
   useEffect(() => {
@@ -111,7 +121,11 @@ export default function MainLayout() {
     }
   }, [location.pathname]);
 
-  if (!isAuthenticated) {
+  if (!authHydrated) {
+    return null;
+  }
+
+  if (!isAuthenticated || isAuthCleared()) {
     return <Navigate to="/login" replace />;
   }
 

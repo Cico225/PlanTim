@@ -3,6 +3,7 @@
 namespace App\Services\HRM;
 
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use stdClass;
 
@@ -89,12 +90,12 @@ class ContractDocumentService
 
         foreach ($aliases as $aliasName) {
             $path = storage_path('app/hr-contract-templates/prepared/' . $aliasName);
-            if (!is_file($path) || filesize($path) < 1000) {
+            if ($this->preparedNeedsSettingsPlaceholders($path)) {
                 $this->docxBuilder->build($path, $paragraphs);
             }
         }
 
-        if (!is_file($preparedPath) || filesize($preparedPath) < 1000) {
+        if ($this->preparedNeedsSettingsPlaceholders($preparedPath)) {
             $this->docxBuilder->build($preparedPath, $paragraphs);
         }
     }
@@ -167,6 +168,28 @@ class ContractDocumentService
 
         return null;
     }
+
+    private function preparedNeedsSettingsPlaceholders(string $path): bool
+    {
+        if (!is_file($path) || filesize($path) < 1000) {
+            return true;
+        }
+
+        $zip = new \ZipArchive();
+        if ($zip->open($path) !== true) {
+            return false;
+        }
+
+        $xml = (string) $zip->getFromName('word/document.xml');
+        $zip->close();
+
+        if (!str_contains($xml, 'contract_sign_date')) {
+            return false;
+        }
+
+        return !str_contains($xml, 'employer_line');
+    }
+
     /**
      * @return array<string, string>
      */
@@ -187,6 +210,20 @@ class ContractDocumentService
 
         $workEnd = $formatDate($contract->work_end_date);
         $workEndClause = $workEnd !== '' ? (', a ugovor važi do ' . $workEnd) : '';
+
+        $settings = DB::table('hrm_contract_settings')->first();
+        $employerName = trim((string) ($settings->employer_name ?? ''));
+        $employerAddress = trim((string) ($settings->employer_address ?? ''));
+        $signCity = trim((string) ($settings->sign_city ?? '')) ?: 'Sarajevo';
+        $directorName = trim((string) ($settings->director_name ?? '')) ?: 'Elvir Hurić';
+        $weeklyHours = (string) ((int) ($settings->weekly_hours ?? 40) ?: 40);
+        $currency = trim((string) ($contract->currency ?? $settings->default_currency ?? 'KM')) ?: 'KM';
+        $probationMonths = (int) ($settings->probation_months ?? 0);
+        $employerLineName = $employerName !== '' ? $employerName : '„PLANIKA FLEX“ d.o.o. Sarajevo';
+        $employerLineAddress = $employerAddress !== '' ? $employerAddress : 'ul. Hajrudina Šabanije br. 39';
+        $probationClause = $probationMonths > 0
+            ? ' Radnik se prima na probni rad u trajanju od ' . $probationMonths . ' mjeseci.'
+            : '';
 
         $values = [
             'contract_sign_date' => $formatDate($contract->contract_sign_date),
@@ -216,6 +253,15 @@ class ContractDocumentService
             'annex_sign_date' => $formatDate($contract->contract_sign_date),
             'parent_contract_number' => (string) ($parentContract->contract_number ?? ''),
             'parent_contract_date' => $formatDate($parentContract->contract_sign_date ?? $parentContract->work_start_date ?? null),
+            'employer_name' => $employerName,
+            'employer_address' => $employerAddress,
+            'employer_line' => '1. ' . $employerLineName . ', ' . $employerLineAddress . ' (u daljem tekstu: Poslodavac), kojeg zastupa direktor ' . $directorName . ',',
+            'sign_city' => $signCity,
+            'director_name' => mb_strtoupper($directorName),
+            'weekly_hours' => $weeklyHours,
+            'probation_months' => (string) $probationMonths,
+            'probation_clause' => $probationClause,
+            'currency' => $currency,
         ];
 
         if (!empty($contract->custom_fields)) {

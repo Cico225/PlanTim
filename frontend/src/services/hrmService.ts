@@ -1,4 +1,5 @@
 import { apiService } from './api';
+import { readStoredToken } from './authSession';
 import type {
   HREmployee,
   HRDepartment,
@@ -10,8 +11,11 @@ import type {
   HROnboardingTemplateTask,
   HREmployeeDocument,
   HRDocumentType,
-  HRDecision,
-  HRDecisionType,
+  EmploymentDecision,
+  DecisionSettings,
+  DecisionTemplate,
+  LeaveRegisterRow,
+  LeavePlanItem,
   HREvaluation,
   HREvaluationTemplate,
   HROffboardingProcess,
@@ -235,6 +239,45 @@ export const replaceEmploymentContractTemplateFile = (
 
 export const downloadEmploymentContractTemplate = (id: number, filename?: string) =>
   apiService.download(`/hrm/contracts/templates/${id}/download`, filename || `sablon-${id}`);
+
+export const deleteEmploymentContractTemplate = (id: number) =>
+  apiService.delete<{ message: string }>(`/hrm/contracts/templates/${id}`);
+
+export type EmploymentContractTemplatePreview =
+  | { kind: 'pdf'; url: string }
+  | { kind: 'html'; title?: string; html?: string; message?: string | null }
+  | { kind: 'unavailable'; title?: string; message?: string };
+
+export async function fetchEmploymentContractTemplatePreview(
+  id: number
+): Promise<EmploymentContractTemplatePreview> {
+  const token = readStoredToken();
+  const response = await fetch(`/api/hrm/contracts/templates/${id}/preview`, {
+    headers: {
+      Accept: 'application/json, application/pdf',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    let message = 'Pregled šablona nije dostupan.';
+    try {
+      const data = await response.json();
+      message = data.message || message;
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('pdf')) {
+    const blob = await response.blob();
+    return { kind: 'pdf', url: URL.createObjectURL(blob) };
+  }
+
+  return response.json();
+}
 
 export const updateEmploymentContractTemplate = (
   id: number,
@@ -460,17 +503,66 @@ export const downloadEmployeeDocument = (employeeId: number, documentId: number,
 // ============================================
 // DECISIONS
 // ============================================
-export const getDecisions = (filters?: { employee_id?: number; status?: string }) =>
-  apiService.get<PaginatedResponse<HRDecision>>('/hrm/decisions', filters);
+export const getEmploymentDecisions = (filters?: {
+  search?: string;
+  kind?: string;
+  status?: string;
+  year?: number;
+  per_page?: number;
+}) => apiService.get<PaginatedResponse<EmploymentDecision>>('/hrm/decisions', filters);
 
-export const getDecisionTypes = () =>
-  apiService.get<HRDecisionType[]>('/hrm/decisions/types');
+export const getEmploymentDecisionSettings = () =>
+  apiService.get<DecisionSettings>('/hrm/decisions/settings');
 
-export const createDecision = (data: Partial<HRDecision>) =>
-  apiService.post<HRDecision>('/hrm/decisions', data);
+export const updateEmploymentDecisionSettings = (data: DecisionSettings) =>
+  apiService.put<DecisionSettings>('/hrm/decisions/settings', data);
 
-export const approveDecision = (id: number, approved: boolean, notes?: string) =>
-  apiService.put(`/hrm/decisions/${id}/approve`, { approved, notes });
+export const getDecisionTemplates = () =>
+  apiService.get<DecisionTemplate[]>('/hrm/decisions/templates');
+
+export const uploadDecisionTemplate = (formData: FormData) =>
+  apiService.upload<DecisionTemplate>('/hrm/decisions/templates', formData);
+
+export const deleteDecisionTemplate = (id: number) =>
+  apiService.delete<{ message: string }>(`/hrm/decisions/templates/${id}`);
+
+export const createEmploymentDecision = (data: Record<string, unknown>) =>
+  apiService.post<EmploymentDecision>('/hrm/decisions', data);
+
+export const cancelEmploymentDecision = (id: number) =>
+  apiService.post<EmploymentDecision>(`/hrm/decisions/${id}/cancel`, {});
+
+export const generateEmploymentDecisionDocument = (id: number) =>
+  apiService.post<EmploymentDecision>(`/hrm/decisions/${id}/generate-document`);
+
+export const downloadEmploymentDecisionDocument = (id: number) =>
+  apiService.download(`/hrm/decisions/${id}/download-document`, `rjesenje-${id}`);
+
+export const getLeaveRegister = (year: number) =>
+  apiService.get<{ year: number; default_annual_leave_days: number; rows: LeaveRegisterRow[] }>(
+    '/hrm/decisions/leave-register',
+    { year }
+  );
+
+export const getLeavePlan = (year: number) =>
+  apiService.get<{ year: number; items: LeavePlanItem[] }>('/hrm/decisions/leave-plan', { year });
+
+export const createLeavePlanItem = (data: Record<string, unknown>) =>
+  apiService.post<LeavePlanItem>('/hrm/decisions/leave-plan', data);
+
+export const updateLeavePlanItem = (id: number, data: Record<string, unknown>) =>
+  apiService.put<LeavePlanItem>(`/hrm/decisions/leave-plan/${id}`, data);
+
+export const deleteLeavePlanItem = (id: number) =>
+  apiService.delete<{ message: string }>(`/hrm/decisions/leave-plan/${id}`);
+
+export const confirmLeavePlan = (data: { year: number; generate_document?: boolean }) =>
+  apiService.post<{ message: string; created: number }>('/hrm/decisions/leave-plan/confirm', data);
+
+export const updateLeaveEntitlement = (
+  employeeId: number,
+  data: { year: number; entitled_days: number; carried_over_days: number }
+) => apiService.put<{ message: string }>(`/hrm/decisions/leave-register/${employeeId}`, data);
 
 // ============================================
 // EVALUATIONS

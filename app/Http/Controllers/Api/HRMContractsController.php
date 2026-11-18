@@ -31,7 +31,17 @@ class HRMContractsController extends Controller
             $query->where('is_active', true);
         }
 
-        $templates = $query->get()->map(fn ($template) => $this->formatTemplate($template));
+        $counts = DB::table('hrm_employment_contracts')
+            ->select('template_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('template_id')
+            ->pluck('total', 'template_id');
+
+        $templates = $query->get()->map(function ($template) use ($counts) {
+            $row = $this->formatTemplate($template);
+            $row['contracts_count'] = (int) ($counts[$template->id] ?? 0);
+
+            return $row;
+        });
 
         return response()->json($templates);
     }
@@ -178,6 +188,134 @@ class HRMContractsController extends Controller
         return Storage::disk('local')->download($relative, basename($template->template_file));
     }
 
+    public function destroyTemplate($id)
+    {
+        $template = DB::table('hrm_contract_templates')->where('id', $id)->first();
+        if (!$template) {
+            return response()->json(['message' => 'Šablon nije pronađen.'], 404);
+        }
+
+        $used = DB::table('hrm_employment_contracts')->where('template_id', $id)->count();
+        if ($used > 0) {
+            return response()->json([
+                'message' => "Šablon se koristi u {$used} ugovora i ne može se obrisati. Deaktivirajte ga ako više ne treba da bude ponuđen.",
+            ], 409);
+        }
+
+        $this->deleteTemplateFileIfManaged($template->template_file);
+        DB::table('hrm_contract_templates')->where('id', $id)->delete();
+
+        return response()->json(['message' => 'Šablon je obrisan.']);
+    }
+
+    public function previewTemplate($id)
+    {
+        $template = DB::table('hrm_contract_templates')->where('id', $id)->first();
+        if (!$template) {
+            return response()->json(['message' => 'Šablon nije pronađen.'], 404);
+        }
+
+        $source = $this->resolvePreviewSource($template);
+        if ($source === null) {
+            return response()->json(['message' => 'Datoteka šablona ne postoji na serveru.'], 404);
+        }
+
+        [$kind, $absolute] = $source;
+
+        if ($kind === 'pdf') {
+            return response()->file($absolute, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . basename($absolute) . '"',
+            ]);
+        }
+
+        if ($kind === 'docx') {
+            $html = $this->docxToPreviewHtml($absolute);
+
+            return response()->json([
+                'kind' => 'html',
+                'title' => $template->name,
+                'html' => $html,
+                'message' => $html === '' ? 'Šablon nema čitljiv tekst za pregled.' : null,
+            ]);
+        }
+
+        return response()->json([
+            'kind' => 'unavailable',
+            'title' => $template->name,
+            'message' => 'Pregled stare .doc datoteke nije moguć u pregledniku. Preuzmite šablon ili zamijenite ga DOCX ili PDF verzijom.',
+        ]);
+    }
+
+    private function resolvePreviewSource(object $template): ?array
+    {
+        $file = ltrim((string) $template->template_file, '/\\');
+        if ($file === '') {
+            return null;
+        }
+
+        $base = storage_path('app/' . self::TEMPLATE_DISK_DIR);
+        $stored = $base . DIRECTORY_SEPARATOR . $file;
+        $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+
+        if ($extension === 'pdf' && is_file($stored)) {
+            return ['pdf', $stored];
+        }
+
+        if ($extension === 'docx' && is_file($stored) && filesize($stored) > 500) {
+            return ['docx', $stored];
+        }
+
+        $docxName = preg_replace('/\.docx?$/i', '.docx', $file) ?: ($file . '.docx');
+        $candidates = [
+            $base . DIRECTORY_SEPARATOR . 'prepared' . DIRECTORY_SEPARATOR . $docxName,
+            $base . DIRECTORY_SEPARATOR . $docxName,
+            $base . DIRECTORY_SEPARATOR . 'prepared' . DIRECTORY_SEPARATOR . $file,
+        ];
+
+        foreach ($candidates as $path) {
+            if (is_file($path) && filesize($path) > 500 && preg_match('/\.docx$/i', $path)) {
+                return ['docx', $path];
+            }
+        }
+
+        if ($extension === 'doc' && is_file($stored)) {
+            return ['doc', $stored];
+        }
+
+        return null;
+    }
+
+    private function docxToPreviewHtml(string $absolutePath): string
+    {
+        $zip = new \ZipArchive();
+        if ($zip->open($absolutePath) !== true) {
+            return '';
+        }
+
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        if (!is_string($xml) || $xml === '') {
+            return '';
+        }
+
+        $xml = preg_replace('/<w:tab\b[^>]*\/>/', ' ', $xml) ?? $xml;
+        $xml = preg_replace('/<w:br\b[^>]*\/>/', '<br>', $xml) ?? $xml;
+        $xml = preg_replace('/<\/w:p>/', "</p>\n", $xml) ?? $xml;
+        $xml = preg_replace('/<w:p\b[^>]*>/', '<p>', $xml) ?? $xml;
+        $text = strip_tags($xml, '<p><br>');
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[ \t]+/', ' ', $text) ?? $text;
+        $text = preg_replace('/<p>\s*(?:<br>\s*)*<\/p>/', '', $text) ?? $text;
+        $text = trim($text);
+
+        if (mb_strlen($text) > 120000) {
+            $text = mb_substr($text, 0, 120000) . '<p>…</p>';
+        }
+
+        return $text;
+    }
+
     public function updateTemplate(Request $request, $id)
     {
         $template = DB::table('hrm_contract_templates')->where('id', $id)->first();
@@ -278,16 +416,7 @@ class HRMContractsController extends Controller
 
     public function settings()
     {
-        $settings = DB::table('hrm_contract_settings')->first();
-
-        if (!$settings) {
-            return response()->json([
-                'default_renewal_notice_days' => 30,
-                'auto_create_renewal_draft' => true,
-            ]);
-        }
-
-        return response()->json($settings);
+        return response()->json($this->contractSettings());
     }
 
     public function updateSettings(Request $request)
@@ -295,7 +424,26 @@ class HRMContractsController extends Controller
         $data = $request->validate([
             'default_renewal_notice_days' => 'required|integer|min:1|max:365',
             'auto_create_renewal_draft' => 'required|boolean',
+            'default_employment_term' => 'required|in:indefinite,fixed',
+            'default_fixed_months' => 'required|integer|min:1|max:60',
+            'default_auto_renew' => 'required|boolean',
+            'default_currency' => 'required|string|max:10',
+            'generate_document_by_default' => 'required|boolean',
+            'contract_number_prefix' => 'nullable|string|max:40',
+            'contract_number_next' => 'required|integer|min:1|max:999999',
+            'employer_name' => 'nullable|string|max:255',
+            'employer_address' => 'nullable|string|max:255',
+            'sign_city' => 'nullable|string|max:80',
+            'director_name' => 'nullable|string|max:255',
+            'weekly_hours' => 'required|integer|min:1|max:60',
+            'probation_months' => 'required|integer|min:0|max:24',
         ]);
+
+        foreach (['contract_number_prefix', 'employer_name', 'employer_address', 'sign_city', 'director_name'] as $key) {
+            if (($data[$key] ?? null) === '') {
+                $data[$key] = null;
+            }
+        }
 
         $existing = DB::table('hrm_contract_settings')->first();
 
@@ -418,12 +566,22 @@ class HRMContractsController extends Controller
             return response()->json(['message' => 'Šablon ugovora nije pronađen.'], 404);
         }
 
-        $settings = DB::table('hrm_contract_settings')->first();
+        $settings = $this->contractSettings();
         $payload = $this->buildContractPayload($data, $employee, $template, $request->user()?->id, $settings);
+        if (empty($payload['contract_number'])) {
+            $assignedNumber = $this->assignContractNumber();
+            if ($assignedNumber) {
+                $payload['contract_number'] = $assignedNumber;
+            }
+        }
 
         $id = DB::table('hrm_employment_contracts')->insertGetId($payload);
 
-        if ($request->boolean('generate_document')) {
+        $generateDocument = $request->has('generate_document')
+            ? $request->boolean('generate_document')
+            : (bool) $settings['generate_document_by_default'];
+
+        if ($generateDocument) {
             $this->generateDocumentInternal($id, $request->user()?->id);
         }
 
@@ -618,12 +776,13 @@ class HRMContractsController extends Controller
         }
 
         $template = DB::table('hrm_contract_templates')->where('id', $source->template_id)->first();
+        $settings = $this->contractSettings();
         $nextAnnex = ((int) ($source->annex_number ?? 0)) + 1;
 
         $newContract = (array) $source;
         unset($newContract['id'], $newContract['generated_document_path'], $newContract['created_at'], $newContract['updated_at']);
         $newContract['parent_contract_id'] = $source->id;
-        $newContract['status'] = 'draft';
+        $newContract['status'] = $settings['auto_create_renewal_draft'] ? 'draft' : 'active';
         $newContract['contract_sign_date'] = $request->input('contract_sign_date', now()->toDateString());
         $newContract['effective_date'] = $request->input('effective_date', $request->input('renewal_end_date'));
         $newContract['work_end_date'] = $request->input('renewal_end_date');
@@ -661,7 +820,11 @@ class HRMContractsController extends Controller
             'updated_at' => now(),
         ]);
 
-        if ($request->boolean('generate_document', true)) {
+        $generateDocument = $request->has('generate_document')
+            ? $request->boolean('generate_document')
+            : (bool) $settings['generate_document_by_default'];
+
+        if ($generateDocument) {
             $this->generateDocumentInternal($newId, $request->user()?->id);
         }
 
@@ -757,11 +920,104 @@ class HRMContractsController extends Controller
         return $request->validate($rules);
     }
 
-    private function buildContractPayload(array $data, object $employee, object $template, ?int $userId, ?object $settings): array
+    /**
+     * @return array<string, mixed>
+     */
+    private function defaultContractSettings(): array
+    {
+        return [
+            'default_renewal_notice_days' => 30,
+            'auto_create_renewal_draft' => true,
+            'default_employment_term' => 'indefinite',
+            'default_fixed_months' => 12,
+            'default_auto_renew' => true,
+            'default_currency' => 'KM',
+            'generate_document_by_default' => true,
+            'contract_number_prefix' => '',
+            'contract_number_next' => 1,
+            'employer_name' => '',
+            'employer_address' => '',
+            'sign_city' => '',
+            'director_name' => '',
+            'weekly_hours' => 40,
+            'probation_months' => 0,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contractSettings(): array
+    {
+        $defaults = $this->defaultContractSettings();
+        $row = DB::table('hrm_contract_settings')->first();
+        if (!$row) {
+            return $defaults;
+        }
+
+        $data = array_merge($defaults, array_intersect_key((array) $row, $defaults));
+
+        foreach (['auto_create_renewal_draft', 'default_auto_renew', 'generate_document_by_default'] as $flag) {
+            $data[$flag] = (bool) $data[$flag];
+        }
+        foreach (['default_renewal_notice_days', 'default_fixed_months', 'contract_number_next', 'weekly_hours', 'probation_months'] as $number) {
+            $data[$number] = (int) $data[$number];
+        }
+        foreach (['contract_number_prefix', 'employer_name', 'employer_address', 'sign_city', 'director_name', 'default_currency'] as $text) {
+            $data[$text] = (string) ($data[$text] ?? '');
+        }
+        if (!in_array($data['default_employment_term'], ['indefinite', 'fixed'], true)) {
+            $data['default_employment_term'] = 'indefinite';
+        }
+
+        return $data;
+    }
+
+    private function assignContractNumber(): ?string
+    {
+        return DB::transaction(function () {
+            $row = DB::table('hrm_contract_settings')->lockForUpdate()->first();
+            if (!$row) {
+                return null;
+            }
+
+            $prefix = trim((string) ($row->contract_number_prefix ?? ''));
+            if ($prefix === '') {
+                return null;
+            }
+
+            $next = max(1, (int) ($row->contract_number_next ?? 1));
+            DB::table('hrm_contract_settings')->where('id', $row->id)->update([
+                'contract_number_next' => $next + 1,
+                'updated_at' => now(),
+            ]);
+
+            return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+        });
+    }
+
+    private function buildContractPayload(array $data, object $employee, object $template, ?int $userId, array $settings): array
     {
         $store = !empty($data['store_id'])
             ? DB::table('hrm_stores')->where('id', $data['store_id'])->first()
             : null;
+
+        $term = $data['employment_term'] ?? ($settings['default_employment_term'] ?? 'indefinite');
+        $start = $data['work_start_date'] ?? now()->toDateString();
+        $expiry = $data['expiry_date'] ?? $data['work_end_date'] ?? null;
+        $end = $data['work_end_date'] ?? null;
+
+        if ($term === 'fixed' && !$expiry) {
+            $months = max(1, (int) ($settings['default_fixed_months'] ?? 12));
+            $computed = \Carbon\Carbon::parse($start)->addMonthsNoOverflow($months)->toDateString();
+            $expiry = $computed;
+            $end = $end ?: $computed;
+        }
+
+        if ($term === 'indefinite' && empty($data['expiry_date']) && empty($data['work_end_date'])) {
+            $expiry = null;
+            $end = null;
+        }
 
         return [
             'employee_id' => $data['employee_id'],
@@ -775,17 +1031,19 @@ class HRMContractsController extends Controller
             'document_kind' => $template->document_kind,
             'annex_number' => $template->document_kind === 'annex' ? 1 : null,
             'status' => $data['status'] ?? 'draft',
-            'employment_term' => $data['employment_term'] ?? 'indefinite',
+            'employment_term' => $term,
             'contract_sign_date' => $data['contract_sign_date'] ?? now()->toDateString(),
-            'work_start_date' => $data['work_start_date'] ?? now()->toDateString(),
-            'work_end_date' => $data['work_end_date'] ?? null,
-            'effective_date' => $data['effective_date'] ?? ($data['work_start_date'] ?? now()->toDateString()),
-            'expiry_date' => $data['expiry_date'] ?? $data['work_end_date'] ?? null,
-            'auto_renew' => array_key_exists('auto_renew', $data) ? (bool) $data['auto_renew'] : true,
-            'renewal_notice_days' => $data['renewal_notice_days'] ?? ($settings->default_renewal_notice_days ?? 30),
+            'work_start_date' => $start,
+            'work_end_date' => $end,
+            'effective_date' => $data['effective_date'] ?? $start,
+            'expiry_date' => $expiry,
+            'auto_renew' => array_key_exists('auto_renew', $data)
+                ? (bool) $data['auto_renew']
+                : (bool) ($settings['default_auto_renew'] ?? true),
+            'renewal_notice_days' => $data['renewal_notice_days'] ?? ($settings['default_renewal_notice_days'] ?? 30),
             'salary_gross' => $data['salary_gross'] ?? $employee->salary ?? null,
             'salary_net' => $data['salary_net'] ?? null,
-            'currency' => $data['currency'] ?? 'KM',
+            'currency' => $data['currency'] ?? ($settings['default_currency'] ?: 'KM'),
             'position_title' => $data['position_title'] ?? $employee->position ?? null,
             'store_name' => $data['store_name'] ?? ($store->name ?? $employee->store ?? null),
             'store_city' => $data['store_city'] ?? ($store->city ?? null),

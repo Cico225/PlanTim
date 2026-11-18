@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '@/services/api';
+import { readStoredToken } from '@/services/authSession';
 
 export function useInboxCount() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -17,11 +18,14 @@ export function useInboxCount() {
   }, []);
 
   useEffect(() => {
+    if (!readStoredToken()) {
+      setLoading(false);
+      return;
+    }
+
     loadUnreadCount();
-    
-    // Poll for updates every 30 seconds
+
     const interval = setInterval(loadUnreadCount, 30000);
-    
     return () => clearInterval(interval);
   }, [loadUnreadCount]);
 

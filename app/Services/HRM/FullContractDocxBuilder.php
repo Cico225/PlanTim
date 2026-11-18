@@ -50,31 +50,31 @@ class FullContractDocxBuilder
     public function fbihParagraphs(): array
     {
         return [
-            ['text' => 'Na osnovu člana Zakona o radu ("Službene novine F BiH", broj 26/16), odredaba Općeg kolektivnog ugovora za teritoriju Federacije Bosne i Hercegovine ("Službene novine FBiH", broj 48/16), i Pravilnika o radu Društva, dana ${contract_sign_date} u Sarajevu, zaključuje se:', 'align' => 'both'],
+            ['text' => 'Na osnovu člana Zakona o radu ("Službene novine F BiH", broj 26/16), odredaba Općeg kolektivnog ugovora za teritoriju Federacije Bosne i Hercegovine ("Službene novine FBiH", broj 48/16), i Pravilnika o radu Društva, dana ${contract_sign_date} u ${sign_city}, zaključuje se:', 'align' => 'both'],
             ['text' => '', 'spaceAfter' => 0],
             ['text' => 'U G O V O R   O   R A D U', 'align' => 'center', 'bold' => true, 'spaceAfter' => 120],
-            ['text' => 'Kojim se uređuju prava i obaveze na rad i po osnovu rada, zaključen u Sarajevu, dana ${contract_sign_date}', 'align' => 'center'],
+            ['text' => 'Kojim se uređuju prava i obaveze na rad i po osnovu rada, zaključen u ${sign_city}, dana ${contract_sign_date}', 'align' => 'center'],
             ['text' => 'između,', 'align' => 'both'],
-            ['text' => '1. „PLANIKA FLEX“ d.o.o. Sarajevo, ul. Hajrudina Šabanije br. 39 (u daljem tekstu: Poslodavac), kojeg zastupa direktor Elvir Hurić,', 'align' => 'both'],
+            ['text' => '${employer_line}', 'align' => 'both'],
             ['text' => 'i', 'align' => 'both'],
             ['text' => '2. ${employee_details_line} (u daljem tekstu: Radnik).', 'align' => 'both'],
             ['text' => ''],
             ['text' => 'Član 1.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Ovim ugovorom Poslodavac i Radnik uređuju međusobna prava i obaveze iz radnog odnosa, u skladu sa Zakonom o radu, Pravilnikom o radu, Kolektivnim ugovorom i drugim općim i pojedinačnim aktima poslodavca.', 'align' => 'both'],
             ['text' => 'Član 2.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
-            ['text' => 'Ugovor se zaključuje ${employment_term_text}. Početak rada po ovom ugovoru je ${work_start_date}${work_end_clause}.', 'align' => 'both'],
+            ['text' => 'Ugovor se zaključuje ${employment_term_text}. Početak rada po ovom ugovoru je ${work_start_date}${work_end_clause}.${probation_clause}', 'align' => 'both'],
             ['text' => 'Član 3.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Radnik se raspoređuje na radno mjesto ${position_title}, u prodavnici ${store_name} u ${store_city}. Ugovorne strane izričito ugovaraju da se zbog potreba posla mjestom rada mogu smatrati i druge poslovne jedinice Poslodavca u BiH, a ukoliko se ukaže potreba za promjenom radnog mjesta, nije potrebno zaključivati aneks ugovora o radu.', 'align' => 'both'],
             ['text' => 'Član 4.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Radnik se obavezuje da će poslove iz člana 3. ovog ugovora obavljati stručno, kvalitetno i blagovremeno, na način i pod uslovima utvrđenim u Pravilniku o radu, a naročito u skladu sa opisom radnog mjesta ${position_title}. Obavlja i druge poslove po nalogu neposrednog rukovodioca i direktora društva, a za svoj rad odgovara neposrednom rukovodiocu i direktoru društva.', 'align' => 'both'],
             ['text' => 'Član 5.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
-            ['text' => 'Za obavljanje poslova iz člana 3. ovog ugovora Radniku se određuje plata prije oporezivanja u iznosu ${salary_gross} KM. Osnovna plaća radnika se uvećava za zakonom propisane dodatke na plaću a prema Pravilniku o radu. Plata iz stava 1. ovog člana se može uvećati ili umanjiti za 30% u zavisnosti od rezultata rada, a ne može biti manja od minimalne zakonom predviđene plaće. Plata će se isplaćivati najkasnije do kraja tekućeg mjeseca za prethodni mjesec.', 'align' => 'both'],
+            ['text' => 'Za obavljanje poslova iz člana 3. ovog ugovora Radniku se određuje plata prije oporezivanja u iznosu ${salary_gross} ${currency}. Osnovna plaća radnika se uvećava za zakonom propisane dodatke na plaću a prema Pravilniku o radu. Plata iz stava 1. ovog člana se može uvećati ili umanjiti za 30% u zavisnosti od rezultata rada, a ne može biti manja od minimalne zakonom predviđene plaće. Plata će se isplaćivati najkasnije do kraja tekućeg mjeseca za prethodni mjesec.', 'align' => 'both'],
             ['text' => 'Član 6.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Radnik ima pravo na naknadu plaće za vrijeme korištenja godišnjeg odmora i privremene nesposobnosti za rad („bolovanje“). Radniku će se isplatiti naknada za ishranu u toku rada („topli obrok“) u skladu sa Zakonom, Kolektivnim ugovorom i općim aktom Poslodavca.', 'align' => 'both'],
             ['text' => 'Član 7.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Poslodavac se obavezuje da plaću i naknade iz člana 5. i 6. ovog ugovora isplaćuje mjesečno, prema njegovoj likvidnosti, a najkasnije do kraja narednog mjeseca. Prilikom isplate plaće Poslodavac se obavezuje Radniku uručiti pisani obračun plaće. Pojedinačno obračunata i isplaćena plaća predstavlja poslovnu tajnu Poslodavca.', 'align' => 'both'],
             ['text' => 'Član 8.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
-            ['text' => 'Radno vrijeme radnika iznosi 40 sati sedmično i raspoređuje se u šestodnevnoj radnoj sedmici, sa rasporedom rada u smjenama, koje su organizovane prema Pravilniku o radu.', 'align' => 'both'],
+            ['text' => 'Radno vrijeme radnika iznosi ${weekly_hours} sati sedmično i raspoređuje se u šestodnevnoj radnoj sedmici, sa rasporedom rada u smjenama, koje su organizovane prema Pravilniku o radu.', 'align' => 'both'],
             ['text' => 'Član 9.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Radnik ima pravo na dnevni i sedmični odmor u skladu sa Zakonom, Kolektivnim ugovorom i općim aktom Poslodavca. Radnik koji radi sa punim radnim vremenom ima pravo na odmor u toku radnog dana u trajanju od 30 minuta. Ovo vrijeme se ne uračunava u radno vrijeme.', 'align' => 'both'],
             ['text' => 'Član 10.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
@@ -86,7 +86,7 @@ class FullContractDocxBuilder
             ['text' => 'Član 13.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Svi drugi uslovi i odnosi koji nisu uređeni ovim ugovorom ostvaruju se u skladu sa Zakonom o radu, Pravilnikom o radu, Kolektivnim ugovorom i drugim općim i pojedinačnim aktima poslodavca.', 'align' => 'both'],
             ['text' => 'Član 14.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
-            ['text' => 'Sve eventualne sporove iz ovog ugovora ugovorne strane će rješavati sporazumno, a ukoliko to nije moguće, spor će se rješavati pred nadležnim sudom u Sarajevu.', 'align' => 'both'],
+            ['text' => 'Sve eventualne sporove iz ovog ugovora ugovorne strane će rješavati sporazumno, a ukoliko to nije moguće, spor će se rješavati pred nadležnim sudom u ${sign_city}.', 'align' => 'both'],
             ['text' => 'Član 15.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
             ['text' => 'Ovaj ugovor se smatra zaključenim kada ga potpišu obje ugovorne strane, a primjenjuje se od ${effective_date}. Potpisom ovog ugovora prestaje da važi prethodno potpisani ugovor kao i sve njegove odredbe.', 'align' => 'both'],
             ['text' => 'Član 16.', 'align' => 'center', 'bold' => true, 'spaceAfter' => 60],
@@ -98,7 +98,7 @@ class FullContractDocxBuilder
             ['text' => ''],
             ['text' => '  ____________________                                                         __________________', 'align' => 'both'],
             ['text' => '        ${employee_signature_name}                                                                     DIREKTOR', 'align' => 'both'],
-            ['text' => '                                                                                                    HURIĆ ELVIR', 'align' => 'both'],
+            ['text' => '                                                                                                    ${director_name}', 'align' => 'both'],
         ];
     }
 
@@ -114,7 +114,7 @@ class FullContractDocxBuilder
         ];
         // Replace FBiH-specific court reference in član 14
         foreach ($paragraphs as $i => $p) {
-            if (($p['text'] ?? '') === 'Sve eventualne sporove iz ovog ugovora ugovorne strane će rješavati sporazumno, a ukoliko to nije moguće, spor će se rješavati pred nadležnim sudom u Sarajevu.') {
+            if (($p['text'] ?? '') === 'Sve eventualne sporove iz ovog ugovora ugovorne strane će rješavati sporazumno, a ukoliko to nije moguće, spor će se rješavati pred nadležnim sudom u ${sign_city}.') {
                 $paragraphs[$i]['text'] = 'Sve eventualne sporove iz ovog ugovora ugovorne strane će rješavati sporazumno, a ukoliko to nije moguće, spor će se rješavati pred nadležnim sudom.';
             }
             if (str_starts_with($p['text'] ?? '', 'Pravo na odmore, odsustva')) {
